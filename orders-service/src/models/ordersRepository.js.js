@@ -1,17 +1,43 @@
-const pool = require('../config/db');
+const pool = require("../config/db");
 
 const OrdersRepository = {
   getAllOrders: async () => {
-    const [orders] = await pool.query('SELECT * FROM Orders');
+    const [orders] = await pool.query("SELECT * FROM Orders");
     return orders;
+  },
+  getOrdersAudit: async () => {
+    const [orders] = await pool.query(
+      "SELECT * FROM Orders WHERE orderstatusid = 6"
+    );
+    return orders;
+  },
+  getOrdersByIDs: async (idsArray) => {
+    if (idsArray.length === 0) return [];
+
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        orderID, 
+        folionum, 
+        cardname
+      FROM orders
+      WHERE orderID IN (?)
+      `,
+      [idsArray]
+    );
+
+    return rows;
   },
 
   getOrderById: async (orderID) => {
-    const [order] = await pool.query('SELECT * FROM Orders WHERE orderID = ?', [orderID]);
+    const [order] = await pool.query("SELECT * FROM Orders WHERE orderID = ?", [
+      orderID,
+    ]);
     return order.length ? order[0] : null;
   },
   getHistory: async (orderID) => {
-    const [order] = await pool.query(`
+    const [order] = await pool.query(
+      `
       SELECT 
         h.historyID,
         h.orderID,
@@ -28,26 +54,29 @@ const OrdersRepository = {
           ON h.previousStatusID = os2.orderstatusid
     WHERE h.orderID = ?;
 
-      `, [orderID]);
+      `,
+      [orderID]
+    );
     return order;
   },
 
   updateOrderStatus: async (orderID, orderStatusID) => {
     const [result] = await pool.query(
-      'UPDATE Orders SET orderStatusID = ? WHERE orderID = ?',
+      "UPDATE Orders SET orderStatusID = ? WHERE orderID = ?",
       [orderStatusID, orderID]
     );
     return result.affectedRows > 0;
   },
 
   createOrder: async (orderData) => {
-    const [result] = await pool.query('INSERT INTO Orders SET ?', orderData);
+    const [result] = await pool.query("INSERT INTO Orders SET ?", orderData);
     return result.insertId;
   },
 
   // Verificar si una orden está completa
   isOrderComplete: async (orderID) => {
-    const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
       SELECT COUNT(*) as pending 
       FROM Order_Product
       WHERE orderID = ?
@@ -56,13 +85,16 @@ const OrdersRepository = {
           FROM Picking_Status 
           WHERE statusName = 'Completado'
         )
-    `, [orderID]);
+    `,
+      [orderID]
+    );
     return rows[0].pending === 0;
   },
 
   // Actualizar productos recogidos en la orden
   updateOrderProduct: async (orderProductID, pickedQuantity) => {
-    const [result] = await pool.query(`
+    const [result] = await pool.query(
+      `
       UPDATE Order_Product 
       SET pickedQuantity = pickedQuantity + ?, 
           pickingStatusID = CASE 
@@ -71,11 +103,12 @@ const OrdersRepository = {
             ELSE pickingStatusID 
           END
       WHERE orderProductID = ?
-    `, [pickedQuantity, pickedQuantity, orderProductID]);
+    `,
+      [pickedQuantity, pickedQuantity, orderProductID]
+    );
 
     return result.affectedRows > 0;
   },
-
 
   getMaxCreatets: async () => {
     const [rows] = await pool.query(`
@@ -83,9 +116,8 @@ const OrdersRepository = {
     `);
     console.log("🔎 Query ejecutada: ", rows);
     // Devuelve "000000" si no hay registros
-    return rows[0]?.createts || "000000"; 
+    return rows[0]?.createts || "000000";
   },
-
 
   getLastQueryDate: async () => {
     const [rows] = await pool.query(`
@@ -93,9 +125,8 @@ const OrdersRepository = {
     `);
     console.log("🔎 Query ejecutada: ", rows);
     // Devuelve "000000" si no hay registros
-    return rows[0]?.lastquerydate 
-  }
-
+    return rows[0]?.lastquerydate;
+  },
 };
 
 module.exports = OrdersRepository;

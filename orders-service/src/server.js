@@ -17,7 +17,7 @@ app.use('/api/orders', orderRoutes);
 // Middleware de manejo de errores
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
   console.log(`🚀 Orders Service running on port ${PORT}`);
   // Iniciar consumidor de Kafka

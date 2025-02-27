@@ -1,0 +1,24 @@
+version: '3.8'
+
+networks:
+  orders-service_kafka_network:
+    external: true  # 📌 Usa la misma red de `orders-service`
+
+services:
+  picking-service:
+    build: .
+    container_name: picking-service
+    restart: always
+    ports:
+      - "5001:5001"
+    environment:
+      PORT: 5001
+      DB_HOST: host.docker.internal
+      DB_USER: root
+      DB_PASSWORD: admin123
+      DB_NAME: picking_service_db
+      DB_PORT: 3306
+      KAFKA_BROKER: kafka:9092
+      KAFKA_CLIENT_ID: picking-service
+    networks:
+      - orders-service_kafka_network

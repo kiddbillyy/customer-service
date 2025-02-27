@@ -1,14 +1,39 @@
-###
-pendiente de picking
-en picking
-picking completo
-pickimg completado
+
+1.- Pedido recibido / Pendiente de picking
+2.- Asignando pickers
+3.- En picking
+4.- Picking Incompleto 
+5.- Picking Exitoso
+6.- Picking Finalizado con faltante
+6.- Picking Finalizado
+7.- Pendiente de auditar
+8.- En auditoria
+9.- Auditoria con error
+10.- Auditoria exitosa
+
+
+1️⃣ Pedido recibido
+2️⃣ Asignando pickers
+3️⃣ En picking
+4️⃣ Picking incompleto / Picking con faltantes
+5️⃣ Picking Finalizado
+6️⃣ Listo para auditoría
+7️⃣ En auditoría
+8️⃣ Auditoría aprobada
+9️⃣ Corrección requerida en auditoría
+
 
 ###
-pendiente de auditar
-en auditoria
-auditoria exitosa
-auditoria con error
+pendiente de picking ❌
+en picking ❌
+picking completo ❌
+pickimg completado❌
+
+###
+pendiente de auditar❌
+en auditoria❌
+auditoria exitosa❌
+auditoria con error❌
 
 ###
 
