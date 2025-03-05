@@ -59,24 +59,6 @@ exports.updateOrderStatus = async (req, res) => {
   }
 };
 
-exports.updateOrderProduct = async (req, res) => {
-  try {
-    const { pickedQuantity } = req.body;
-    const updated = await OrdersService.updateOrderProduct(
-      req.params.orderProductID,
-      pickedQuantity
-    );
-    if (!updated)
-      return res
-        .status(404)
-        .json({ message: "Producto no encontrado o ya completado" });
-
-    res.json({ message: "Producto actualizado correctamente" });
-  } catch (error) {
-    console.error("Error actualizando producto:", error);
-    res.status(500).json({ message: "Error interno del servidor" });
-  }
-};
 
 exports.getMaxCreatets = async (req, res) => {
   try {

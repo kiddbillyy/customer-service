@@ -1,5 +1,5 @@
 
-1.- Pedido recibido / Pendiente de picking
+1.- Pedido recibido
 2.- Asignando pickers
 3.- En picking
 4.- Picking Incompleto 

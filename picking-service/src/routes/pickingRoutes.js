@@ -8,6 +8,7 @@ const {
   getProductsAssignedToPicker,
   getProductsAssignedFromOrder,
   getStatuses,
+  reassignPicker 
 } = require("../controllers/pickingController");
 
 const {
@@ -15,6 +16,7 @@ const {
   updatePickedProductValidator,
   completePickingValidator,
   getProductsFromOrderValidator,
+  reassignPickerValidator 
 } = require("../middleware/pickingValidator");
 
 const validateRequest = require("../middleware/validateRequest");
@@ -46,6 +48,14 @@ router.put(
   completePickingValidator,
   validateRequest,
   completePicking
+);
+
+// Endpoint para reasignar picking de un producto
+router.put(
+  "/reassign/:orderProductID",
+  reassignPickerValidator,
+  validateRequest,
+  reassignPicker
 );
 
 // Obtener productos de una orden

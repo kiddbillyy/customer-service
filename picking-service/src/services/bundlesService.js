@@ -4,9 +4,9 @@ const axios = require('axios');
 
 
 const BundlesService = {
-  createBundle: async (orderID, pickerRUT, packageType, products) => {
+  createBundle: async (orderID, pickerRUT, packageTypeID, products) => {
     // 1. Crear el bulto en la DB (inserta barcode + refid)
-    const bundleID = await BundlesRepository.createBundle(orderID, pickerRUT, packageType, products);
+    const bundleID = await BundlesRepository.createBundle(orderID, pickerRUT, packageTypeID, products);
     if (!bundleID) return null;
 
     // 2. Determinar si es bulto suelto o múltiple
@@ -17,7 +17,7 @@ const BundlesService = {
       orderID,
       pickerRUT,
       bundleID,
-      packageType,
+      packageTypeID,
       isLoose
     });
 
@@ -49,7 +49,7 @@ const BundlesService = {
         if (bundle.Controlador) {
           try {
             // Llamada al endpoint para obtener la información del usuario
-            const { data: user } = await axios.get(`http://192.168.0.211:5002/api/users/${bundle.Controlador}`);
+            const { data: user } = await axios.get(`http://192.168.0.161:5002/api/users/${bundle.Controlador}`);
             // Supongamos que el endpoint devuelve la propiedad "name" (ajusta según tu respuesta real)
             bundle.ControladorName = user.name || null;
             bundle.ControladorEmail = user.email || null;
@@ -69,6 +69,20 @@ const BundlesService = {
     
     return bundlesWithUserData;
   },
+  updateDimensions: async (bundleID, { height, width, length, weight, cubage, location }) => {
+    // 2. Delegar al repositorio la actualización
+    const result = await BundlesRepository.updateDimensions(bundleID, {
+      height,
+      width,
+      length,
+      weight,
+      cubage,
+      location
+    });
+  
+    return result;
+  },
+  
 };
 
 module.exports = BundlesService;

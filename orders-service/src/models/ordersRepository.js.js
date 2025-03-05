@@ -91,24 +91,6 @@ const OrdersRepository = {
     return rows[0].pending === 0;
   },
 
-  // Actualizar productos recogidos en la orden
-  updateOrderProduct: async (orderProductID, pickedQuantity) => {
-    const [result] = await pool.query(
-      `
-      UPDATE Order_Product 
-      SET pickedQuantity = pickedQuantity + ?, 
-          pickingStatusID = CASE 
-            WHEN pickedQuantity + ? >= quantity 
-            THEN (SELECT pickingStatusID FROM Picking_Status WHERE statusName = 'Completado')
-            ELSE pickingStatusID 
-          END
-      WHERE orderProductID = ?
-    `,
-      [pickedQuantity, pickedQuantity, orderProductID]
-    );
-
-    return result.affectedRows > 0;
-  },
 
   getMaxCreatets: async () => {
     const [rows] = await pool.query(`

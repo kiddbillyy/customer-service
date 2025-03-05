@@ -1,9 +1,10 @@
+// src/config/kafka.js
 const { Kafka } = require('kafkajs');
-require('dotenv').config();
+const { kafka } = require('./index');
 
-const kafka = new Kafka({
-  clientId: process.env.KAFKA_CLIENT_ID || 'sap-integration-service',
-  brokers: [process.env.KAFKA_BROKER]
+const kafkaClient = new Kafka({
+  clientId: kafka.clientId,
+  brokers: kafka.brokers
 });
 
-module.exports = kafka;
+module.exports = kafkaClient;

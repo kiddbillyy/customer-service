@@ -3,7 +3,7 @@ const { sendMessage } = require("../producer");
 const axios = require("axios");
 
 // Ajusta la URL según tu configuración real (IP, puertos, etc.).
-const PICKING_SERVICE_URL = "http://192.168.0.211:5001/api/picking";
+const PICKING_SERVICE_URL = "http://192.168.0.161:5001/api/picking";
 
 const OrdersService = {
   getAllOrders: async () => {
@@ -116,10 +116,6 @@ const OrdersService = {
     return updated;
   },
 
-  // Puedes exponerlo si se usa en otros lados
-  updateOrderProduct: async (orderProductID, pickedQuantity) => {
-    return OrdersRepository.updateOrderProduct(orderProductID, pickedQuantity);
-  },
   getMaxCreatets: async () => {
     const maxCreatets = await OrdersRepository.getMaxCreatets();
     console.log(`✅ maxCreatets obtenido en Service: ${maxCreatets}`);

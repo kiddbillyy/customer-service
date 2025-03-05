@@ -1,3 +1,4 @@
+// src/controllers/schedulerController.js
 const { processNewOrders, createNewOrder } = require('../services/sapSchedulerService');
 
 exports.runScheduler = async (req, res) => {
@@ -10,15 +11,12 @@ exports.runScheduler = async (req, res) => {
   }
 };
 
-
 exports.createNewOrder = async (req, res) => {
   try {
-    // Se espera que el folionum venga en los parámetros de la ruta
     const { folionum } = req.params;
     if (!folionum) {
       return res.status(400).json({ message: 'El parámetro folionum es requerido' });
     }
-
     await createNewOrder(folionum);
     res.json({ message: 'Orden procesada correctamente. Revisa logs para más detalles.' });
   } catch (error) {

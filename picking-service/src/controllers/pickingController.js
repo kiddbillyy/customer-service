@@ -32,15 +32,17 @@ exports.assignPickers = async (req, res) => {
 
 exports.updatePickedProduct = async (req, res) => {
   try {
-    const { pickedQuantity } = req.body;
+    const { pickedQuantity, itemcode, pickerRUT } = req.body;
     const updated = await PickingService.updatePickedProduct(
       req.params.orderProductID,
-      pickedQuantity
+      pickedQuantity,
+      itemcode,
+      pickerRUT  // Se pasa el pickerRUT al service
     );
     if (!updated) {
-      return res
-        .status(404)
-        .json({ message: "Producto no encontrado o ya completado" });
+      return res.status(404).json({
+        message: "Producto no encontrado, itemcode no coincide o ya completado"
+      });
     }
     res.json({ message: "Producto actualizado correctamente" });
   } catch (error) {
@@ -48,6 +50,10 @@ exports.updatePickedProduct = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
+
+
+
+
 
 exports.completePicking = async (req, res) => {
   try {
@@ -122,6 +128,21 @@ exports.getProductsAssignedFromOrder = async (req, res) => {
       "❌ Error obteniendo productos asignados para el pedido:",
       error
     );
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+exports.reassignPicker = async (req, res) => {
+  try {
+    const { orderProductID } = req.params;
+    const { newPicker, quantity, reason } = req.body;
+    const result = await PickingService.reassignPicker(orderProductID, newPicker, quantity, reason);
+    if (!result) {
+      return res.status(400).json({ message: "No se pudo reasignar el picker. Verifica la cantidad a reasignar y que el producto exista." });
+    }
+    res.json({ message: "Picker reasignado correctamente", details: result });
+  } catch (error) {
+    console.error("❌ Error reasignando picker:", error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };

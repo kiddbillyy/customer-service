@@ -1,25 +1,20 @@
-
+// src/server.js
 const express = require('express');
-const dotenv = require('dotenv');
 const cors = require('cors');
+const { port } = require('./config');
 const { startScheduler } = require('./services/sapSchedulerService');
 const schedulerRoutes = require('./routes/schedulerRoutes');
-dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Rutas opcionales
+// Rutas de la API
 app.use('/api/scheduler', schedulerRoutes);
 
-
-
-
-// Iniciamos el cron que corre cada 10 min
+// Iniciar el cron job (cada 10 minutos)
 startScheduler();
 
-const PORT = process.env.PORT || 5005;
-app.listen(PORT, () => {
-  console.log(`🚀 SAP Scheduler Service corriendo en el puerto ${PORT}`);
+app.listen(port, () => {
+  console.log(`🚀 SAP Scheduler Service corriendo en el puerto ${port}`);
 });

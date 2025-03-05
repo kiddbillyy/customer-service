@@ -38,22 +38,22 @@ const BundlesRepository = {
    * Crea un nuevo bulto e inserta los productos asociados.
    * Genera automáticamente un barcode y un refid únicos.
    */
-  createBundle: async (orderID, pickerRUT, packageType, products) => {
+  createBundle: async (orderID, pickerRUT, packageTypeID, products) => {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
-
+  
       // Generar barcode y refid con factor único
       const { barcode, refid } = generateCodesForBundle(orderID);
-
-      // 1. Insertar bulto en la tabla Bundles
+  
+      // 1. Insertar bulto en la tabla Bundles usando packageTypeID en lugar de packageType
       const [bundleResult] = await conn.query(
-        `INSERT INTO Bundles (orderID, pickerRUT, packageType, barcode, refid)
-         VALUES (?, ?, ?, ?, ?)`,
-        [orderID, pickerRUT, packageType, barcode, refid]
+        `INSERT INTO Bundles (orderID, pickerRUT, packageTypeID, barcode, refid)
+           VALUES (?, ?, ?, ?, ?)`,
+        [orderID, pickerRUT, packageTypeID, barcode, refid]
       );
       const bundleID = bundleResult.insertId;
-
+  
       // 2. Insertar los productos en "Bundle_Products" y actualizar "order_product_picker"
       for (const { orderProductID, quantity } of products) {
         // Insertar en Bundle_Products
@@ -61,16 +61,16 @@ const BundlesRepository = {
           `INSERT INTO Bundle_Products (bundleID, orderProductID, quantity) VALUES (?, ?, ?)`,
           [bundleID, orderProductID, quantity]
         );
-
+  
         // Asociar el producto al bulto en order_product_picker
         await conn.query(
           `UPDATE order_product_picker
-           SET bundleID = ?
-           WHERE orderProductID = ?`,
+             SET bundleID = ?
+             WHERE orderProductID = ?`,
           [bundleID, orderProductID]
         );
       }
-
+  
       await conn.commit();
       return bundleID;
     } catch (error) {
@@ -81,7 +81,6 @@ const BundlesRepository = {
       conn.release();
     }
   },
-
   markProductAsLoose: async (orderProductID) => {
     const [result] = await pool.query(
       `UPDATE order_product_picker 
@@ -179,7 +178,25 @@ from bundles
       [orderID]
     );
     return products;
-  }
+  },
+  updateDimensions: async (bundleID, { height, width, length, weight, cubage, location }) => {
+    const [result] = await pool.query(
+      `
+      UPDATE bundles
+      SET 
+        height = ?,
+        width = ?,
+        length = ?,
+        weight = ?,
+        cubage = ?,
+        location = ?
+      WHERE bundleID = ?
+      `,
+      [height, width, length, weight, cubage, location, bundleID]
+    );
+    return result.affectedRows > 0;
+  },
+  
 };
 
 module.exports = BundlesRepository;

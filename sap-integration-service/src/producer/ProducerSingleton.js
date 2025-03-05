@@ -28,6 +28,7 @@ class ProducerSingleton {
       console.log(`📤 Mensaje enviado a Kafka [${topic}]:`, message);
     } catch (error) {
       console.error('❌ Error enviando mensaje a Kafka:', error);
+      // Se podría implementar un mecanismo de reintento aquí
     }
   }
 }

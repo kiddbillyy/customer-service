@@ -1,29 +1,30 @@
-// src/routes/bundlesRoutes.js
 const express = require('express');
 const {
   createBundle,  
   getBundlesByOrder, 
   getBundleDetails,
   getOrderProductsWithBundleID,
-  getAllBundles
+  getAllBundles,
+  updateBundleDimensions 
 } = require('../controllers/bundlesController');
 
 const {
   createBundleValidator,
   getBundleDetailsValidator,
   getBundlesByOrderValidator,
-  getOrderProductsWithBundleIDValidator
+  getOrderProductsWithBundleIDValidator,
+  updateBundleDimensionsValidator
 } = require('../middleware/bundlesValidator');
 
 const validateRequest = require('../middleware/validateRequest');
 
 const router = express.Router();
 
-// Crear un bulto
-router.post('/', createBundleValidator, validateRequest, createBundle);
-
 // Obtener todos los bultos
 router.get('/', getAllBundles);
+
+// Crear un bulto
+router.post('/create', createBundleValidator, validateRequest, createBundle);
 
 // Obtener bultos de una orden
 router.get('/:orderID', getBundlesByOrderValidator, validateRequest, getBundlesByOrder);
@@ -33,5 +34,8 @@ router.get('/bundle/:bundleID', getBundleDetailsValidator, validateRequest, getB
 
 // Obtener productos con bundleID
 router.get('/order-products/:orderID', getOrderProductsWithBundleIDValidator, validateRequest, getOrderProductsWithBundleID);
+
+// Actualizar dimensiones del bulto
+router.put('/dimensions/:bundleID', updateBundleDimensionsValidator, validateRequest, updateBundleDimensions);
 
 module.exports = router;
