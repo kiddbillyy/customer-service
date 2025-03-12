@@ -71,8 +71,36 @@ const PickingRepository = {
     return allAssigned ? 3 : 2;
   },
   
+  getProductsByOrder: async (orderID) => {
+    const [products] = await pool.query(
+      `SELECT orderProductID FROM Order_Product WHERE orderID = ?`,
+      [orderID]
+    );
+    return products; // Devuelve la lista de productos
+  },
   
-  
+  insertOrUpdateProduct: async ({ itemcode, dscription, price }) => {
+    await pool.query(`
+      INSERT INTO Products (itemcode, dscription, price)
+      VALUES (?, ?, ?)
+      ON DUPLICATE KEY UPDATE 
+      dscription = VALUES(dscription),
+      price = VALUES(price)
+    `, [itemcode, dscription, price]);
+
+    console.log(`✅ Producto ${itemcode} actualizado en la BD`);
+  },
+
+  insertOrUpdateOrderProduct: async (orderID, { itemcode, quantity }) => {
+    await pool.query(`
+      INSERT INTO Order_Product (orderID, itemcode, quantity, pickedQuantity, pickingStatusID)
+      VALUES (?, ?, ?, 0, 1)
+      ON DUPLICATE KEY UPDATE 
+      quantity = VALUES(quantity)
+    `, [orderID, itemcode, quantity]);
+
+    console.log(`✅ Producto ${itemcode} agregado a Order_Product en orden ${orderID}`);
+  },
   
 
   getProductsFromOrder: async (orderID) => {
@@ -119,7 +147,17 @@ const PickingRepository = {
     );
     return products.length ? products : null;
   },
-  
+  updateOrderProductPicker: async (bundleID, products) => {
+    for (const { orderProductID } of products) {
+      await pool.query(`
+        UPDATE order_product_picker
+        SET bundleID = ?
+        WHERE orderProductID = ?
+      `, [bundleID, orderProductID]);
+
+      console.log(`✅ order_product_picker actualizado: orderProductID=${orderProductID}, bundleID=${bundleID}`);
+    }
+  },
 
   getProductsAssignedFromOrder: async (pickerRUT) => {
     const [products] = await pool.query(
@@ -148,7 +186,6 @@ const PickingRepository = {
   },
 
   updatePickedProduct: async (orderProductID, quantityToAdd, itemcode, pickerRUT) => {
-    // Actualización en Order_Product (progreso global)
     const [resultOrderProduct] = await pool.query(
       `
       UPDATE Order_Product
@@ -167,7 +204,7 @@ const PickingRepository = {
       [quantityToAdd, quantityToAdd, quantityToAdd, orderProductID, itemcode]
     );
   
-    // Actualización en order_product_picker (solo para el picker indicado)
+    // Similar update en order_product_picker
     const [resultOrderProductPicker] = await pool.query(
       `
       UPDATE order_product_picker AS opp
@@ -187,7 +224,6 @@ const PickingRepository = {
       [quantityToAdd, quantityToAdd, quantityToAdd, orderProductID, pickerRUT]
     );
   
-    // Retorna true si al menos se actualizó Order_Product
     return resultOrderProduct.affectedRows > 0;
   },
   
@@ -316,5 +352,28 @@ const PickingRepository = {
     );
     return result.affectedRows > 0;
   },
+
+  findOrderProductsByIds: async (orderProductIDs) => {
+    if (!orderProductIDs || orderProductIDs.length === 0) return [];
+    
+    const placeholders = orderProductIDs.map(() => '?').join(',');
+    const sql = `
+      SELECT 
+        op.orderProductID,
+        op.itemcode,
+        p.dscription,
+        op.pickedQuantity AS found,
+        op.notFound AS not_found,
+        op.repickedQuantity AS repicked,
+        opp.pickerRUT
+      FROM Order_Product op
+      JOIN Products p ON p.itemcode = op.itemcode
+      LEFT JOIN order_product_picker opp ON opp.orderProductID = op.orderProductID
+      WHERE op.orderProductID IN (${placeholders})
+    `;
+    
+    const [rows] = await pool.query(sql, orderProductIDs);
+    return rows;
+  }
 };
 module.exports = PickingRepository;

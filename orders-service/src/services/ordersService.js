@@ -3,7 +3,7 @@ const { sendMessage } = require("../producer");
 const axios = require("axios");
 
 // Ajusta la URL según tu configuración real (IP, puertos, etc.).
-const PICKING_SERVICE_URL = "http://192.168.0.161:5001/api/picking";
+const PICKING_SERVICE_URL = "http://192.168.0.82:5001/api/picking";
 
 const OrdersService = {
   getAllOrders: async () => {
@@ -23,11 +23,11 @@ const OrdersService = {
     const { data: assignedProducts } = await axios.get(
       `${PICKING_SERVICE_URL}/assigned/${pickerRUT}`
     );
-
+  
     if (!assignedProducts || assignedProducts.length === 0) {
       return []; // No hay productos asignados
     }
-
+  
     // 2. Agrupar los productos asignados por orderID
     const orderGroups = {};
     assignedProducts.forEach((prod) => {
@@ -37,39 +37,43 @@ const OrdersService = {
       }
       orderGroups[id].push(prod);
     });
-
+  
     // 3. Extraer los orderID únicos
-    const uniqueOrderIDs = Object.keys(orderGroups).map((id) =>
-      parseInt(id, 10)
-    );
-
+    const uniqueOrderIDs = Object.keys(orderGroups).map((id) => parseInt(id, 10));
+  
     // 4. Consultar la base de datos de orders (local) para obtener los detalles de esos pedidos
     const orders = await OrdersRepository.getOrdersByIDs(uniqueOrderIDs);
-
+  
     // 5. Llamar al picking-service para obtener la lista de picking_status
-    const { data: statuses } = await axios.get(
-      `${PICKING_SERVICE_URL}/statuses`
-    );
+    const { data: statuses } = await axios.get(`${PICKING_SERVICE_URL}/statuses`);
     // Se espera que 'statuses' sea un array de objetos:
     // [ { pickingStatusID: 1, statusName: "No asignado" }, { pickingStatusID: 2, statusName: "Asignado" }, ... ]
     const statusMap = {};
     statuses.forEach((s) => {
       statusMap[s.pickingStatusID] = s.statusName;
     });
-
+  
     // 6. Enriquecer cada pedido con:
-    //    - assignedCount: cantidad de productos asignados a ese picker para ese pedido
-    //    - pickingStatusID y pickingStatusName: tomando el pickingStatusID del primer producto asignado (o aplicando otra lógica si es necesario)
+    //    - assignedCount: cuántos productos tiene asignados
+    //    - pickingStatusID / pickingStatusName: Por ejemplo,
+    //      tomamos la del PRIMER producto asignado (o podrías unificar si hay más de uno)
     const enrichedOrders = orders.map((order) => {
       const prods = orderGroups[order.orderID] || [];
       const assignedCount = prods.length;
-
+  
+      // Si cada pedido solo maneja un pickingStatus "principal", puedes elegir el del primer producto
+      // O unificar la lógica si hay múltiples estados. Ejemplo: prods[0]?.pickingStatusID
+      const pickingStatusID = prods[0]?.pickingStatusID || null;
+      const pickingStatusName = pickingStatusID ? statusMap[pickingStatusID] : null;
+  
       return {
         ...order,
         assignedCount,
+        pickingStatusID,
+        pickingStatusName,
       };
     });
-
+  
     return enrichedOrders;
   },
 

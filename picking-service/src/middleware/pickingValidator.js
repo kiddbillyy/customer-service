@@ -1,5 +1,5 @@
 // src/validations/pickingValidator.js
-const { check, body } = require('express-validator');
+const { check, body, param } = require('express-validator');
 
 exports.assignPickersValidator = [
   check('orderID')
@@ -49,14 +49,13 @@ exports.reassignPickerValidator = [
 ];
 
 exports.updatePickedProductValidator = [
-  check('orderProductID')
+  param('orderProductID')
     .exists().withMessage('orderProductID es requerido')
     .isInt().withMessage('orderProductID debe ser un número'),
   check('pickedQuantity')
     .exists().withMessage('pickedQuantity es requerido')
     .isInt({ gt: 0 }).withMessage('pickedQuantity debe ser mayor que 0'),
 ];
-
 exports.completePickingValidator = [
   check('orderID')
     .exists().withMessage('orderID es requerido')

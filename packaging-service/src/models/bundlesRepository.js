@@ -1,35 +1,23 @@
-const pool = require('../config/db');
-const crypto = require('crypto');
+const pool = require("../config/db");
+const crypto = require("crypto");
 
 /**
  * Hashea una cadena y devuelve el hash MD5 en formato hexadecimal (32 chars).
  */
 function md5Hash(str) {
-  return crypto.createHash('md5')
-               .update(str)
-               .digest('hex');
+  return crypto.createHash("md5").update(str).digest("hex");
 }
 
 /**
- * Genera barcode (hash completo) y refid (últimos 7 chars) basados en:
- *   - orderID
- *   - un factor único (por ejemplo, Date.now() + random)
+ * Genera barcode (hash completo) y refid (últimos 7 chars) basados en orderID y un factor único.
  */
 function generateCodesForBundle(orderID) {
-  // Factor único: marca de tiempo + aleatorio
   const uniqueFactor = `${Date.now()}-${Math.random()}`;
-  
-  // Construimos una cadena base
   const baseString = `${orderID}-${uniqueFactor}`;
-  
-  // Generamos el hash MD5
   const hashed = md5Hash(baseString);
-  
-  // barcode = todo el hash (32 caracteres hex)
-  const barcode = hashed;
-  // refid = últimos 7 caracteres en mayúscula
-  const refid = hashed.slice(-7).toUpperCase();
-  
+
+  const barcode = hashed;                  // Hash completo
+  const refid = hashed.slice(-7).toUpperCase();  // Últimos 7 chars en mayúscula
   return { barcode, refid };
 }
 
@@ -38,53 +26,48 @@ const BundlesRepository = {
    * Crea un nuevo bulto e inserta los productos asociados.
    * Genera automáticamente un barcode y un refid únicos.
    */
-  createBundle: async (orderID, pickerRUT, packageTypeID, products) => {
+  createBundle: async (orderID, pickerRUT, packageTypeID, products, height, width, length, weight, location, cubage) => {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
-  
-      // Generar barcode y refid con factor único
+
+      // Generar barcode y refid
       const { barcode, refid } = generateCodesForBundle(orderID);
-  
-      // 1. Insertar bulto en la tabla Bundles usando packageTypeID en lugar de packageType
+
+      // Insertar el nuevo bulto en la tabla Bundles
       const [bundleResult] = await conn.query(
-        `INSERT INTO Bundles (orderID, pickerRUT, packageTypeID, barcode, refid)
-           VALUES (?, ?, ?, ?, ?)`,
-        [orderID, pickerRUT, packageTypeID, barcode, refid]
+        `INSERT INTO Bundles (orderID, pickerRUT, packageTypeID, barcode, refid, height, width, length, weight, location, cubage)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [orderID, pickerRUT, packageTypeID, barcode, refid, height, width, length, weight, location, cubage]
       );
       const bundleID = bundleResult.insertId;
-  
-      // 2. Insertar los productos en "Bundle_Products" y actualizar "order_product_picker"
+
+      // Insertar los productos en Bundle_Products y actualizar order_product_picker
       for (const { orderProductID, quantity } of products) {
-        // Insertar en Bundle_Products
         await conn.query(
-          `INSERT INTO Bundle_Products (bundleID, orderProductID, quantity) VALUES (?, ?, ?)`,
+          `INSERT INTO Bundle_Products (bundleID, orderProductID, quantity)
+           VALUES (?, ?, ?)`,
           [bundleID, orderProductID, quantity]
         );
-  
-        // Asociar el producto al bulto en order_product_picker
-        await conn.query(
-          `UPDATE order_product_picker
-             SET bundleID = ?
-             WHERE orderProductID = ?`,
-          [bundleID, orderProductID]
-        );
+
+
       }
-  
+
       await conn.commit();
       return bundleID;
     } catch (error) {
       await conn.rollback();
-      console.error('❌ Error creando bulto:', error);
+      console.error("❌ Error creando bulto:", error);
       return null;
     } finally {
       conn.release();
     }
   },
+
   markProductAsLoose: async (orderProductID) => {
     const [result] = await pool.query(
-      `UPDATE order_product_picker 
-       SET bundleID = NULL 
+      `UPDATE order_product_picker
+       SET bundleID = NULL
        WHERE orderProductID = ?`,
       [orderProductID]
     );
@@ -93,19 +76,30 @@ const BundlesRepository = {
 
   getAllBundles: async () => {
     const [rows] = await pool.query(`
-    select bundleID as ID,  orderid as refid, barcode as idEntidad, auditRUT as Controlador, auditStatusID as estado
-from bundles
+      SELECT
+        bundleID AS ID,
+        orderID AS refid,
+        barcode AS idEntidad,
+        auditRUT AS Controlador,
+        auditStatusID AS estado
+      FROM Bundles
     `);
+    return rows;
+  },
+  getBundleById: async (bundleID) => {
+    const [rows] = await pool.query(
+      `SELECT * FROM Bundles WHERE bundleID = ?`,
+      [bundleID]
+    );
     return rows;
   },
 
   getBundlesByOrder: async (orderID) => {
     const [bundles] = await pool.query(
-      `SELECT * FROM Bundles
-       WHERE orderID = ?`,
+      `SELECT * FROM Bundles WHERE orderID = ?`,
       [orderID]
     );
-    return bundles; // Retorna la lista de bultos de esa orden
+    return bundles;
   },
 
   getBundleDetails: async (bundleID) => {
@@ -114,7 +108,7 @@ from bundles
       SELECT 
         b.bundleID,
         b.orderID,
-        b.packageType,
+        b.packageTypeID,
         b.barcode,
         b.refid,
         b.auditStatusID,
@@ -127,31 +121,29 @@ from bundles
         op.notFound AS not_found,
         op.repickedQuantity AS repicked,
         opp.pickerRUT
-      FROM bundles b
-      JOIN bundle_products bp ON bp.bundleID = b.bundleID 
-      JOIN order_product op ON op.orderProductID = bp.orderProductID
-      JOIN products p ON p.itemcode = op.itemcode
+      FROM Bundles b
+      JOIN Bundle_Products bp ON bp.bundleID = b.bundleID
+      JOIN Order_Product op ON op.orderProductID = bp.orderProductID
+      JOIN Products p ON p.itemcode = op.itemcode
       LEFT JOIN order_product_picker opp ON opp.orderProductID = op.orderProductID
       WHERE b.bundleID = ?;
       `,
       [bundleID]
     );
-  
+
     if (rows.length === 0) return null;
-  
-    // Datos comunes del bulto (se asume que son los mismos en todas las filas)
+
     const bundleDetails = {
       bundleID: rows[0].bundleID,
       orderID: rows[0].orderID,
-      packageType: rows[0].packageType,
+      packageTypeID: rows[0].packageTypeID,
       barcode: rows[0].barcode,
       refid: rows[0].refid,
       auditStatusID: rows[0].auditStatusID,
       products: []
     };
-  
-    // Recorrer cada fila para formar el listado de productos
-    rows.forEach(row => {
+
+    rows.forEach((row) => {
       bundleDetails.products.push({
         bundleProductID: row.bundleProductID,
         orderProductID: row.orderProductID,
@@ -164,14 +156,14 @@ from bundles
         pickerRUT: row.pickerRUT
       });
     });
-  
+
     return bundleDetails;
   },
 
   getOrderProductsWithBundleID: async (orderID) => {
     const [products] = await pool.query(
       `SELECT op.orderProductID, op.itemcode, opp.pickerRUT, opp.bundleID
-       FROM order_product op
+       FROM Order_Product op
        LEFT JOIN order_product_picker opp
          ON op.orderProductID = opp.orderProductID
        WHERE op.orderID = ?`,
@@ -179,11 +171,12 @@ from bundles
     );
     return products;
   },
+
   updateDimensions: async (bundleID, { height, width, length, weight, cubage, location }) => {
     const [result] = await pool.query(
       `
-      UPDATE bundles
-      SET 
+      UPDATE Bundles
+      SET
         height = ?,
         width = ?,
         length = ?,
@@ -196,7 +189,30 @@ from bundles
     );
     return result.affectedRows > 0;
   },
-  
+  getBundleAndProductsLocal: async (bundleID) => {
+    // OJO: solo consultamos tablas locales: Bundles y Bundle_Products
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        b.bundleID,
+        b.orderID,
+        b.packageTypeID,
+        b.barcode,
+        b.refid,
+        b.auditStatusID,
+        b.cubage,
+        b.location,
+        bp.bundleProductID,
+        bp.orderProductID,
+        bp.quantity AS expected
+      FROM Bundles b
+      JOIN Bundle_Products bp ON bp.bundleID = b.bundleID
+      WHERE b.bundleID = ?;
+      `,
+      [bundleID]
+    );
+    return rows;
+  }
 };
 
 module.exports = BundlesRepository;

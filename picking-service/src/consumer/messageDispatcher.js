@@ -1,51 +1,25 @@
-const pool = require('../config/db');
+const pickingService = require('../services/pickingService');
 
 module.exports = {
-'new.order.created': async (msg) => {
-    console.log(`📥 Recibida nueva orden con orderID=${msg.orderID} en Picking Service...`);
-    if (!msg.products || msg.products.length === 0) {
-        console.warn(`⚠️ No hay productos en la orden ${msg.orderID}, se omite registro en Picking Service.`);
-        return;
-    }
-    for (let product of msg.products) {
-      // Insertar el producto en la tabla Products si no existe
-      await pool.query(`
-        INSERT INTO Products (itemcode, dscription, price)
-        VALUES (?, ?, ?)
-        ON DUPLICATE KEY UPDATE 
-        dscription = VALUES(dscription),
-        price = VALUES(price)
-      `, [product.itemcode, product.dscription, product.price]);
-
-      // Insertar en Order_Product (productos asociados a una orden)
-      await pool.query(`
-        INSERT INTO Order_Product (orderID, itemcode, quantity, pickedQuantity, pickingStatusID)
-        VALUES (?, ?, ?, 0, 1)
-        ON DUPLICATE KEY UPDATE 
-        quantity = VALUES(quantity)
-      `, [msg.orderID, product.itemcode, product.quantity]);
-    }
-    console.log(`✅ Productos de la orden ${msg.orderID} registrados en Picking Service`);
-}
-,
-
-  'order.status.updated': async (msg) => {
-    // Aquí puedes examinar `msg.newStatus` y reaccionar
-    if (msg.newStatus === 2) {
-      console.log(`📦 Orden ${msg.orderID} pasó a "Asignando Pickers", verificando asignación...`);
-      const [products] = await pool.query(
-        `SELECT orderProductID FROM Order_Product WHERE orderID = ?`, 
-        [msg.orderID]
-      );
-      if (products.length === 0) {
-        console.warn(`⚠️ No hay productos en la orden ${msg.orderID} para asignar pickers.`);
-      } else {
-        console.log(`📌 La orden ${msg.orderID} tiene ${products.length} productos pendientes de asignación.`);
-      }
-    }
-
-    if (msg.newStatus === 3) {
-      console.log(`✅ Orden ${msg.orderID} ahora está "En Picking". Se pueden empezar a recoger productos.`);
+  'new.order.created': async (msg) => {
+    console.log(`📥 [picking-service] new.order.created recibido:`, msg);
+    try {
+      await pickingService.handleNewOrderCreated(msg);
+      console.log(`✅ Orden procesada correctamente en picking-service`);
+    } catch (error) {
+      console.error("❌ Error procesando new.order.created:", error);
+      throw error; // Para que Kafka maneje reintentos si es necesario
     }
   },
+
+'order.status.updated': async (msg) => {
+    console.log(`📦 [picking-service] order.status.updated recibido:`, msg);
+    try {
+      await pickingService.handleOrderStatusUpdated(msg);
+      console.log(`✅ Estado procesado correctamente en picking-service`);
+    } catch (error) {
+      console.error("❌ Error procesando order.status.updated:", error);
+      throw error; // Para que Kafka maneje reintentos si es necesario
+    }
+  }
 };

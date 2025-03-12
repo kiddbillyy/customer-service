@@ -18,7 +18,7 @@ async function getMaxCreatets() {
 // Obtener las órdenes desde SAP
 async function fetchOrdersFromSap(createts) {
   try {
-    const { data } = await axios.get(`${endpoints.sap}?createts=${createts}`);
+    const { data } = await axios.get(`${endpoints.sap}?createts=000000`);
     return data;
   } catch (error) {
     console.error('❌ Error al llamar al endpoint SAP:', error);

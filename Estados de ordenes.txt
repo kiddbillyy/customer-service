@@ -1,6 +1,5 @@
-
 1.- Pedido recibido
-2.- Asignando pickers
+2.- Asignando pickers //quitar// asignar completamente a usuarios activos 
 3.- En picking
 4.- Picking Incompleto 
 5.- Picking Exitoso
@@ -12,66 +11,26 @@
 10.- Auditoria exitosa
 
 
-1️⃣ Pedido recibido
-2️⃣ Asignando pickers
-3️⃣ En picking
-4️⃣ Picking incompleto / Picking con faltantes
-5️⃣ Picking Finalizado
-6️⃣ Listo para auditoría
-7️⃣ En auditoría
-8️⃣ Auditoría aprobada
-9️⃣ Corrección requerida en auditoría
 
 
-###
-pendiente de picking ❌
-en picking ❌
-picking completo ❌
-pickimg completado❌
-
-###
-pendiente de auditar❌
-en auditoria❌
-auditoria exitosa❌
-auditoria con error❌
-
-###
-
-Pendiente de envio/retiro
+pendiente de pickear 
+en picking
+Pickeado
+Picking Parcial
+    asignador:
+        - Reasignar
+Pendiente de Repickear
+En repicking 
+Repickeado
+Repicking con faltante -> Cancelar o sustituir 
+    auditar
+    poder modificar el bulto para corregir
 
 
 
--- FLUJO --
+estados de auditoria:
 
-
-1.- Se cargan pedidos:
-    - Retail Pro: Bajo demanda, se cargan con numero de folio
-    - Sap: Tarea programada, se cargan cada 10 minutos
-    ----/* Si se inserta primero desde retail que de sap se actualiza el pedido con los campos desde sap*/-----
-    - Todas las ordenes entran en estado: 1 = Pedido recibido 
-
-
-2.- Un asigner esta encargado de asignar pickers a productos de pedidos para que obtenga todas las cantidades 
-    - Se puede asignar Pickers a productos de pedidos
-    Si:
-        1.- El pedido existe
-        2.- El pedido tiene productos disponibles para asignar
-        3.- El producto no tiene un picker asignado
-        4.- Existen "Pickers" en estado Activo 
-        5.- El usuario tiene el rol de "ASIGNER"
-
-3.- El picker esta encargado de:
-    1.- Ver los productos que tiene asignados y a que pedido pertenecen
-    2.- Buscar todas las cantidades de un producto que tiene asignado
-    3.- Una vez encontradas, asignarlas a bultos asociados al numero del pedido (picker decide cantidad de bultos).
-        cuando finalice puede cambiar el estado del pedido a "Picking Completo/Parcial"
-    4.- Finalmente el pedido queda listo para ser auditado.
-
-4.- El auditor esta encargado de:
-    1.- Revisar cada pedido en estado "Picking Completo/Parcial" 
-    2.- 
-
-
-
-
-
+pendiente de auditar
+en auditoria
+auditado
+Auditado con error -> 

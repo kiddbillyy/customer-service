@@ -60,35 +60,48 @@ const PickingService = {
     return await PickingRepository.getProductsAssignedToPicker(pickerRUT);
   },
 
-  updatePickedProduct: async (orderProductID, pickedQuantity, itemcode, pickerRUT) => {
-    // Obtener información global del producto
+  updatePickedProduct: async (orderProductID, newPickedTotal, itemcode, pickerRUT) => {
+    // 1) Obtener información actual de la DB
     const orderProduct = await PickingRepository.getOrderProduct(orderProductID);
     if (!orderProduct) {
       console.error(`❌ No se encontró el producto con orderProductID ${orderProductID}`);
       return false;
     }
-    
-    // Validar que el itemcode enviado coincida con el asignado
+
+    // 2) Validar itemcode
     if (orderProduct.itemcode !== itemcode) {
       console.error(
         `❌ El itemcode proporcionado (${itemcode}) no coincide con el asignado (${orderProduct.itemcode}).`
       );
       return false;
     }
-    
-    // Calcular cuántos items faltan globalmente
-    const remaining = orderProduct.quantity - orderProduct.pickedQuantity;
-    if (remaining <= 0) {
-      console.log(`El producto ${orderProductID} ya está completamente pickeado.`);
+
+    // 3) Calcular cuántos ítems YA estaban pickeados
+    const oldPicked = orderProduct.pickedQuantity; 
+
+    // 4) El front dice que ahora hay newPickedTotal pickeados en total
+    //    Entonces la "diferencia" que vas a añadir en esta acción es:
+    const difference = newPickedTotal - oldPicked; // <-- CAMBIO CLAVE -->
+
+    if (difference <= 0) {
+      console.log(`ℹ️ No hay aumento en la cantidad pickeada (o se envió un valor menor).`);
       return false;
     }
-    
-    // Se agrega como máximo la cantidad faltante
-    const quantityToAdd = Math.min(pickedQuantity, remaining);
-    
+
+    // 5) Verificar cuánto falta realmente
+    const remaining = orderProduct.quantity - orderProduct.pickedQuantity; // lo que quedaba por recoger
+    if (remaining <= 0) {
+      console.log(`ℹ️ El producto ${orderProductID} ya está completamente pickeado.`);
+      return false;
+    }
+
+    // 6) La cantidad efectiva que sumarás es el mínimo entre "difference" y "remaining"
+    const quantityToAdd = Math.min(difference, remaining); // <-- CAMBIO CLAVE -->
+
+    // 7) Llamamos al repository para aplicar la actualización
     const updated = await PickingRepository.updatePickedProduct(
       orderProductID,
-      quantityToAdd,
+      quantityToAdd,        // <--- Se envía la diferencia
       itemcode,
       pickerRUT
     );
@@ -96,12 +109,12 @@ const PickingService = {
       console.error(`❌ Error actualizando el producto ${orderProductID}`);
       return false;
     }
-    
+
     console.log(
       `✅ Producto ${orderProductID} actualizado con ${quantityToAdd} unidades recogidas para el picker ${pickerRUT}.`
     );
-    
-    // Resto de la lógica de notificación...
+
+    // 8) Verificar si la orden ya está toda pickeada
     const { orderID } = await getorderIDByOrderProduct(orderProductID);
     if (orderID) {
       const isComplete = await PickingRepository.isOrderFullyPicked(orderID);
@@ -118,8 +131,56 @@ const PickingService = {
     return updated;
   },
   
+  handleBundleCreated: async ({ bundleID, products }) => {
+    if (!bundleID || !products?.length) {
+      console.warn("⚠️ bundle.created sin datos suficientes para actualizar picking");
+      return;
+    }
+
+    // Delegar a la capa de persistencia
+    await PickingRepository.updateOrderProductPicker(bundleID, products);
+  },
   
-  
+  handleOrderStatusUpdated: async ({ orderID, newStatus }) => {
+    if (!orderID || typeof newStatus !== "number") {
+      console.warn("⚠️ order.status.updated con datos insuficientes");
+      return;
+    }
+
+    if (newStatus === 2) {
+      console.log(`📦 Orden ${orderID} pasó a "Asignando Pickers", verificando asignación...`);
+      
+      // Llamar al repositorio para obtener los productos de la orden
+      const products = await PickingRepository.getProductsByOrder(orderID);
+      
+      if (products.length === 0) {
+        console.warn(`⚠️ No hay productos en la orden ${orderID} para asignar pickers.`);
+      } else {
+        console.log(`📌 La orden ${orderID} tiene ${products.length} productos pendientes de asignación.`);
+      }
+    }
+
+    if (newStatus === 3) {
+      console.log(`✅ Orden ${orderID} ahora está "En Picking". Se pueden empezar a recoger productos.`);
+      // Aquí podrías agregar más lógica si es necesario (ejemplo: actualizar algo en BD)
+    }
+  },
+  handleNewOrderCreated: async ({ orderID, products }) => {
+    console.log(`📥 Procesando nueva orden orderID=${orderID} en Picking Service...`);
+
+    if (!products || products.length === 0) {
+      console.warn(`⚠️ No hay productos en la orden ${orderID}, se omite registro en Picking Service.`);
+      return;
+    }
+
+    // Insertar productos en la base de datos
+    for (let product of products) {
+      await PickingRepository.insertOrUpdateProduct(product);
+      await PickingRepository.insertOrUpdateOrderProduct(orderID, product);
+    }
+
+    console.log(`✅ Productos de la orden ${orderID} registrados en Picking Service`);
+  },
   
 
   completePicking: async (orderID) => {
@@ -194,8 +255,12 @@ const PickingService = {
       assignedQuantity: quantity,
     };
   },
-  
 
+  findOrderProducts: async (orderProductIDs) => {
+    return await PickingRepository.findOrderProductsByIds(orderProductIDs);
+  },
+
+  
 };
 
 /**

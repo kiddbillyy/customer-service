@@ -33,11 +33,12 @@ exports.assignPickers = async (req, res) => {
 exports.updatePickedProduct = async (req, res) => {
   try {
     const { pickedQuantity, itemcode, pickerRUT } = req.body;
+    console.log(req.body)
     const updated = await PickingService.updatePickedProduct(
       req.params.orderProductID,
       pickedQuantity,
       itemcode,
-      pickerRUT  // Se pasa el pickerRUT al service
+      pickerRUT  
     );
     if (!updated) {
       return res.status(404).json({
@@ -99,9 +100,7 @@ exports.getProductsAssignedToPicker = async (req, res) => {
       req.params.pickerRUT
     );
     if (!products || products.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No hay productos asignados a este picker" });
+      return res.json([]); 
     }
     res.json(products);
   } catch (error) {
@@ -144,5 +143,29 @@ exports.reassignPicker = async (req, res) => {
   } catch (error) {
     console.error("❌ Error reasignando picker:", error);
     res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+
+exports.getOrderProductsBulk = async (req, res) => {
+  try {
+    // Recibe algo tipo: ?ids=30533,30534,30535
+    const idsParam = req.query.ids; 
+    if (!idsParam) {
+      return res.status(400).json({ message: "Faltan IDs" });
+    }
+
+    // Convertir "30533,30534" en [30533, 30534]
+    const orderProductIDs = idsParam
+      .split(",")
+      .map(id => parseInt(id.trim()))
+      .filter(Boolean);
+
+    const result = await PickingService.findOrderProducts(orderProductIDs);
+    res.json(result);
+
+  } catch (error) {
+    console.error("❌ Error en getOrderProductsBulk:", error);
+    res.status(500).json({ message: "Error interno de picking-service" });
   }
 };

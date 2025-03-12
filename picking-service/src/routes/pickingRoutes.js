@@ -8,7 +8,8 @@ const {
   getProductsAssignedToPicker,
   getProductsAssignedFromOrder,
   getStatuses,
-  reassignPicker 
+  reassignPicker,
+  getOrderProductsBulk
 } = require("../controllers/pickingController");
 
 const {
@@ -25,6 +26,9 @@ const router = express.Router();
 
 // Asignar pickers a una orden
 router.post("/assign", assignPickersValidator, validateRequest, assignPickers);
+
+// obtener datos de múltiples orderProductID:
+router.get("/order-products/bulk", getOrderProductsBulk);
 
 // Obtener productos asignados a un picker
 router.get("/assigned/:pickerRUT", getProductsAssignedToPicker);

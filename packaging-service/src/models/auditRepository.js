@@ -1,4 +1,4 @@
-const pool = require('../config/db');
+const pool = require("../config/db");
 
 const AuditRepository = {
   auditBundle: async (bundleID, auditStatusID, comments, auditorRUT) => {
@@ -10,7 +10,6 @@ const AuditRepository = {
     );
     return result.affectedRows > 0;
   }
-  
 };
 
 module.exports = AuditRepository;

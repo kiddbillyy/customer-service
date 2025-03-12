@@ -2,17 +2,15 @@ const kafka = require('../config/kafka');
 const dispatcher = require('./messageDispatcher');
 
 const consumer = kafka.consumer({ 
-  groupId: 'picking-service-group', 
+  groupId: 'packaging-service-group', 
   retry: { retries: 5 }
 });
 
 const consumeMessages = async () => {
   try {
     await consumer.connect();
-    console.log('✅ Consumer de Picking conectado a Kafka');
+    console.log('✅ Consumer de Packaging conectado a Kafka');
 
-    await consumer.subscribe({ topic: 'new.order.created', fromBeginning: false });
-    await consumer.subscribe({ topic: 'order.status.updated', fromBeginning: false });
     await consumer.subscribe({ topic: 'bundle.created', fromBeginning: false });
 
     await consumer.run({
@@ -22,7 +20,6 @@ const consumeMessages = async () => {
         console.log(`📥 Mensaje recibido de Kafka [${topic}]:`, msg);
 
         try {
-          // Command/Dispatcher pattern
           const handler = dispatcher[topic];
           if (handler) {
             await handler(msg);
@@ -30,7 +27,6 @@ const consumeMessages = async () => {
             console.warn(`⚠️ No existe un manejador para el tópico: ${topic}`);
           }
 
-          // Confirma offset y heartbeat
           await consumer.commitOffsets([
             { topic, partition, offset: (Number(message.offset) + 1).toString() }
           ]);
@@ -41,7 +37,7 @@ const consumeMessages = async () => {
       },
     });
   } catch (err) {
-    console.error('❌ Error al iniciar el consumidor picking-service:', err);
+    console.error('❌ Error al iniciar el consumidor packaging-service:', err);
   }
 };
 
