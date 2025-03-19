@@ -60,7 +60,7 @@ const PickingService = {
     return await PickingRepository.getProductsAssignedToPicker(pickerRUT);
   },
 
-  updatePickedProduct: async (orderProductID, newPickedTotal, itemcode, pickerRUT) => {
+  updatePickedProduct: async (orderProductID, increment, itemcode, pickerRUT) => {
     // 1) Obtener información actual de la DB
     const orderProduct = await PickingRepository.getOrderProduct(orderProductID);
     if (!orderProduct) {
@@ -77,31 +77,29 @@ const PickingService = {
     }
 
     // 3) Calcular cuántos ítems YA estaban pickeados
-    const oldPicked = orderProduct.pickedQuantity; 
+    const oldPicked = orderProduct.pickedQuantity;
 
-    // 4) El front dice que ahora hay newPickedTotal pickeados en total
-    //    Entonces la "diferencia" que vas a añadir en esta acción es:
-    const difference = newPickedTotal - oldPicked; // <-- CAMBIO CLAVE -->
-
+    // 4) Aquí interpretamos "increment" como la cantidad extra que vas a sumar
+    const difference = increment; 
     if (difference <= 0) {
-      console.log(`ℹ️ No hay aumento en la cantidad pickeada (o se envió un valor menor).`);
+      console.log(`ℹ️ No hay aumento en la cantidad pickeada (o se envió un valor menor o igual a 0).`);
       return false;
     }
 
     // 5) Verificar cuánto falta realmente
-    const remaining = orderProduct.quantity - orderProduct.pickedQuantity; // lo que quedaba por recoger
+    const remaining = orderProduct.quantity - oldPicked; // lo que quedaba por recoger
     if (remaining <= 0) {
       console.log(`ℹ️ El producto ${orderProductID} ya está completamente pickeado.`);
       return false;
     }
 
     // 6) La cantidad efectiva que sumarás es el mínimo entre "difference" y "remaining"
-    const quantityToAdd = Math.min(difference, remaining); // <-- CAMBIO CLAVE -->
+    const quantityToAdd = Math.min(difference, remaining);
 
     // 7) Llamamos al repository para aplicar la actualización
     const updated = await PickingRepository.updatePickedProduct(
       orderProductID,
-      quantityToAdd,        // <--- Se envía la diferencia
+      quantityToAdd,        // <--- Se envía la "diferencia"
       itemcode,
       pickerRUT
     );
@@ -111,7 +109,7 @@ const PickingService = {
     }
 
     console.log(
-      `✅ Producto ${orderProductID} actualizado con ${quantityToAdd} unidades recogidas para el picker ${pickerRUT}.`
+      `✅ Producto ${orderProductID} actualizado con ${quantityToAdd} unidades recogidas (incremento) para el picker ${pickerRUT}.`
     );
 
     // 8) Verificar si la orden ya está toda pickeada
@@ -128,6 +126,7 @@ const PickingService = {
         );
       }
     }
+
     return updated;
   },
   
@@ -258,6 +257,16 @@ const PickingService = {
 
   findOrderProducts: async (orderProductIDs) => {
     return await PickingRepository.findOrderProductsByIds(orderProductIDs);
+  },
+  updateAssignedProductsByPicker: async (pickerRUT, orderID, newPickingStatus) => {
+    return await PickingRepository.updateAssignedProductsByPicker(pickerRUT, orderID, newPickingStatus);
+  },
+  
+  updateProductsBulkStatus: async (orderID, pickerRUT, newStatus) => {
+    // Llamar a PickingRepository para actualizar los productos asignados
+    const updatedCount = await PickingRepository.bulkUpdateProductStatus(orderID, pickerRUT, newStatus);
+  
+    return updatedCount; // Retorna el número de filas afectadas
   },
 
   

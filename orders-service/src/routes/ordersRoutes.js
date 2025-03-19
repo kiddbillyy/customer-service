@@ -8,6 +8,7 @@ const {
   getHistory,
   getOrdersAudit,
   getOrdersByPickerRUT,
+  createOrder
 } = require("../controllers/ordersController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -24,6 +25,7 @@ router.put("/:id/status", updateOrderStatus); // API para actualizar el estado d
 router.get("/max/createts", getMaxCreatets); // API para obtener la fecha de la última orden creada
 router.get("/max/lastQueryDate", getLastQueryDate); // API para obtener la fecha de la última consulta
 router.get("/history/:id", getHistory); // API para obtener el historial de una orden
+router.post("/create", createOrder); // API para crear un pedido
 
 // authMiddleware([userRole.ADMIN, userRole.ASSIGNER]) para asignar múltiples roles
 module.exports = router;

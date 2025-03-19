@@ -33,18 +33,20 @@ exports.assignPickers = async (req, res) => {
 exports.updatePickedProduct = async (req, res) => {
   try {
     const { pickedQuantity, itemcode, pickerRUT } = req.body;
-    console.log(req.body)
+    console.log(req.body);
     const updated = await PickingService.updatePickedProduct(
       req.params.orderProductID,
       pickedQuantity,
       itemcode,
-      pickerRUT  
+      pickerRUT
     );
+
     if (!updated) {
       return res.status(404).json({
         message: "Producto no encontrado, itemcode no coincide o ya completado"
       });
     }
+
     res.json({ message: "Producto actualizado correctamente" });
   } catch (error) {
     console.error("❌ Error actualizando producto:", error);
@@ -167,5 +169,56 @@ exports.getOrderProductsBulk = async (req, res) => {
   } catch (error) {
     console.error("❌ Error en getOrderProductsBulk:", error);
     res.status(500).json({ message: "Error interno de picking-service" });
+  }
+};
+
+exports.updateAssignedProductsByPicker = async (req, res) => {
+  try {
+    const { pickerRUT } = req.params;
+    const { orderID, newPickingStatus } = req.body;
+    if (!orderID || !newPickingStatus) {
+      return res.status(400).json({ message: "Faltan orderID o newPickingStatus" });
+    }
+
+    const updatedCount = await PickingService.updateAssignedProductsByPicker(
+      pickerRUT,
+      orderID,
+      newPickingStatus
+    );
+
+    if (updatedCount === 0) {
+      return res.status(404).json({
+        message: "No se encontraron productos asignados para ese picker y pedido."
+      });
+    }
+
+    res.json({ 
+      message: "Productos actualizados correctamente",
+      updatedCount 
+    });
+  } catch (error) {
+    console.error("❌ Error en updateAssignedProductsByPicker:", error);
+    res.status(500).json({ message: "Error interno picking-service" });
+  }
+};
+
+exports.updateProductsBulkStatus = async (req, res) => {
+  try {
+    const { orderID } = req.params;
+    const { pickerRUT, newStatus } = req.body;
+
+    // Llamar a pickingService para actualizar el estado de todos los productos de este picker en la orden
+    const updatedCount = await PickingService.updateProductsBulkStatus(orderID, pickerRUT, newStatus);
+
+    if (updatedCount === 0) {
+      return res.status(404).json({ message: "No se encontraron productos para actualizar." });
+    }
+
+    res.json({
+      message: `Se actualizaron productos en la orden ${orderID} al estado ${newStatus} para pickerRUT=${pickerRUT}`
+    });
+  } catch (error) {
+    console.error("❌ Error en updateProductsBulkStatus controller:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
   }
 };

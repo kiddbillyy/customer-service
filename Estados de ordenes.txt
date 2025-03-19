@@ -1,5 +1,5 @@
 1.- Pedido recibido
-2.- Asignando pickers //quitar// asignar completamente a usuarios activos 
+2.- Asignando pickers 
 3.- En picking
 4.- Picking Incompleto 
 5.- Picking Exitoso
@@ -13,16 +13,16 @@
 
 
 
-pendiente de pickear 
-en picking
-Pickeado
-Picking Parcial
+1.- pendiente de pickear 
+2.- en picking
+3.- Pickeado
+4.- Picking Parcial
     asignador:
         - Reasignar
-Pendiente de Repickear
-En repicking 
-Repickeado
-Repicking con faltante -> Cancelar o sustituir 
+5.- Pendiente de Repickear
+6.- En repicking 
+6.- Repickeado
+7.- Repicking con faltante -> Cancelar o sustituir 
     auditar
     poder modificar el bulto para corregir
 
@@ -34,3 +34,31 @@ pendiente de auditar
 en auditoria
 auditado
 Auditado con error -> 
+
+
+
+
+
+
+-- CLEAR PICKING SERVICE
+delete from picking_service_db.picking_waves where waveID >=0;
+delete from picking_service_db.picking_rounds where roundID >=0;
+delete from picking_service_db.picking_round_products where prpID >=0;
+delete from picking_service_db.picker_reassignments where reassignmentID >=0;
+delete from picking_service_db.order_product_picker where orderProductPickerID >=0;
+delete from picking_service_db.order_product where orderProductID >=0;
+
+
+
+-- CLEAR PACKAGING SERVICEcd 
+
+delete from packaging_service_db.bundle_products where bundleProductID >= 0;
+delete from packaging_service_db.bundles where bundleID >= 0;
+
+
+-- CLEAR ORDERS SERVICE
+
+delete from orders_service_db.order_status_history where historyID >= 0;
+delete from orders_service_db.orders where orderID >= 0;
+
+

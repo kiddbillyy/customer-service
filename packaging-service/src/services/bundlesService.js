@@ -53,7 +53,7 @@ const BundlesService = {
           try {
             // Llama a tu servicio de usuarios, ajusta el endpoint según sea necesario
             const { data: user } = await axios.get(
-              `http://192.168.0.82:5002/api/users/${bundle.Controlador}`
+              `http://192.168.0.89:5002/api/users/${bundle.Controlador}`
             );
             bundle.ControladorName = user.name || null;
             bundle.ControladorEmail = user.email || null;

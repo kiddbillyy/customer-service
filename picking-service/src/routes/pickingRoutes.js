@@ -9,7 +9,9 @@ const {
   getProductsAssignedFromOrder,
   getStatuses,
   reassignPicker,
-  getOrderProductsBulk
+  getOrderProductsBulk,
+  updateAssignedProductsByPicker,
+  updateProductsBulkStatus
 } = require("../controllers/pickingController");
 
 const {
@@ -37,6 +39,12 @@ router.get("/statuses", getStatuses);
 
 // Obtener productos asignados de un picker para un pedido específico
 router.get("/assigned/:pickerRUT/order/:orderID", getProductsAssignedFromOrder);
+
+// Endpoint para actualizar en bloque el estado de productos asignados
+router.put("/orders/:orderID/bulk-status", updateProductsBulkStatus);
+
+// Actualizar estado de productos
+router.put("/assigned/:pickerRUT", updateAssignedProductsByPicker);
 
 // Actualizar cantidad pickeada de un producto en una orden
 router.put(

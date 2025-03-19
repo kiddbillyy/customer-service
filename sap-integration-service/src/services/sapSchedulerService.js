@@ -49,7 +49,7 @@ async function processNewOrders() {
 // Función para crear una orden a partir del folionum
 async function createNewOrder(folionum) {
   try {
-    let { data: order } = await axios.get(`${endpoints.retail}/${folionum}`);
+    let { data: order } = await axios.get(`${endpoints.retail}${folionum}`);
 
     // Si la respuesta es un array, tomar el primer elemento para mantener el mismo formato
     if (Array.isArray(order)) {
@@ -70,7 +70,7 @@ async function createNewOrder(folionum) {
 // Cron job que se ejecuta cada 10 minutos
 function startScheduler() {
   // Expresión cron: "*/10 * * * *" => cada 10 minutos
-  cron.schedule('*/1 * * * *', async () => {
+  cron.schedule('*/10 * * * *', async () => {
     console.log('⏰ [CRON] Ejecutando job para traer órdenes desde SAP...');
     await processNewOrders();
   });

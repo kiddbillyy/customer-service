@@ -1,6 +1,17 @@
 const pool = require("../config/db");
 
 const PickingRepository = {
+  
+  // 1. Este método inserta (o actualiza) un registro en 'order_picker' para orderID + pickerRUT
+  async upsertOrderPicker(orderID, pickerRUT) {
+    await pool.query(`
+      INSERT INTO order_picker (orderID, pickerRUT, pickingStatusID)
+      VALUES (?, ?, 1)
+      ON DUPLICATE KEY UPDATE
+        pickingStatusID = pickingStatusID
+    `, [orderID, pickerRUT]);
+  },
+
   assignPickers: async (orderID, pickerAssignments) => {
     const [products] = await pool.query(
       `
@@ -11,19 +22,22 @@ const PickingRepository = {
       `,
       [orderID]
     );
-  
+
     if (products.length === 0) return false;
-  
+
     for (let { orderProductID, pickerRUT } of pickerAssignments) {
-      // Obtener la cantidad total del producto
+      // --> upsert en 'order_picker' para el estado global
+      await PickingRepository.upsertOrderPicker(orderID, pickerRUT);
+
+      // 1. Obtener la cantidad total del producto
       const [prodRows] = await pool.query(
         `SELECT quantity FROM Order_Product WHERE orderProductID = ?`,
         [orderProductID]
       );
       if (!prodRows || prodRows.length === 0) continue;
       const totalQuantity = prodRows[0].quantity;
-  
-      // Verificar si el producto ya tiene asignación en Order_Product_Picker
+
+      // 2. Verificar si el producto ya tiene asignación en 'Order_Product_Picker'
       const [existing] = await pool.query(
         `
         SELECT orderProductPickerID 
@@ -32,19 +46,19 @@ const PickingRepository = {
         `,
         [orderProductID]
       );
-  
-      // Si no existe, insertar la asignación inicial con assignedQuantity = totalQuantity
+
+      // 3. Si no existe, insertar la asignación inicial con assignedQuantity = totalQuantity
       if (existing.length === 0) {
         await pool.query(
           `
           INSERT INTO Order_Product_Picker 
             (orderProductID, pickerRUT, pickingStatusID, pickedQuantity, assignedQuantity)
-          VALUES (?, ?, 2, 0, ?)
+          VALUES (?, ?, 1, 0, ?)
           `,
           [orderProductID, pickerRUT, totalQuantity]
         );
       } else {
-        // Si ya existe, opcionalmente se puede actualizar el picker y asignar el total
+        // 4. Si ya existe, opcionalmente se puede actualizar el picker y asignar el total
         await pool.query(
           `
           UPDATE Order_Product_Picker 
@@ -54,8 +68,8 @@ const PickingRepository = {
           [pickerRUT, totalQuantity, orderProductID]
         );
       }
-  
-      // Actualizar el estado de picking del producto en Order_Product
+
+      // 5. Actualizar el estado de picking del producto en 'Order_Product'
       await pool.query(
         `
         UPDATE Order_Product
@@ -65,7 +79,7 @@ const PickingRepository = {
         [orderProductID]
       );
     }
-  
+
     // Verificar si TODOS los productos de la orden tienen pickers asignados
     const allAssigned = await PickingRepository.isAllProductsAssigned(orderID);
     return allAssigned ? 3 : 2;
@@ -159,6 +173,19 @@ const PickingRepository = {
     }
   },
 
+  updateStatus: async (orderProductPickerID, pickingStatusID) => {
+    const [result] = await pool.query(
+      `
+      UPDATE order_product_picker
+      SET pickingStatusID = ?
+      WHERE orderProductPickerID = ?
+      `,
+      [pickingStatusID, orderProductPickerID]
+    );
+
+    return result.affectedRows > 0; // Retorna true si se actualizó
+  },
+
   getProductsAssignedFromOrder: async (pickerRUT) => {
     const [products] = await pool.query(
       `
@@ -186,45 +213,63 @@ const PickingRepository = {
   },
 
   updatePickedProduct: async (orderProductID, quantityToAdd, itemcode, pickerRUT) => {
-    const [resultOrderProduct] = await pool.query(
-      `
+    // 1) Primero, suma a pickedQuantity sin forzar estado a 3 de inmediato.
+    const [resultFirst] = await pool.query(`
       UPDATE Order_Product
       SET 
-        pickedQuantity = CASE
-          WHEN pickedQuantity + ? >= quantity THEN quantity
-          ELSE pickedQuantity + ?
-        END,
+        pickedQuantity = LEAST(pickedQuantity + ?, quantity)
+      WHERE orderProductID = ?
+        AND itemcode = ?
+    `, [quantityToAdd, orderProductID, itemcode]);
+  
+    if (resultFirst.affectedRows === 0) {
+      return false;
+    }
+  
+    // 2) Luego, set pickingStatusID según si pickedQuantity == quantity
+    const [resultSecond] = await pool.query(`
+      UPDATE Order_Product
+      SET 
         pickingStatusID = CASE
-          WHEN pickedQuantity + ? >= quantity THEN 3
+          WHEN pickedQuantity >= quantity THEN 3
           ELSE 2
         END
       WHERE orderProductID = ?
         AND itemcode = ?
-      `,
-      [quantityToAdd, quantityToAdd, quantityToAdd, orderProductID, itemcode]
-    );
+    `, [orderProductID, itemcode]);
   
-    // Similar update en order_product_picker
-    const [resultOrderProductPicker] = await pool.query(
-      `
-      UPDATE order_product_picker AS opp
-      JOIN Order_Product AS op ON opp.orderProductID = op.orderProductID
-      SET
-        opp.pickedQuantity = CASE
-          WHEN opp.pickedQuantity + ? >= op.quantity THEN op.quantity
-          ELSE opp.pickedQuantity + ?
-        END,
-        opp.pickingStatusID = CASE
-          WHEN opp.pickedQuantity + ? >= op.quantity THEN 3
-          ELSE 2
-        END
+    if (resultSecond.affectedRows === 0) {
+      return false;
+    }
+  
+    // 3) Repetimos la lógica en order_product_picker
+    //    para que orderProductPicker se mantenga sincronizado.
+    //    Primero sumamos pickedQuantity
+    const [pickerUpdate1] = await pool.query(`
+      UPDATE order_product_picker opp
+      JOIN Order_Product op ON opp.orderProductID = op.orderProductID
+      SET opp.pickedQuantity = LEAST(opp.pickedQuantity + ?, op.quantity)
       WHERE opp.orderProductID = ?
         AND opp.pickerRUT = ?
-      `,
-      [quantityToAdd, quantityToAdd, quantityToAdd, orderProductID, pickerRUT]
-    );
+    `, [quantityToAdd, orderProductID, pickerRUT]);
   
-    return resultOrderProduct.affectedRows > 0;
+    if (pickerUpdate1.affectedRows === 0) {
+      return false;
+    }
+  
+    // 4) Luego asignar pickingStatusID = 3 solo si opp.pickedQuantity >= op.quantity
+    const [pickerUpdate2] = await pool.query(`
+      UPDATE order_product_picker opp
+      JOIN Order_Product op ON opp.orderProductID = op.orderProductID
+      SET opp.pickingStatusID = CASE
+        WHEN opp.pickedQuantity >= op.quantity THEN 3
+        ELSE 2
+      END
+      WHERE opp.orderProductID = ?
+        AND opp.pickerRUT = ?
+    `, [orderProductID, pickerRUT]);
+  
+    return pickerUpdate2.affectedRows > 0;
   },
   
   
@@ -374,6 +419,97 @@ const PickingRepository = {
     
     const [rows] = await pool.query(sql, orderProductIDs);
     return rows;
-  }
+  },
+  async assignPickersToProducts(orderID, pickerAssignments) {
+    // 1. Seleccionar los productos con pickingStatusID=1 o 2
+    const [products] = await pool.query(`
+      SELECT orderProductID 
+      FROM Order_Product
+      WHERE orderID = ?
+        AND (pickingStatusID = 1 OR pickingStatusID = 2)
+    `, [orderID]);
+
+    if (products.length === 0) {
+      // No hay productos para asignar
+      return false;
+    }
+
+    // 2. Recorremos pickerAssignments
+    for (const { orderProductID, pickerRUT } of pickerAssignments) {
+      // Revisar la cantidad total de ese producto
+      const [prodRows] = await pool.query(`
+        SELECT quantity 
+        FROM Order_Product 
+        WHERE orderProductID = ?
+      `, [orderProductID]);
+      if (!prodRows || prodRows.length === 0) continue;
+
+      const totalQuantity = prodRows[0].quantity;
+
+      // Verificar si existe en Order_Product_Picker
+      const [existing] = await pool.query(`
+        SELECT orderProductPickerID 
+        FROM Order_Product_Picker
+        WHERE orderProductID = ?
+      `, [orderProductID]);
+
+      if (existing.length === 0) {
+        // Inserta una fila nueva
+        await pool.query(`
+          INSERT INTO Order_Product_Picker
+            (orderProductID, pickerRUT, pickingStatusID, pickedQuantity, assignedQuantity)
+          VALUES (?, ?, 1, 0, ?)
+        `, [orderProductID, pickerRUT, totalQuantity]);
+      } else {
+        // Actualiza la fila existente
+        await pool.query(`
+          UPDATE Order_Product_Picker
+          SET pickerRUT = ?, assignedAt = NOW(), assignedQuantity = ?
+          WHERE orderProductID = ?
+        `, [pickerRUT, totalQuantity, orderProductID]);
+      }
+
+      // Cambiar en Order_Product => pickingStatusID=2 (Asignado/EnPicking)
+      await pool.query(`
+        UPDATE Order_Product
+        SET pickingStatusID = 2
+        WHERE orderProductID = ?
+      `, [orderProductID]);
+    }
+
+    // 3. Revisar si TODOS tienen pickers
+    const allAssigned = await this.isAllProductsAssigned(orderID);
+    return allAssigned ? 3 : 2; // 3 => “EnPickingCompleto”, 2 => “AsignandoPickers”
+  },
+  upsertOrderPicker: async (orderID, pickerRUT)  => {
+    await pool.query(`
+      INSERT INTO order_picker (orderID, pickerRUT, pickingStatusID)
+      VALUES (?, ?, 1)
+      ON DUPLICATE KEY UPDATE
+        pickingStatusID = pickingStatusID
+    `, [orderID, pickerRUT]);
+  },
+  updateAssignedProductsByPicker: async (pickerRUT, orderID, newPickingStatus) => {
+    const [result] = await pool.query(`
+      UPDATE order_product_picker opp
+      JOIN order_product op ON opp.orderProductID = op.orderProductID
+      SET opp.pickingStatusID = ?
+      WHERE opp.pickerRUT = ?
+        AND op.orderID = ?
+    `, [newPickingStatus, pickerRUT, orderID]);
+  
+    return result.affectedRows;
+  },
+  bulkUpdateProductStatus: async (orderID, pickerRUT, newStatus) => {
+    const [result] = await pool.query(`
+      UPDATE order_product op
+      JOIN order_product_picker opp ON opp.orderProductID = op.orderProductID
+      SET op.pickingStatusID = ?, opp.pickingStatusID = ?
+      WHERE op.orderID = ? AND opp.pickerRUT = ?
+    `, [newStatus, newStatus, orderID, pickerRUT]);
+  
+    return result.affectedRows; // Devuelve el número de registros actualizados
+  },
+  
 };
 module.exports = PickingRepository;
