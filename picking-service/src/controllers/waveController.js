@@ -118,6 +118,15 @@ exports.getWaves = async (req, res) => {
     res.status(500).json({ message: 'Error interno al obtener olas' });
   }
 };
+exports.getRounds = async (req, res) => {
+  try {
+    const waves = await WaveService.getRounds();
+    res.json(waves);
+  } catch (error) {
+    console.error('❌ Error obteniendo olas:', error);
+    res.status(500).json({ message: 'Error interno al obtener olas' });
+  }
+};
 
 // Obtener una ola por ID
 exports.getWaveById = async (req, res) => {

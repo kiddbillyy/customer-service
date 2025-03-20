@@ -11,9 +11,9 @@ const consumeMessages = async () => {
     await consumer.connect();
     console.log('✅ Consumer de Picking conectado a Kafka');
 
-    await consumer.subscribe({ topic: 'new.order.created', fromBeginning: false });
-    await consumer.subscribe({ topic: 'order.status.updated', fromBeginning: false });
-    await consumer.subscribe({ topic: 'bundle.created', fromBeginning: false });
+    await consumer.subscribe({ topic: 'new.order.created', fromBeginning: true });
+    await consumer.subscribe({ topic: 'order.status.updated', fromBeginning: true });
+    await consumer.subscribe({ topic: 'bundle.created', fromBeginning: true });
 
     await consumer.run({
       autoCommit: false,

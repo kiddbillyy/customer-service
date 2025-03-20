@@ -70,7 +70,7 @@ async function createNewOrder(folionum) {
 // Cron job que se ejecuta cada 10 minutos
 function startScheduler() {
   // Expresión cron: "*/10 * * * *" => cada 10 minutos
-  cron.schedule('*/10 * * * *', async () => {
+  cron.schedule('*/1 * * * *', async () => {
     console.log('⏰ [CRON] Ejecutando job para traer órdenes desde SAP...');
     await processNewOrders();
   });

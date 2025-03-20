@@ -9,7 +9,8 @@ const {
     getWaveById,      
     getRoundsByWave,  
     getRoundById,
-    createRoundAndAssign     
+    createRoundAndAssign,
+    getRounds     
 } = require('../controllers/waveController');
 
 const router = express.Router();
@@ -32,6 +33,7 @@ router.patch('/waves/:waveID/rounds/:roundID/status', updateRoundStatus);
 
 // Nuevos endpoints GET
 router.get('/waves', getWaves);
+router.get('/rounds', getRounds)
 router.get('/waves/:waveID', getWaveById);
 router.get('/waves/:waveID/rounds', getRoundsByWave);
 router.get('/waves/:waveID/rounds/:roundID', getRoundById);

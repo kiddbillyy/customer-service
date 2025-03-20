@@ -12,8 +12,8 @@ const consumeMessages = async () => {
     console.log('✅ Consumer de Orders conectado a Kafka');
 
     // Suscribirse a los tópicos que deseamos escuchar
-    await consumer.subscribe({ topic: 'sap.order.imported', fromBeginning: false });
-    await consumer.subscribe({ topic: 'order.status.updated', fromBeginning: false });
+    await consumer.subscribe({ topic: 'sap.order.imported', fromBeginning: true });
+    await consumer.subscribe({ topic: 'order.status.updated', fromBeginning: true });
 
     await consumer.run({
       autoCommit: false,

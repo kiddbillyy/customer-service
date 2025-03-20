@@ -268,6 +268,42 @@ const PickingService = {
   
     return updatedCount; // Retorna el número de filas afectadas
   },
+  getAllOrdersProducts: async () => {
+    // 1. Obtenemos todas las filas de order_product (JOIN con products)
+    const rows = await PickingRepository.getAllOrderProducts();
+    if (!rows || rows.length === 0) {
+      return [];
+    }
+
+    // 2. Agrupar por orderID
+    const ordersMap = {};
+    for (const row of rows) {
+      const orderID = row.orderID;
+      if (!ordersMap[orderID]) {
+        ordersMap[orderID] = {
+          orderID,
+          products: []
+        };
+      }
+      // Construir objeto de producto
+      const productData = {
+        orderProductID: row.orderProductID,
+        itemcode: row.itemcode,
+        dscription: row.dscription,
+        price: row.price,
+        quantity: row.quantity,
+        pickedQuantity: row.pickedQuantity,
+        pickingStatusID: row.pickingStatusID,
+        total: row.total,
+        isAssigned: row.isAssigned
+      };
+      ordersMap[orderID].products.push(productData);
+    }
+
+    // 3. Convertir el objeto final en un array
+    return Object.values(ordersMap);
+  },
+  
 
   
 };

@@ -94,6 +94,11 @@ const WaveRepository = {
     const [rows] = await pool.query(sql);
     return rows;
   },
+  async getRounds() {
+    const sql = `SELECT * FROM picking_rounds`;
+    const [rows] = await pool.query(sql);
+    return rows;
+  },
 
   // Obtener una ola por ID
   async getWaveById(waveID) {

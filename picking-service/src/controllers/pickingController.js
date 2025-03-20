@@ -222,3 +222,16 @@ exports.updateProductsBulkStatus = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
+
+exports.getAllOrdersProducts = async (req, res) => {
+  try {
+    const data = await PickingService.getAllOrdersProducts();
+    if (!data || data.length === 0) {
+      return res.status(404).json({ message: "No hay pedidos/productos." });
+    }
+    res.json(data);
+  } catch (error) {
+    console.error("❌ Error obteniendo todos los pedidos con sus productos:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};

@@ -34,6 +34,9 @@ const WaveService = {
   async getWaves() {
     return await WaveRepository.getWaves();
   },
+  async getRounds() {
+    return await WaveRepository.getRounds();
+  },
 
   // Función para obtener una ola por ID
   async getWaveById(waveID) {
