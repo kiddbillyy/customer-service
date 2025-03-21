@@ -514,28 +514,39 @@ const PickingRepository = {
     // Query para obtener todos los productos con su 'orderID'
     const [rows] = await pool.query(`
       SELECT 
-        op.orderProductID,
-        op.orderID,
-        op.itemcode,
-        p.dscription,
-        p.price,
-        op.quantity,
-        op.pickedQuantity,
-        op.pickingStatusID,
-        (op.quantity * p.price) AS total,
-        -- Nuevo campo 'isAssigned'
-        IFNULL(
-          (SELECT 1
-          FROM order_product_picker opp
-          WHERE opp.orderProductID = op.orderProductID
-          LIMIT 1),
-          0
-        ) AS isAssigned
-      FROM order_product op
-      JOIN products p ON p.itemcode = op.itemcode
-      ORDER BY op.orderID
+      op.orderProductID,
+      op.orderID,
+      op.itemcode,
+      p.dscription,
+      p.price,
+      op.quantity,
+      op.pickedQuantity,
+      op.pickingStatusID,
+      (op.quantity * p.price) AS total,
+      IFNULL(
+        (SELECT 1
+         FROM order_product_picker opp
+         WHERE opp.orderProductID = op.orderProductID
+         LIMIT 1),
+        0
+      ) AS isAssigned
+    FROM order_product op
+    JOIN products p ON p.itemcode = op.itemcode
+    WHERE NOT EXISTS (
+      SELECT 1 FROM order_product_picker opp
+      WHERE opp.orderProductID = op.orderProductID
+    )
+    ORDER BY op.orderID
     `);
     return rows;
+  },
+  async getOrderProductAndOrderID(orderProductID) {
+    const [rows] = await pool.query(`
+      SELECT orderID, quantity
+      FROM order_product
+      WHERE orderProductID = ?
+    `, [orderProductID]);
+    return rows[0]; // { orderID, quantity }
   },
   
 };

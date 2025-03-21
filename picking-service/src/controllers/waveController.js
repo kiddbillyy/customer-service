@@ -173,62 +173,50 @@ exports.getRoundById = async (req, res) => {
 exports.createRoundAndAssign = async (req, res) => {
   try {
     const { waveID } = req.params;
+    const { roundData, products } = req.body;
 
-    // Datos para la ronda
-    const {
-      pickingPoint,
-      pickerName,
-      pickerEmail,
-      ordersCount,
-      productsCount,
-      itemsCount,
-      missingItems,
-      isCompleted,
-      roundStatus,
-      // Datos para la asignación
-      orderID,
-      pickerAssignments
-    } = req.body;
-
-    // 1) Crear la ronda
-    const roundData = {
+    // 1) Crear la ronda con 0 en ordersCount/productsCount/itemsCount (temporal)
+    const roundID = await WaveService.createRound({
       waveID,
-      pickingPoint,
-      pickerName,
-      pickerEmail,
-      ordersCount,
-      productsCount,
-      itemsCount,
-      missingItems,
-      isCompleted,
-      roundStatus
-    };
-    const roundID = await WaveService.createRound(roundData);
+      pickingPoint: roundData.pickingPoint,
+      pickerName: roundData.pickerName,
+      pickerEmail: roundData.pickerEmail,
+      ordersCount: 0,
+      productsCount: 0,
+      itemsCount: 0,
+      missingItems: 0,
+      isCompleted: 0,
+      roundStatus: "Pendiente"
+    });
 
-    // 2) Asignar productos y pickers (misma lógica de assignProductsAndPickers)
-    const result = await WaveService.assignProductsAndPickers(waveID, roundID, orderID, pickerAssignments);
-
+    // 2) Unificar la lógica de asignar
+    const result = await WaveService.assignProductsAndPickersNoOrderID(waveID, roundID, products);
     if (!result) {
-      return res.status(404).json({ message: "No hay productos pendientes o hubo un error en la asignación." });
+      return res.status(400).json({
+        message: "No se asignaron productos (o no estaban pendientes)."
+      });
     }
-
     const { newStatus, oldStatus } = result;
+
+    // 3) Calcular ordersCount, productsCount, itemsCount
+    await WaveService.updateRoundCounts(roundID);
+
+    // 4) Construir un mensaje final
     const statusMessage =
       newStatus === 3
         ? "Todos los productos tienen pickers asignados. Estado: En Picking"
         : "Algunos productos aún no tienen pickers asignados. Estado: Asignando Pickers";
 
-    res.json({
+    return res.json({
       roundID,
       message: "Ronda creada y productos/pickers asignados con éxito",
       status: newStatus,
       oldStatus,
       statusMessage
     });
-
   } catch (error) {
     console.error("❌ Error creando ronda y asignando productos/pickers:", error);
-    res.status(500).json({
+    return res.status(500).json({
       message: "Error interno en createRoundAndAssign",
       error: error.message
     });

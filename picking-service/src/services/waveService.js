@@ -13,9 +13,7 @@ const WaveService = {
   },
 
   async createRound(roundData) {
-    // roundData = { waveID, pickingPoint, pickerName, ... }
-    const roundID = await WaveRepository.createRound(roundData);
-    return roundID;
+    return await WaveRepository.createRound(roundData);
   },
 
   async assignProductsToRound(roundID, products) {
@@ -130,6 +128,129 @@ const WaveService = {
 
     // Devolvemos los estados
     return { newStatus, oldStatus };
+  },
+
+  async assignProductsAndPickersNoOrderID(waveID, roundID, products) {
+    // 1) Agrupemos "orderID" para el 'oldStatus' logic
+    //    Podríamos tener varios orderIDs. 
+    //    Si deseas un estado "global", debes decidir cómo unificarlo
+    //    (Por simplicidad, obtendremos oldStatus solo del PRIMER pedido).
+    let oldStatus = null;
+    let firstOrderID = null;
+
+    // 2) Recorremos cada item, consultamos su orderID
+    const itemDetails = [];
+    for (const { orderProductID, pickerRUT } of products) {
+      // SELECT orderID from order_product
+      const row = await PickingRepository.getOrderProductAndOrderID(orderProductID);
+      if (!row) continue;
+
+      const { orderID, quantity } = row;
+      // guardar en itemDetails para el picking assignment
+      itemDetails.push({ orderProductID, pickerRUT, orderID, quantity });
+
+      // upsert en picking_round_products
+      await WaveRepository.upsertRoundProduct(roundID, orderID, orderProductID);
+
+      // Lógica para "oldStatus" => solo si no lo tenemos
+      if (firstOrderID == null) {
+        firstOrderID = orderID;
+      }
+    }
+
+    if (itemDetails.length === 0) {
+      // No hay nada que asignar
+      return false;
+    }
+
+    // 3) Obtener oldStatus del primer orderID (opcional, si deseas mandar a orders-service)
+    if (firstOrderID) {
+      try {
+        const response = await axios.get(`${ORDERS_SERVICE_URL}/${firstOrderID}`);
+        oldStatus = response.data.orderStatusID;
+      } catch (error) {
+        console.error(`❌ Error obteniendo estado de la orden ${firstOrderID} desde orders-service:`, error.message);
+        // Podrías ignorar o retornar false
+      }
+    }
+
+    // 4) Asignar pickers en order_product_picker
+    //    NOTA: Podrías crear un pickingRepository method que reciba itemDetails con {orderProductID, pickerRUT}
+    //    y no requiera un orderID global. 
+    //    Reusamos 'assignPickersToProducts' con un "falso" orderID => 
+    //    Realmente, assignPickersToProducts revisa "SELECT orderProductID FROM order_product WHERE orderID=? and pickingstatusid=1/2" => 
+    //    Esto asume un solo orderID. 
+    //    MEJOR: crear un method "assignPickersItems(items)" que no requiera orderID global.
+
+    // 4a) Creamos un array de "fake" group by orderID
+    const orderGroups = {};
+    for (const item of itemDetails) {
+      if (!orderGroups[item.orderID]) {
+        orderGroups[item.orderID] = [];
+      }
+      orderGroups[item.orderID].push({
+        orderProductID: item.orderProductID,
+        pickerRUT: item.pickerRUT
+      });
+    }
+
+    let finalStatus = 2; // 2 => "AsignandoPickers"
+    for (const [anOrderID, groupAssignments] of Object.entries(orderGroups)) {
+      // Llamamos un método adaptado que asigne sin filtrar pickingStatus=1/2 
+      // o creamos un method "assignPickersForOrder" con la actual logic
+      const status = await PickingRepository.assignPickersToProducts(parseInt(anOrderID, 10), groupAssignments);
+      // combinamos "status" => si uno es 3 => finalStatus=3
+      if (status === 3) {
+        finalStatus = 3;
+      }
+    }
+
+    // 5) oldStatus vs newStatus => si deseas mandar "order.status.updated"
+    //    OJO: Podrías mandar 1 evento por cada orderID. 
+    //    Por simplicidad, mandar uno por el "primer" orderID:
+    if (oldStatus != null && finalStatus !== false && oldStatus != finalStatus && firstOrderID) {
+      await sendMessage("order.status.updated", { orderID: firstOrderID, newStatus: finalStatus });
+      console.log(`📤 Estado de la orden ${firstOrderID} actualizado a ${finalStatus}`);
+    }
+
+    // devolvemos un objeto con newStatus=finalStatus, oldStatus
+    return { newStatus: finalStatus, oldStatus };
+  },
+
+  /**
+   * Actualiza las columnas 'ordersCount', 'productsCount', 'itemsCount' en picking_rounds 
+   * en base a picking_round_products (para saber cuántos 'orderID' únicos hay, cuántos 'orderProductID', y suma de quantity).
+   */
+  async updateRoundCounts(roundID) {
+    // 1) Obtener la lista de (orderID, orderProductID) en picking_round_products
+    const roundProds = await WaveRepository.getRoundProducts(roundID);
+    if (!roundProds || roundProds.length === 0) {
+      // no hay nada
+      await WaveRepository.updateRoundCounts(roundID, 0, 0, 0);
+      return;
+    }
+    // 2) Calcular distinct orderIDs, distinct products, sum of quantity
+    const distinctOrders = new Set();
+    const distinctProducts = new Set();
+    let totalItems = 0;
+
+    for (const rp of roundProds) {
+      distinctOrders.add(rp.orderID);
+      distinctProducts.add(rp.orderProductID);
+
+      // Buscar la "quantity" en order_product
+      const row = await PickingRepository.getOrderProduct(rp.orderProductID);
+      if (row) {
+        totalItems += row.quantity;
+      }
+    }
+
+    const ordersCount = distinctOrders.size;
+    const productsCount = distinctProducts.size;
+    const itemsCount = totalItems;
+
+    // 3) Update la ronda
+    await WaveRepository.updateRoundCounts(roundID, ordersCount, productsCount, itemsCount);
   },
 
 };

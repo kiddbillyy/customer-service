@@ -120,6 +120,25 @@ const WaveRepository = {
     const [rows] = await pool.query(sql, [roundID]);
     return rows[0];
   },
+  async getRoundProducts(roundID) {
+    // Devuelve rows con { orderProductID, orderID }
+    const [rows] = await pool.query(`
+      SELECT orderProductID, orderID
+      FROM picking_round_products
+      WHERE roundID = ?
+    `, [roundID]);
+    return rows;
+  },
+  async updateRoundCounts(roundID, ordersCount, productsCount, itemsCount) {
+    const sql = `
+      UPDATE picking_rounds
+      SET ordersCount = ?,
+          productsCount = ?,
+          itemsCount = ?
+      WHERE roundID = ?
+    `;
+    await pool.query(sql, [ordersCount, productsCount, itemsCount, roundID]);
+  },
 
 };
 
