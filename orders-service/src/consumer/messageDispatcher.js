@@ -24,10 +24,10 @@ module.exports = {
         `
         INSERT INTO Orders (
           docentry, docnum, folionum, cardcode, cardname, phone1, e_mail,
-          docdate, itemsamount, doctotalsy, orderStatusID, paymentMethodID, 
+          u_ref1, slpname, docdate, itemsamount, doctotalsy, orderStatusID, paymentMethodID, 
           deliveryTypeID, salesChannelID, recipient, deliveryDate, createdate, createts
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           docentry       = VALUES(docentry),
           docnum         = VALUES(docnum),
@@ -35,6 +35,8 @@ module.exports = {
           cardname       = VALUES(cardname),
           phone1         = VALUES(phone1),
           e_mail         = VALUES(e_mail),
+          u_ref1         = VALUES(u_ref1),
+          slpname         = VALUES(slpname),
           docdate        = VALUES(docdate),
           itemsamount    = VALUES(itemsamount),
           doctotalsy     = VALUES(doctotalsy),
@@ -48,7 +50,7 @@ module.exports = {
         `,
         [
           msg.docentry, msg.docnum, msg.folionum, msg.cardcode, msg.cardname, msg.phone1, msg.e_mail,
-          msg.docdate, msg.itemsamount, msg.doctotalsy, orderStatusID, msg.paymentMethodID,
+          msg.u_ref1, msg.slpname, msg.docdate, msg.itemsamount, msg.doctotalsy, orderStatusID, msg.paymentMethodID,
           msg.deliveryTypeID, msg.salesChannelID, msg.recipient, msg.deliveryDate, 
           msg.createdate, msg.createts
         ]

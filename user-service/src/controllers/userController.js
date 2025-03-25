@@ -8,6 +8,16 @@ exports.getAllUsers = async (req, res, next) => {
     next(err);
   }
 };
+exports.getAllActiveUsers = async (req, res, next) => {
+  try {
+    const users = await UserService.getAllActiveUsers();
+    res.json(users);
+  } catch (err) {
+    next(err);
+  }
+};
+
+
 
 exports.getUserByRut = async (req, res, next) => {
   try {
@@ -20,6 +30,7 @@ exports.getUserByRut = async (req, res, next) => {
     next(err);
   }
 };
+
 
 exports.updateUser = async (req, res, next) => {
   try {

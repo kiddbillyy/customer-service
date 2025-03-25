@@ -93,14 +93,18 @@ const PickingRepository = {
     return products; // Devuelve la lista de productos
   },
   
-  insertOrUpdateProduct: async ({ itemcode, dscription, price }) => {
+  insertOrUpdateProduct: async ({ itemcode, dscription, price, codebars, whscode, U_Subcategoria   }) => {
     await pool.query(`
-      INSERT INTO Products (itemcode, dscription, price)
-      VALUES (?, ?, ?)
+      INSERT INTO Products (itemcode, dscription, price, codebars, whscode, U_Subcategoria)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE 
       dscription = VALUES(dscription),
-      price = VALUES(price)
-    `, [itemcode, dscription, price]);
+      price = VALUES(price),
+      codebars = VALUES(codebars),
+      whscode = VALUES(whscode),
+      U_Subcategoria = VALUES(U_Subcategoria)
+
+    `, [itemcode, dscription, price, codebars, whscode, U_Subcategoria]);
 
     console.log(`✅ Producto ${itemcode} actualizado en la BD`);
   },
@@ -198,6 +202,7 @@ const PickingRepository = {
         op.orderProductID,
         op.orderID,
         op.itemcode,
+        p.codebars,
         p.dscription,
         p.price,
         op.quantity,
@@ -332,14 +337,32 @@ const PickingRepository = {
   getOrderProduct: async (orderProductID) => {
     const [rows] = await pool.query(
       `
-      SELECT orderProductID, itemcode, quantity, pickedQuantity
-      FROM Order_Product
-      WHERE orderProductID = ?`
-      ,
+      SELECT 
+        op.orderProductID, 
+        op.itemcode, 
+        op.quantity, 
+        op.pickedQuantity,
+        p.codebars
+      FROM Order_Product op
+      JOIN Products p ON p.itemcode = op.itemcode
+      WHERE op.orderProductID = ?
+      `,
       [orderProductID]
     );
-    return rows[0];
-  },  
+    return rows[0]; 
+  }, 
+
+  getAssignment: async (orderProductID, pickerRUT) => {
+    const [rows] = await pool.query(`
+      SELECT *
+      FROM order_product_picker
+      WHERE orderProductID = ? AND pickerRUT = ?
+    `, [orderProductID, pickerRUT]);
+  
+    return rows.length > 0 ? rows[0] : null;
+  },
+  
+
   // Obtener la asignación actual en order_product_picker
   getOrderProductPicker: async (orderProductID) => {
     const [rows] = await pool.query(
@@ -501,15 +524,53 @@ const PickingRepository = {
     return result.affectedRows;
   },
   bulkUpdateProductStatus: async (orderID, pickerRUT, newStatus) => {
+    // 1) Primero, ver cuántos productos coinciden
+    const [matchingRows] = await pool.query(`
+      SELECT DISTINCT op.orderProductID
+      FROM order_product op
+      JOIN order_product_picker opp ON opp.orderProductID = op.orderProductID
+      WHERE op.orderID = ? 
+        AND opp.pickerRUT = ?
+    `, [orderID, pickerRUT]);
+  
+    // Este es el número de productos
+    const matchedCount = matchingRows.length;
+    if (matchedCount === 0) {
+      return 0; // No hay nada que actualizar
+    }
+  
+    // 2) Ahora sí ejecutar el UPDATE
     const [result] = await pool.query(`
       UPDATE order_product op
       JOIN order_product_picker opp ON opp.orderProductID = op.orderProductID
       SET op.pickingStatusID = ?, opp.pickingStatusID = ?
-      WHERE op.orderID = ? AND opp.pickerRUT = ?
+      WHERE op.orderID = ?
+        AND opp.pickerRUT = ?
     `, [newStatus, newStatus, orderID, pickerRUT]);
   
-    return result.affectedRows; // Devuelve el número de registros actualizados
+    // 3) Retornar matchedCount en lugar de result.affectedRows
+    //    De ese modo tu endpoint dirá "Se actualizaron X productos..."
+    return matchedCount;
   },
+  bulkSetProductsInProcess: async (orderID, orderProductIDs) => {
+    if (!orderProductIDs.length) return 0;
+  
+    const placeholders = orderProductIDs.map(() => '?').join(',');
+    const sql = `
+      UPDATE order_product_picker opp
+      JOIN order_product op ON opp.orderProductID = op.orderProductID
+      SET opp.pickingStatusID = 2
+      WHERE op.orderID = ?
+        AND op.orderProductID IN (${placeholders})
+    `;
+  
+    const params = [orderID, ...orderProductIDs];
+    const [result] = await pool.query(sql, params);
+  
+    return result.affectedRows; // Aquí cuentas las filas actualizadas en order_product_picker
+  },
+
+  
   getAllOrderProducts: async() => {
     // Query para obtener todos los productos con su 'orderID'
     const [rows] = await pool.query(`

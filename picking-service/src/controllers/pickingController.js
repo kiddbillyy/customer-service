@@ -32,19 +32,17 @@ exports.assignPickers = async (req, res) => {
 
 exports.updatePickedProduct = async (req, res) => {
   try {
-    const { pickedQuantity, itemcode, pickerRUT } = req.body;
-    console.log(req.body);
+    const { pickedQuantity, providedCode, pickerRUT } = req.body;
+    
     const updated = await PickingService.updatePickedProduct(
       req.params.orderProductID,
-      pickedQuantity,
-      itemcode,
-      pickerRUT
+      providedCode,
+      pickerRUT,
+      pickedQuantity
     );
 
     if (!updated) {
-      return res.status(404).json({
-        message: "Producto no encontrado, itemcode no coincide o ya completado"
-      });
+      return res.status(404).json({ message: "Producto no encontrado, ya completado o code/picker no coincide" });
     }
 
     res.json({ message: "Producto actualizado correctamente" });
@@ -53,7 +51,6 @@ exports.updatePickedProduct = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
-
 
 
 
@@ -205,17 +202,21 @@ exports.updateAssignedProductsByPicker = async (req, res) => {
 exports.updateProductsBulkStatus = async (req, res) => {
   try {
     const { orderID } = req.params;
-    const { pickerRUT, newStatus } = req.body;
+    const { orderProductIDs } = req.body;
 
-    // Llamar a pickingService para actualizar el estado de todos los productos de este picker en la orden
-    const updatedCount = await PickingService.updateProductsBulkStatus(orderID, pickerRUT, newStatus);
+    if (!Array.isArray(orderProductIDs) || orderProductIDs.length === 0) {
+      return res.status(400).json({ message: "Debes enviar orderProductIDs en un array." });
+    }
+
+    // Llamar a pickingService para poner estos productos en estado 2
+    const updatedCount = await PickingService.setProductsInProcess(orderID, orderProductIDs);
 
     if (updatedCount === 0) {
       return res.status(404).json({ message: "No se encontraron productos para actualizar." });
     }
 
     res.json({
-      message: `Se actualizaron productos en la orden ${orderID} al estado ${newStatus} para pickerRUT=${pickerRUT}`
+      message: `Se actualizaron ${updatedCount} productos del pedido ${orderID} al estado 2 (En Proceso).`
     });
   } catch (error) {
     console.error("❌ Error en updateProductsBulkStatus controller:", error);

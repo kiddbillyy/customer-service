@@ -14,6 +14,9 @@ const router = express.Router();
 // Obtener todos los usuarios (solo Admin)
 router.get('/', userController.getAllUsers);
 
+router.get('/active', userController.getAllActiveUsers);
+
+
 // Obtener usuario por RUT (Admin o el mismo usuario... simplificado, aquí sólo Admin)
 router.get('/:rut', userController.getUserByRut);
 

@@ -4,6 +4,9 @@ const UserService = {
   getAllUsers: () => {
     return UserRepository.getAllUsers();
   },
+  getAllActiveUsers: () => {
+    return UserRepository.getAllActiveUsers();
+  },
 
   getUserByRut: async (rut) => {
     return UserRepository.findByRut(rut);

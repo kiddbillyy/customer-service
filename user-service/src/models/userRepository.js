@@ -49,13 +49,25 @@ const UserRepository = {
   // Lista todos los usuarios
   getAllUsers: async () => {
     const [rows] = await pool.query(`
-      SELECT u.*, r.roleName, s.statusName
+      SELECT u.rut, u.name, u.email, r.roleName, s.statusName
       FROM Users u
       LEFT JOIN Roles r ON u.roleID = r.roleID
       LEFT JOIN User_Status s ON u.statusID = s.statusID
     `);
     return rows;
   },
+  getAllActiveUsers: async () => {
+    const [rows] = await pool.query(`
+      SELECT u.rut, u.name, u.email, r.roleName, s.statusName
+      FROM Users u
+      LEFT JOIN Roles r ON u.roleID = r.roleID
+      LEFT JOIN User_Status s ON u.statusID = s.statusID
+      where u.statusID = 1;
+    `);
+    return rows;
+  },
+
+
 
   // Elimina usuario por rut
   deleteUser: async (rut) => {
