@@ -148,7 +148,6 @@ exports.reassignPicker = async (req, res) => {
 
 exports.getOrderProductsBulk = async (req, res) => {
   try {
-    // Recibe algo tipo: ?ids=30533,30534,30535
     const idsParam = req.query.ids; 
     if (!idsParam) {
       return res.status(400).json({ message: "Faltan IDs" });
