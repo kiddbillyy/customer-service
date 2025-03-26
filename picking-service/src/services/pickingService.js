@@ -187,6 +187,30 @@ const PickingService = {
     console.log(`✅ Productos de la orden ${orderID} registrados en Picking Service`);
   },
   
+  handleNewBundle: async (msg) => {
+    console.log('Procesando nuevo bulto');
+
+    if(!msg.bundleID){
+      console.error('❌ El ID del bulto no fue proporcionado')
+      return;
+    }
+    if (!msg.products?.length) {
+      console.error('❌ No hay productos en el mensaje');
+      return false;
+    }
+    
+    const bundle = await PickingRepository.isBundled(msg);
+    console.log(`Valor de bundle:`, bundle[0]);
+    if (bundle.length > 0 && bundle[0].bundleID !== null) {
+      console.error('❌ Ya existe un bulto para este producto');
+      return;
+    }
+    
+    await PickingRepository.handleNewBundle(msg);
+
+  },
+
+  
 
   completePicking: async (orderID) => {
 

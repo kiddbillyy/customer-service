@@ -6,20 +6,19 @@ const axios = require("axios");
 const BundlesService = {
   
   createBundle: async (orderID, pickerRUT, packageTypeID, products, height, width, length, weight, location, cubage) => {
-    // 1. Crear el bulto en la DB (inserta barcode + refid)
-    const bundleID = await BundlesRepository.createBundle(orderID, pickerRUT, packageTypeID, products, height, width, length, weight, location, cubage);
+    // Delegamos la creación al repositorio (que genera el barcode corto)
+    const bundleID = await BundlesRepository.createBundle(
+      orderID, pickerRUT, packageTypeID, products, 
+      height, width, length, weight, location, cubage
+    );
     if (!bundleID) return null;
 
-    // 2. Opcional: Determinar si es bulto suelto o múltiple
-    const isLoose = (products.length === 1);
-
-    // 3. Enviar evento a Kafka (si quieres avisar a otros servicios)
+    // Ejemplo de enviar evento
     await sendMessage("bundle.created", {
       bundleID,
       orderID,
       pickerRUT,
       packageTypeID,
-      isLoose,
       products
     });
 

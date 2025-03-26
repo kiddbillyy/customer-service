@@ -1,56 +1,42 @@
 const pool = require("../config/db");
-const crypto = require("crypto");
-
-/**
- * Hashea una cadena y devuelve el hash MD5 en formato hexadecimal (32 chars).
- */
-function md5Hash(str) {
-  return crypto.createHash("md5").update(str).digest("hex");
-}
-
-/**
- * Genera barcode (hash completo) y refid (últimos 7 chars) basados en orderID y un factor único.
- */
-function generateCodesForBundle(orderID) {
-  const uniqueFactor = `${Date.now()}-${Math.random()}`;
-  const baseString = `${orderID}-${uniqueFactor}`;
-  const hashed = md5Hash(baseString);
-
-  const barcode = hashed;                  // Hash completo
-  const refid = hashed.slice(-7).toUpperCase();  // Últimos 7 chars en mayúscula
-  return { barcode, refid };
-}
 
 const BundlesRepository = {
-  /**
-   * Crea un nuevo bulto e inserta los productos asociados.
-   * Genera automáticamente un barcode y un refid únicos.
-   */
+
   createBundle: async (orderID, pickerRUT, packageTypeID, products, height, width, length, weight, location, cubage) => {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
 
-      // Generar barcode y refid
-      const { barcode, refid } = generateCodesForBundle(orderID);
+      // 1) Obtener la secuencia
+      const [rows] = await conn.query(
+        `SELECT COUNT(*) AS count FROM Bundles WHERE orderID = ?`,
+        [orderID]
+      );
+      const currentCount = rows[0].count;
+      const nextSequence = currentCount + 1;
 
-      // Insertar el nuevo bulto en la tabla Bundles
+      // 2) Formar un barcode corto:  "orderID-0X"
+      //    Por ejemplo, si nextSequence=1 => "01", si 2 => "02", etc.
+      const sequenceStr = String(nextSequence).padStart(2, "0"); 
+      const shortBarcode = `PED${orderID}${sequenceStr}`;
+      const refid = `${orderID}${sequenceStr}`;
+
+      // 3) Insertar el nuevo bulto (usando el barcode corto)
       const [bundleResult] = await conn.query(
-        `INSERT INTO Bundles (orderID, pickerRUT, packageTypeID, barcode, refid, height, width, length, weight, location, cubage)
+        `INSERT INTO Bundles 
+         (orderID, pickerRUT, packageTypeID, barcode, refid, height, width, length, weight, location, cubage)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [orderID, pickerRUT, packageTypeID, barcode, refid, height, width, length, weight, location, cubage]
+        [orderID, pickerRUT, packageTypeID, shortBarcode, refid, height, width, length, weight, location, cubage]
       );
       const bundleID = bundleResult.insertId;
 
-      // Insertar los productos en Bundle_Products y actualizar order_product_picker
+      // Insertar productos
       for (const { orderProductID, quantity } of products) {
         await conn.query(
           `INSERT INTO Bundle_Products (bundleID, orderProductID, quantity)
            VALUES (?, ?, ?)`,
           [bundleID, orderProductID, quantity]
         );
-
-
       }
 
       await conn.commit();

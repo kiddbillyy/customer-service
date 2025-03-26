@@ -307,6 +307,29 @@ const PickingRepository = {
     return rows[0].missing > 0;
   },
 
+  handleNewBundle: async (msg) => {
+    const [result] = await pool.query(
+    `UPDATE order_product_picker
+      SET bundleID = ?
+      where orderProductID = ? and pickerRUT = ?;      
+      `,
+      [msg.bundleID, msg.products[0].orderProductID, msg.pickerRUT]
+    );
+    return result.affectedRows > 0;
+
+  },
+
+  isBundled: async (msg) => {
+    const [result] = await pool.query(
+    `select bundleID 
+    from picking_service_db.order_product_picker 
+    where orderProductID = ?`,
+    [msg.products[0].orderProductID]
+    );
+
+    return result
+  },
+
   isAllProductsAssigned: async (orderID) => {
     const [result] = await pool.query(
       `

@@ -21,5 +21,16 @@ module.exports = {
       console.error("❌ Error procesando order.status.updated:", error);
       throw error; // Para que Kafka maneje reintentos si es necesario
     }
+  },
+  
+  'bundle.created' : async (msg) => {
+    console.log('📦[picking-service] bundle.created recibido:');
+    try{
+      await pickingService.handleNewBundle(msg);
+      console.log('✅ Bulto procesado correctamente en picking-service');
+    } catch (error){
+      console.error('❌ Error procesando bundle.created: ', error);
+      throw error;
+    }
   }
 };

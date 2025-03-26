@@ -38,4 +38,5 @@ router.get("/order-products/:orderID", getOrderProductsWithBundleIDValidator, va
 // Actualizar dimensiones del bulto
 router.put("/dimensions/:bundleID", updateBundleDimensionsValidator, validateRequest, updateBundleDimensions);
 
+
 module.exports = router;

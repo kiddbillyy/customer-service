@@ -1,4 +1,8 @@
 const BundlesService = require("../services/bundlesService");
+const PDFDocument = require("pdfkit");
+const bwipJs = require("bwip-js");
+const moment = require("moment");  
+const axios = require("axios");
 
 exports.createBundle = async (req, res) => {
   try {
@@ -123,3 +127,4 @@ exports.getBundleDetails = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
+
