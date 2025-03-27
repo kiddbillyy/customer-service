@@ -150,7 +150,8 @@ exports.getOrderProductsBulk = async (req, res) => {
   try {
     const idsParam = req.query.ids; 
     if (!idsParam) {
-      return res.status(400).json({ message: "Faltan IDs" });
+      // Si no se pasan IDs, se retorna un arreglo vacío en lugar de error
+      return res.json([]);
     }
 
     // Convertir "30533,30534" en [30533, 30534]
@@ -161,7 +162,6 @@ exports.getOrderProductsBulk = async (req, res) => {
 
     const result = await PickingService.findOrderProducts(orderProductIDs);
     res.json(result);
-
   } catch (error) {
     console.error("❌ Error en getOrderProductsBulk:", error);
     res.status(500).json({ message: "Error interno de picking-service" });

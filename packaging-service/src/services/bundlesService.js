@@ -5,24 +5,132 @@ const axios = require("axios");
 
 const BundlesService = {
   
-  createBundle: async (orderID, pickerRUT, packageTypeID, products, height, width, length, weight, location, cubage) => {
-    // Delegamos la creación al repositorio (que genera el barcode corto)
+  createBundle: async (
+    orderID,
+    pickerRUT,
+    packageTypeID,
+    products,
+    height,
+    width,
+    length,
+    weight,
+    location,
+    cubage,
+    status // new field
+  ) => {
     const bundleID = await BundlesRepository.createBundle(
-      orderID, pickerRUT, packageTypeID, products, 
-      height, width, length, weight, location, cubage
+      orderID,
+      pickerRUT,
+      packageTypeID,
+      products,
+      height,
+      width,
+      length,
+      weight,
+      location,
+      cubage,
+      status
     );
     if (!bundleID) return null;
 
-    // Ejemplo de enviar evento
+    // Opción: emitir un evento "bundle.created"
     await sendMessage("bundle.created", {
       bundleID,
       orderID,
       pickerRUT,
-      packageTypeID,
-      products
+      status
     });
-
     return bundleID;
+  },
+  updateBundleDraft: async (bundleID, fieldsToUpdate, products) => {
+    // 1) Verificamos si el bulto está en 'draft'
+    const bundle = await BundlesRepository.getBundleById(bundleID);
+    if (!bundle || bundle.length === 0) {
+      return { success: false, statusCode: 404, message: "Bulto no encontrado" };
+    }
+    if (bundle[0].status !== "draft") {
+      return {
+        success: false,
+        statusCode: 400,
+        message: "No se puede editar un bulto que no está en 'draft'"
+      };
+    }
+
+    // 2) Actualizamos campos (dimensiones, location, etc.)
+    const updated = await BundlesRepository.updateBundleDraft(bundleID, fieldsToUpdate);
+    if (!updated) {
+      return {
+        success: false,
+        statusCode: 400,
+        message: "No se pudo actualizar el bulto en la base de datos"
+      };
+    }
+
+    // 3) Si 'products' viene, podría significar:
+    //    - Agregar productos (si no están ya)
+    //    - Eliminar productos (?)
+    //    Lo más simple: “agregar los que no estén”
+    //    Podrías hacer una lógica extra si quieres eliminar o reemplazar
+    if (products && products.length > 0) {
+      // Lógica para insertar o actualizar
+      // Asumo que 'products' es array con { orderProductID, quantity }
+      for (const prod of products) {
+        await BundlesRepository.addOrUpdateBundleProduct(
+          bundleID,
+          prod.orderProductID,
+          prod.quantity
+        );
+      }
+    }
+
+    // Listo
+    return { success: true, message: "Bulto en draft actualizado correctamente" };
+  },
+
+  // FINALIZAR PACKAGING DE LA ORDEN
+  finalizeOrderPackaging: async (orderID) => {
+    // A) Verificar que exista al menos 1 bulto para la orden
+    const bundles = await BundlesRepository.getBundlesByOrder(orderID);
+    if (!bundles || bundles.length === 0) {
+      return {
+        success: false,
+        message: "No hay bultos creados para esta orden"
+      };
+    }
+
+    // B) Verificar que NINGÚN bulto esté vacío (sin productos)
+    //    Nos basta con contar cuántos productos hay en cada bulto
+    for (const b of bundles) {
+      const countProducts = await BundlesRepository.countProductsInBundle(b.bundleID);
+      if (countProducts === 0) {
+        return {
+          success: false,
+          message: `El bulto ${b.bundleID} no tiene productos, debes eliminarlo o asignarle productos antes de finalizar`
+        };
+      }
+    }
+
+    // C) Verificar que TODOS los productos de la orden estén en algún bulto
+    //    1) Cuántos productos totales tiene la orden
+    const totalOrderProducts = await BundlesRepository.countOrderProducts(orderID);
+    //    2) Cuántos están asignados a algún bundle
+    const totalAssigned = await BundlesRepository.countOrderProductsAssignedToBundles(orderID);
+
+    if (totalOrderProducts !== totalAssigned) {
+      return {
+        success: false,
+        message: "Existen productos de esta orden que no están en ningún bulto"
+      };
+    }
+
+    // Si todo está OK, cambiamos todos los bultos a 'completed'
+    // (o cada uno a 'completed' si todavía tienen 'draft')
+    await BundlesRepository.completeAllBundlesOfOrder(orderID);
+
+    return {
+      success: true,
+      message: "Todos los bultos de la orden han sido finalizados con éxito"
+    };
   },
 
   markProductAsLoose: async (orderProductID) => {
@@ -31,6 +139,10 @@ const BundlesService = {
 
   getBundlesByOrder: async (orderID) => {
     return await BundlesRepository.getBundlesByOrder(orderID);
+  },
+
+  getBundlesByPicker: async (orderID, pickerRUT) => {
+    return await BundlesRepository.getBundlesByPicker(orderID, pickerRUT);
   },
 
   getBundleDetails: async (bundleID) => {
@@ -105,6 +217,7 @@ const BundlesService = {
     // 1) Obtener datos locales de Bundles y Bundle_Products
     const rows = await BundlesRepository.getBundleAndProductsLocal(bundleID);
     if (!rows || rows.length === 0) return null;
+    
 
     // Armar objeto base con los campos del primer registro
     const bundleDetails = {
@@ -119,6 +232,7 @@ const BundlesService = {
       products: []
     };
 
+
     // Lista de orderProductIDs (únicos) para pedir a picking-service
     const orderProductIDs = [];
 
@@ -132,6 +246,10 @@ const BundlesService = {
       });
       orderProductIDs.push(row.orderProductID);
     });
+    if (orderProductIDs.length === 0) {
+      // No hay productos: retorna inmediatamente el bundle con products: []
+      return bundleDetails; // 'bundleDetails' va con products vacío
+    }
 
     // 2) Llamar a picking-service con la lista de orderProductIDs
     const pickingData = await pickingServiceClient.fetchOrderProductDetails(orderProductIDs);

@@ -2,12 +2,24 @@ const pool = require("../config/db");
 
 const BundlesRepository = {
 
-  createBundle: async (orderID, pickerRUT, packageTypeID, products, height, width, length, weight, location, cubage) => {
+  createBundle: async (
+    orderID,
+    pickerRUT,
+    packageTypeID,
+    products,
+    height,
+    width,
+    length,
+    weight,
+    location,
+    cubage,
+    status
+  ) => {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
 
-      // 1) Obtener la secuencia
+      // 1) Contamos cuántos bultos hay para hacer nuestro shortBarcode
       const [rows] = await conn.query(
         `SELECT COUNT(*) AS count FROM Bundles WHERE orderID = ?`,
         [orderID]
@@ -15,28 +27,41 @@ const BundlesRepository = {
       const currentCount = rows[0].count;
       const nextSequence = currentCount + 1;
 
-      // 2) Formar un barcode corto:  "orderID-0X"
-      //    Por ejemplo, si nextSequence=1 => "01", si 2 => "02", etc.
-      const sequenceStr = String(nextSequence).padStart(2, "0"); 
+      const sequenceStr = String(nextSequence).padStart(2, "0");
       const shortBarcode = `PED${orderID}${sequenceStr}`;
       const refid = `${orderID}${sequenceStr}`;
 
-      // 3) Insertar el nuevo bulto (usando el barcode corto)
+      // 2) Insertar en Bundles (incluyendo status)
       const [bundleResult] = await conn.query(
-        `INSERT INTO Bundles 
-         (orderID, pickerRUT, packageTypeID, barcode, refid, height, width, length, weight, location, cubage)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [orderID, pickerRUT, packageTypeID, shortBarcode, refid, height, width, length, weight, location, cubage]
+        `INSERT INTO Bundles
+         (orderID, pickerRUT, packageTypeID, barcode, refid, height, width, length, weight, location, cubage, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          orderID,
+          pickerRUT,
+          packageTypeID,
+          shortBarcode,
+          refid,
+          height || 0,
+          width || 0,
+          length || 0,
+          weight || 0,
+          location || null,
+          cubage || 0,
+          status
+        ]
       );
       const bundleID = bundleResult.insertId;
 
-      // Insertar productos
-      for (const { orderProductID, quantity } of products) {
-        await conn.query(
-          `INSERT INTO Bundle_Products (bundleID, orderProductID, quantity)
-           VALUES (?, ?, ?)`,
-          [bundleID, orderProductID, quantity]
-        );
+      // 3) Insertar productos (si vienen)
+      if (products && products.length > 0) {
+        for (const { orderProductID, quantity } of products) {
+          await conn.query(
+            `INSERT INTO Bundle_Products (bundleID, orderProductID, quantity)
+             VALUES (?, ?, ?)`,
+            [bundleID, orderProductID, quantity || 1]
+          );
+        }
       }
 
       await conn.commit();
@@ -86,6 +111,109 @@ const BundlesRepository = {
       [orderID]
     );
     return bundles;
+  },
+
+  updateBundleDraft: async (bundleID, fieldsToUpdate) => {
+    // Construir el query dinámicamente o algo simple:
+    const {
+      packageTypeID,
+      height,
+      width,
+      length,
+      weight,
+      location
+    } = fieldsToUpdate;
+
+    // Query de ejemplo
+    const [result] = await pool.query(
+      `UPDATE Bundles
+       SET
+         packageTypeID = COALESCE(?, packageTypeID),
+         height        = COALESCE(?, height),
+         width         = COALESCE(?, width),
+         length        = COALESCE(?, length),
+         weight        = COALESCE(?, weight),
+         location      = COALESCE(?, location)
+       WHERE bundleID = ?`,
+      [packageTypeID, height, width, length, weight, location, bundleID]
+    );
+    return result.affectedRows > 0;
+  },
+  addOrUpdateBundleProduct: async (bundleID, orderProductID, quantity) => {
+    // Ver si ya existe:
+    const [rows] = await pool.query(
+      `SELECT * FROM Bundle_Products
+       WHERE bundleID = ? AND orderProductID = ?`,
+      [bundleID, orderProductID]
+    );
+    if (rows.length > 0) {
+      // Ya existe, actualizamos la quantity
+      await pool.query(
+        `UPDATE Bundle_Products
+         SET quantity = ?
+         WHERE bundleID = ? AND orderProductID = ?`,
+        [quantity, bundleID, orderProductID]
+      );
+    } else {
+      // Insertamos
+      await pool.query(
+        `INSERT INTO Bundle_Products (bundleID, orderProductID, quantity)
+         VALUES (?, ?, ?)`,
+        [bundleID, orderProductID, quantity]
+      );
+    }
+  },
+  getBundlesByOrder: async (orderID) => {
+    const [bundles] = await pool.query(
+      `SELECT * FROM Bundles WHERE orderID = ?`,
+      [orderID]
+    );
+    return bundles;
+  },
+  countProductsInBundle: async (bundleID) => {
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) as total
+       FROM Bundle_Products
+       WHERE bundleID = ?`,
+      [bundleID]
+    );
+    return total;
+  },
+  getBundlesByPicker: async (orderID, pickerRUT) => {
+    const [rows] = await pool.query(
+      `SELECT * FROM Bundles 
+       WHERE orderID = ? 
+         AND pickerRUT = ?`,
+      [orderID, pickerRUT]
+    );
+    return rows;
+  },
+  countOrderProducts: async (orderID) => {
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) as total
+       FROM Order_Product
+       WHERE orderID = ?`,
+      [orderID]
+    );
+    return total;
+  },
+  countOrderProductsAssignedToBundles: async (orderID) => {
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(DISTINCT bp.orderProductID) as total
+       FROM Bundle_Products bp
+       INNER JOIN Bundles b ON bp.bundleID = b.bundleID
+       WHERE b.orderID = ?`,
+      [orderID]
+    );
+    return total;
+  },
+  completeAllBundlesOfOrder: async (orderID) => {
+    await pool.query(
+      `UPDATE Bundles
+       SET status = 'completed'
+       WHERE orderID = ?`,
+      [orderID]
+    );
   },
 
   getBundleDetails: async (bundleID) => {
@@ -192,7 +320,7 @@ const BundlesRepository = {
         bp.orderProductID,
         bp.quantity AS expected
       FROM Bundles b
-      JOIN Bundle_Products bp ON bp.bundleID = b.bundleID
+      LEFT JOIN Bundle_Products bp ON bp.bundleID = b.bundleID
       WHERE b.bundleID = ?;
       `,
       [bundleID]

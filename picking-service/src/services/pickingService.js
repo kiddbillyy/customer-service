@@ -199,13 +199,6 @@ const PickingService = {
       return false;
     }
     
-    const bundle = await PickingRepository.isBundled(msg);
-    console.log(`Valor de bundle:`, bundle[0]);
-    if (bundle.length > 0 && bundle[0].bundleID !== null) {
-      console.error('❌ Ya existe un bulto para este producto');
-      return;
-    }
-    
     await PickingRepository.handleNewBundle(msg);
 
   },

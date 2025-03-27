@@ -4,14 +4,15 @@ const PICKING_BASE_URL = process.env.PICKING_SERVICE_URL || "http://192.168.0.83
 
 const pickingServiceClient = {
   fetchOrderProductDetails: async (orderProductIDs) => {
-    // Llamamos al endpoint que creaste en picking-service
+    if (!orderProductIDs || orderProductIDs.length === 0) {
+      // No hay IDs para consultar, se retorna un arreglo vacío
+      return [];
+    }
     const idsParam = orderProductIDs.join(",");
     const url = `${PICKING_BASE_URL}/order-products/bulk?ids=${idsParam}`;
-    
     const { data } = await axios.get(url);
-    // data será el array con itemcode, found, not_found, repicked, pickerRUT, etc.
     return data;
-  }
+  },
 };
 
 module.exports = pickingServiceClient;

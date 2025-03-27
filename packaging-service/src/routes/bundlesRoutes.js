@@ -5,7 +5,10 @@ const {
   getBundleDetails,
   getOrderProductsWithBundleID,
   getAllBundles,
-  updateBundleDimensions
+  updateBundleDimensions,
+  updateBundleDraft,
+  finalizeOrderPackaging,
+  getBundlesByPicker
 } = require("../controllers/bundlesController");
 
 const {
@@ -24,7 +27,7 @@ const router = express.Router();
 router.get("/", getAllBundles);
 
 // Crear un bulto
-router.post("/create", createBundleValidator, validateRequest, createBundle);
+router.post("/create", createBundle);
 
 // Obtener bultos de una orden
 router.get("/:orderID", getBundlesByOrderValidator, validateRequest, getBundlesByOrder);
@@ -37,6 +40,15 @@ router.get("/order-products/:orderID", getOrderProductsWithBundleIDValidator, va
 
 // Actualizar dimensiones del bulto
 router.put("/dimensions/:bundleID", updateBundleDimensionsValidator, validateRequest, updateBundleDimensions);
+
+// Nuevo endpoint para actualizar un bulto en draft (agregar/quitar productos, cambiar height, etc.)
+router.put("/update/:bundleID", updateBundleDraft);
+
+// Endpoint para finalizar el packaging de una orden
+router.post("/finalize/:orderID", finalizeOrderPackaging);
+
+// Bultos creados por un picker a un pedido
+router.get("/order/:orderID/picker/:pickerRUT", getBundlesByPicker);
 
 
 module.exports = router;

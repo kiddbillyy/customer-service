@@ -1,23 +1,127 @@
 const BundlesService = require("../services/bundlesService");
-const PDFDocument = require("pdfkit");
-const bwipJs = require("bwip-js");
-const moment = require("moment");  
-const axios = require("axios");
+
 
 exports.createBundle = async (req, res) => {
   try {
+    const {
+      orderID,
+      pickerRUT,
+      packageTypeID,
+      products,
+      height,
+      width,
+      length,
+      weight,
+      location,
+      status = "draft"
+    } = req.body;
 
-    const { orderID, pickerRUT, packageTypeID, products, height, width, length, weight, location} = req.body;
-    const cubage = height * width * length;
+    // 1) Validación de campos mínimos
+    if (!orderID || !pickerRUT) {
+      return res.status(400).json({ message: "Faltan campos requeridos (orderID y pickerRUT)" });
+    }
 
-    const bundleID = await BundlesService.createBundle(orderID, pickerRUT, packageTypeID, products, height, width, length, weight, location, cubage);
+    // 2) Validar que obligatoriamente haya al menos 1 producto
+    if (!products || products.length === 0) {
+      return res.status(400).json({
+        message: "Debes asignar al menos 1 producto al crear el bulto"
+      });
+    }
+
+    // Calcular cubage si se desea
+    const cubage = (height && width && length) ? height * width * length : 0;
+
+    // 3) Llamar al servicio
+    const bundleID = await BundlesService.createBundle(
+      orderID,
+      pickerRUT,
+      packageTypeID,
+      products,
+      height,
+      width,
+      length,
+      weight,
+      location,
+      cubage,
+      status
+    );
+
     if (!bundleID) {
       return res.status(500).json({ message: "Error al crear el bulto" });
     }
 
-    return res.status(201).json({ message: "Bulto creado con éxito", bundleID });
+    return res.status(201).json({
+      message: "Bulto creado con éxito",
+      bundleID
+    });
   } catch (error) {
     console.error("❌ Error creando bulto:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+
+exports.updateBundleDraft = async (req, res) => {
+  try {
+    const { bundleID } = req.params;
+    const {
+      packageTypeID,
+      height,
+      width,
+      length,
+      weight,
+      location,
+      products,   // si queremos agregar/quitar o actualizar productos
+    } = req.body;
+
+    // Llamamos al service
+    const result = await BundlesService.updateBundleDraft(
+      bundleID,
+      {
+        packageTypeID,
+        height,
+        width,
+        length,
+        weight,
+        location
+      },
+      products // array con la nueva lista o productos a agregar/quitar
+    );
+
+    if (!result.success) {
+      return res.status(result.statusCode).json({ message: result.message });
+    }
+
+    res.json({ message: result.message });
+  } catch (error) {
+    console.error("❌ Error actualizando bulto en draft:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+exports.finalizeOrderPackaging = async (req, res) => {
+  try {
+    const { orderID } = req.params;
+
+    const result = await BundlesService.finalizeOrderPackaging(orderID);
+
+    if (!result.success) {
+      return res.status(400).json({ message: result.message });
+    }
+
+    return res.json({ message: "Packaging finalizado con éxito" });
+  } catch (error) {
+    console.error("❌ Error finalizando packaging de la orden:", error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+exports.getBundlesByPicker = async (req, res) => {
+  try {
+    const { orderID, pickerRUT } = req.params;
+    const bundles = await BundlesService.getBundlesByPicker(orderID, pickerRUT);
+    return res.json(bundles);
+  } catch (error) {
+    console.error("❌ Error obteniendo bultos por picker:", error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
@@ -113,18 +217,5 @@ exports.updateBundleDimensions = async (req, res) => {
   }
 };
 
-exports.getBundleDetails = async (req, res) => {
-  try {
-    const { bundleID } = req.params;
-    const result = await BundlesService.getBundleDetails(bundleID);
 
-    if (!result) {
-      return res.status(404).json({ message: "Bulto no encontrado" });
-    }
-    res.json(result);
-  } catch (error) {
-    console.error("❌ Error obteniendo detalles del bulto:", error);
-    res.status(500).json({ message: "Error interno del servidor" });
-  }
-};
 
