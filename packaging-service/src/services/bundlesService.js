@@ -152,6 +152,10 @@ const BundlesService = {
   getOrderProductsWithBundleID: async (orderID) => {
     return await BundlesRepository.getOrderProductsWithBundleID(orderID);
   },
+  getMyBundlesByOrder: async (orderID, pickerRUT) => {
+    // Delegamos la query al repositorio
+    return await BundlesRepository.getBundlesByPicker(orderID, pickerRUT);
+  },
 
   getAllBundles: async () => {
     // 1. Obtener los bultos desde la base de datos

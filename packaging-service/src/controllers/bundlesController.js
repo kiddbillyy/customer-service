@@ -126,6 +126,22 @@ exports.getBundlesByPicker = async (req, res) => {
   }
 };
 
+exports.getMyBundlesByOrder = async (req, res) => {
+  try {
+    const { orderID, pickerRUT } = req.params;
+
+    // Llamamos al servicio
+    const bundles = await BundlesService.getMyBundlesByOrder(orderID, pickerRUT);
+
+    // Si no hay bultos, podemos retornar un arreglo vacío o un 404, según tu preferencia
+    // Aquí devolvemos un array vacío y status 200
+    return res.status(200).json(bundles);
+  } catch (error) {
+    console.error("❌ Error obteniendo bultos por picker:", error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
 exports.markProductAsLoose = async (req, res) => {
   try {
     const { orderProductID } = req.body;
