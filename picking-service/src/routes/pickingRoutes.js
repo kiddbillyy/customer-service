@@ -12,7 +12,8 @@ const {
   getOrderProductsBulk,
   updateAssignedProductsByPicker,
   updateProductsBulkStatus,
-  getAllOrdersProducts
+  getAllOrdersProducts,
+  getAssignedQuantity
 } = require("../controllers/pickingController");
 
 const {
@@ -49,6 +50,10 @@ router.put("/assigned/:pickerRUT", updateAssignedProductsByPicker);
 
 // Obtener todos los pedidos con productos
 router.get("/products/all", getAllOrdersProducts);
+
+
+// Obtener cantidades asignadas 
+router.get("/assigned-quantity", getAssignedQuantity); 
 
 // Actualizar cantidad pickeada de un producto en una orden
 router.put(

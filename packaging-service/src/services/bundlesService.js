@@ -16,13 +16,35 @@ const BundlesService = {
     weight,
     location,
     cubage,
-    status // new field
+    status
   ) => {
+    // 1) Validar primero, sin crear bulto todavía
+    //    Si alguno falla, retorna error o null
+    for (const prod of products) {
+      const { orderProductID, quantity } = prod;
+  
+      // 1.1) assignedQuantity => picking-service
+      const assignedQuantity = await pickingServiceClient.fetchAssignedQuantity(orderProductID, pickerRUT);
+  
+      // 1.2) Sumar lo que ya está asignado en bultos anteriores
+      //      NOTA: Al no existir bulto todavía, le pasamos excludeBundleID=0, 
+      //      para que no afecte la query con "!= excludeBundleID".
+      const alreadyAssigned = await BundlesRepository.getAlreadyAssignedToPicker(orderProductID, pickerRUT, 0);
+  
+      const remaining = assignedQuantity - alreadyAssigned;
+      if (quantity > remaining) {
+        throw new Error(`No se puede crear el bulto: Intentas asignar ${quantity}, pero sólo quedan ${remaining} disponibles para el producto ${orderProductID}.`);
+      }
+    }
+  
+    // 2) Si llegamos aquí, significa que todos los productos son válidos.
+    //    Ahora sí creamos el bulto en la base de datos.
+  
     const bundleID = await BundlesRepository.createBundle(
       orderID,
       pickerRUT,
       packageTypeID,
-      products,
+      products, // Insertamos de una vez los productos
       height,
       width,
       length,
@@ -31,15 +53,20 @@ const BundlesService = {
       cubage,
       status
     );
-    if (!bundleID) return null;
-
-    // Opción: emitir un evento "bundle.created"
+  
+    if (!bundleID) {
+      // Si por alguna razón falló la inserción
+      return null;
+    }
+  
+    // 3) Opcional: Emitir evento "bundle.created"
     await sendMessage("bundle.created", {
       bundleID,
       orderID,
       pickerRUT,
       status
     });
+  
     return bundleID;
   },
   updateBundleDraft: async (bundleID, fieldsToUpdate, products) => {
@@ -75,11 +102,19 @@ const BundlesService = {
       // Lógica para insertar o actualizar
       // Asumo que 'products' es array con { orderProductID, quantity }
       for (const prod of products) {
-        await BundlesRepository.addOrUpdateBundleProduct(
-          bundleID,
-          prod.orderProductID,
-          prod.quantity
-        );
+        try {
+          await BundlesService.addOrUpdateProductWithValidation(
+            bundleID,
+            prod.orderProductID,
+            prod.quantity
+          );
+        } catch (err) {
+          return {
+            success: false,
+            statusCode: 400,
+            message: err.message
+          };
+        }
       }
     }
 
@@ -131,6 +166,40 @@ const BundlesService = {
       success: true,
       message: "Todos los bultos de la orden han sido finalizados con éxito"
     };
+  },
+  addOrUpdateProductWithValidation: async (bundleID, orderProductID, quantity) => {
+    // 1) Obtener info del bulto local, para saber pickerRUT
+    const bundleRows = await BundlesRepository.getBundleById(bundleID);
+    if (!bundleRows || bundleRows.length === 0) {
+      throw new Error(`Bulto ${bundleID} no existe`);
+    }
+    const pickerRUT = bundleRows[0].pickerRUT;
+  
+    // 2) Llamar a picking-service -> assignedQuantity
+    const assignedQuantity = await pickingServiceClient.fetchAssignedQuantity(orderProductID, pickerRUT);
+    console.log("assignedQuantity =>", assignedQuantity);
+    // Ej: 5
+  
+    // 3) Sumar cuántas ya están asignadas a bultos distintos (o el mismo bulto si quieres excluirlo)
+    // Creamos un método en BundlesRepository que sume:
+    // "SELECT COALESCE(SUM(quantity), 0) FROM Bundle_Products bp JOIN Bundles b ON b.bundleID=bp.bundleID
+    //  WHERE bp.orderProductID=? AND b.pickerRUT=? AND b.bundleID != ?"
+    const alreadyAssigned = await BundlesRepository.getAlreadyAssignedToPicker(
+      orderProductID,
+      pickerRUT,
+      bundleID
+    );
+    console.log("alreadyAssigned =>", alreadyAssigned);
+    console.log("quantity =>", quantity);
+    // p.e. 2
+  
+    const remaining = assignedQuantity - alreadyAssigned; // p.e. 3
+    if (quantity > remaining) {
+      throw new Error(`Asignas ${quantity}, pero sólo quedan ${remaining} disponibles para este picker/producto.`);
+    }
+  
+    // 4) Insert/Update en la DB local
+    await BundlesRepository.addOrUpdateBundleProduct(bundleID, orderProductID, quantity);
   },
 
   markProductAsLoose: async (orderProductID) => {

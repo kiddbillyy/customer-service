@@ -13,6 +13,12 @@ const pickingServiceClient = {
     const { data } = await axios.get(url);
     return data;
   },
+  async fetchAssignedQuantity(orderProductID, pickerRUT) {
+    const resp = await axios.get(`${PICKING_BASE_URL}/assigned-quantity`, {
+      params: { orderProductID, pickerRUT }
+    });
+    return resp.data.assignedQuantity; // number
+  },
 };
 
 module.exports = pickingServiceClient;

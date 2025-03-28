@@ -235,3 +235,23 @@ exports.getAllOrdersProducts = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
+
+exports.getAssignedQuantity = async (req, res) => {
+  try {
+    const { orderProductID, pickerRUT } = req.query;
+
+    // 1) Buscar en 'order_product_picker' la fila
+    const assigned = await PickingService.getAssignedQuantity(orderProductID, pickerRUT);
+    if (assigned === null) {
+      return res.status(404).json({
+        message: "No se encontró asignación para ese orderProductID y pickerRUT"
+      });
+    }
+
+    // Devuelve { assignedQuantity: number }
+    return res.json({ assignedQuantity: assigned });
+  } catch (error) {
+    console.error("❌ Error al obtener assignedQuantity:", error);
+    res.status(500).json({ message: "Error interno de picking-service" });
+  }
+};

@@ -285,6 +285,10 @@ const PickingService = {
     return await PickingRepository.updateAssignedProductsByPicker(pickerRUT, orderID, newPickingStatus);
   },
   
+  getAssignedQuantity: async (orderProductID, pickerRUT) => {
+    return await PickingRepository.getAssignedQuantity(orderProductID, pickerRUT);
+  },
+  
   updateProductsBulkStatus: async (orderID, pickerRUT, newStatus) => {
     // Llamar a PickingRepository para actualizar los productos asignados
     const updatedCount = await PickingRepository.bulkUpdateProductStatus(orderID, pickerRUT, newStatus);

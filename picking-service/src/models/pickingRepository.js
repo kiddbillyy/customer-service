@@ -546,6 +546,20 @@ const PickingRepository = {
   
     return result.affectedRows;
   },
+
+  getAssignedQuantity: async (orderProductID, pickerRUT) => {
+    const [rows] = await pool.query(`
+      SELECT assignedQuantity
+      FROM order_product_picker
+      WHERE orderProductID = ?
+        AND pickerRUT = ?
+      LIMIT 1
+    `, [orderProductID, pickerRUT]);
+  
+    if (rows.length === 0) return null;
+    return rows[0].assignedQuantity; // number
+  },
+
   bulkUpdateProductStatus: async (orderID, pickerRUT, newStatus) => {
     // 1) Primero, ver cuántos productos coinciden
     const [matchingRows] = await pool.query(`

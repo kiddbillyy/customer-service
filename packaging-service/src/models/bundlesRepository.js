@@ -112,6 +112,17 @@ const BundlesRepository = {
     );
     return bundles;
   },
+  getAlreadyAssignedToPicker: async (orderProductID, pickerRUT, excludeBundleID) => {
+    const [rows] = await pool.query(`
+      SELECT COALESCE(SUM(bp.quantity), 0) as total
+      FROM Bundle_Products bp
+      JOIN Bundles b ON b.bundleID = bp.bundleID
+      WHERE bp.orderProductID = ?
+        AND b.pickerRUT = ?
+        AND b.bundleID != ?
+    `, [orderProductID, pickerRUT, excludeBundleID]);
+    return rows[0].total;
+  },
 
   updateBundleDraft: async (bundleID, fieldsToUpdate) => {
     // Construir el query dinámicamente o algo simple:
