@@ -18,33 +18,51 @@ const BundlesService = {
     cubage,
     status
   ) => {
-    // 1) Validar primero, sin crear bulto todavía
-    //    Si alguno falla, retorna error o null
+    // 1) Validar primero, sin crear el bulto todavía
+    //    Si alguno falla, retorna error (no se crea en DB).
     for (const prod of products) {
       const { orderProductID, quantity } = prod;
+      console.log("Validando prod:", prod.orderProductID, "qtyWanted=", prod.quantity);
+
   
-      // 1.1) assignedQuantity => picking-service
-      const assignedQuantity = await pickingServiceClient.fetchAssignedQuantity(orderProductID, pickerRUT);
+      // 1.1) Obtener cuántas unidades tiene el picker en picking-service
+      const assignedQuantity = await pickingServiceClient.fetchAssignedQuantity(
+        orderProductID,
+        pickerRUT
+      );
+      console.log("assignedQuantity=", assignedQuantity);
   
-      // 1.2) Sumar lo que ya está asignado en bultos anteriores
-      //      NOTA: Al no existir bulto todavía, le pasamos excludeBundleID=0, 
-      //      para que no afecte la query con "!= excludeBundleID".
-      const alreadyAssigned = await BundlesRepository.getAlreadyAssignedToPicker(orderProductID, pickerRUT, 0);
-  
+      // 1.2) Sumar cuántas ya están en bultos anteriores
+      //      Al no existir bulto nuevo todavía, usamos excludeBundleID=0.
+      const alreadyAssigned = await BundlesRepository.getAlreadyAssignedToPicker(
+        orderProductID,
+        pickerRUT,
+        0
+      );
+      console.log("alreadyAssigned=", alreadyAssigned);
       const remaining = assignedQuantity - alreadyAssigned;
+  
+      // Si remaining <= 0, ya no hay disponibilidad para este producto.
+      if (remaining <= 0) {
+        throw new Error(
+          `No se puede crear el bulto: el producto ${orderProductID} no tiene disponibilidad (restan ${remaining}).`
+        );
+      }
+      console.log("remaining=", remaining);
+      // Si la cantidad requerida excede lo que queda, también error.
       if (quantity > remaining) {
-        throw new Error(`No se puede crear el bulto: Intentas asignar ${quantity}, pero sólo quedan ${remaining} disponibles para el producto ${orderProductID}.`);
+        throw new Error(
+          `No se puede crear el bulto: intentas asignar ${quantity}, pero sólo quedan ${remaining} disponibles (producto ${orderProductID}).`
+        );
       }
     }
   
-    // 2) Si llegamos aquí, significa que todos los productos son válidos.
-    //    Ahora sí creamos el bulto en la base de datos.
-  
+    // 2) Si todas las validaciones pasan, ahora sí creamos el bulto en DB.
     const bundleID = await BundlesRepository.createBundle(
       orderID,
       pickerRUT,
       packageTypeID,
-      products, // Insertamos de una vez los productos
+      products, // Insertamos los productos de una vez.
       height,
       width,
       length,
@@ -55,11 +73,11 @@ const BundlesService = {
     );
   
     if (!bundleID) {
-      // Si por alguna razón falló la inserción
+      // Si la inserción falló por alguna razón
       return null;
     }
   
-    // 3) Opcional: Emitir evento "bundle.created"
+    // 3) (Opcional) Emitir evento "bundle.created"
     await sendMessage("bundle.created", {
       bundleID,
       orderID,
@@ -224,6 +242,10 @@ const BundlesService = {
   getMyBundlesByOrder: async (orderID, pickerRUT) => {
     // Delegamos la query al repositorio
     return await BundlesRepository.getBundlesByPicker(orderID, pickerRUT);
+  },
+  getTotalAssignedToPicker: async (orderProductID, pickerRUT) => {
+    // Llama a un método del repositorio
+    return await BundlesRepository.getTotalAssignedToPicker(orderProductID, pickerRUT);
   },
 
   getAllBundles: async () => {

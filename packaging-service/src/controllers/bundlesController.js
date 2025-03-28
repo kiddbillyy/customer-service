@@ -142,6 +142,20 @@ exports.getMyBundlesByOrder = async (req, res) => {
   }
 };
 
+exports.getAssignedToPicker = async (req, res) => {
+  try {
+    const { orderProductID, pickerRUT } = req.query;
+
+    // Llamamos a un método que sume la cantidad total en bultos de este picker
+    const totalInBultos = await BundlesService.getTotalAssignedToPicker(orderProductID, pickerRUT);
+
+    return res.json({ totalInBultos });
+  } catch (err) {
+    console.error("Error en /assigned-quantity packaging-service:", err);
+    return res.status(500).json({ message: "Error interno packaging-service" });
+  }
+};
+
 exports.markProductAsLoose = async (req, res) => {
   try {
     const { orderProductID } = req.body;

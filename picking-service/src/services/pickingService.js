@@ -1,4 +1,5 @@
 const PickingRepository = require("../models/pickingRepository");
+const packagingServiceClient = require("../client/packagingServiceClient.js")
 const { sendMessage } = require("../producer");
 const axios = require("axios");
 
@@ -53,7 +54,25 @@ const PickingService = {
     );
     // Luego, filtramos aquellos que pertenecen al orderID indicado
     const filteredProducts = products.filter((prod) => prod.orderID == orderID);
-    return filteredProducts;
+    const enriched = [];
+
+    for (const p of filteredProducts) {
+      // Llamada HTTP a packaging-service
+      const totalInBultos = await packagingServiceClient.fetchAssignedToPicker(p.orderProductID, p.Pickeador);
+
+      // asume p.quantity es la cantidad total para ese product/picker
+      const assignedQuantity = p.quantity; 
+      const availableForPacking = assignedQuantity - totalInBultos;
+
+      enriched.push({
+        ...p,
+        availableForPacking
+      });
+    }
+    
+
+    return enriched;
+
   },
 
   getProductsAssignedToPicker: async (pickerRUT) => {

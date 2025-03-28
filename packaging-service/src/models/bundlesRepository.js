@@ -190,6 +190,18 @@ const BundlesRepository = {
     );
     return total;
   },
+  getTotalAssignedToPicker: async (orderProductID, pickerRUT) => {
+    // Suma la cantidad en Bundle_Products para todos los bultos del mismo picker
+    const [rows] = await pool.query(`
+      SELECT COALESCE(SUM(bp.quantity), 0) as totalAssigned
+      FROM Bundle_Products bp
+      JOIN Bundles b ON b.bundleID = bp.bundleID
+      WHERE bp.orderProductID = ?
+        AND b.pickerRUT = ?
+    `, [orderProductID, pickerRUT]);
+  
+    return rows[0].totalAssigned;
+  },
   getBundlesByPicker: async (orderID, pickerRUT) => {
     const [rows] = await pool.query(
       `SELECT * FROM Bundles 

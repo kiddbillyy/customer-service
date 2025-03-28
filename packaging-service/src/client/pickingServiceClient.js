@@ -14,7 +14,7 @@ const pickingServiceClient = {
     return data;
   },
   async fetchAssignedQuantity(orderProductID, pickerRUT) {
-    const resp = await axios.get(`${PICKING_BASE_URL}/assigned-quantity`, {
+    const resp = await axios.get(`${PICKING_BASE_URL}/get/quantity`, {
       params: { orderProductID, pickerRUT }
     });
     return resp.data.assignedQuantity; // number

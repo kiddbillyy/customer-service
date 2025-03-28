@@ -9,7 +9,8 @@ const {
   updateBundleDraft,
   finalizeOrderPackaging,
   getBundlesByPicker,
-  getMyBundlesByOrder 
+  getMyBundlesByOrder,
+  getAssignedToPicker
 } = require("../controllers/bundlesController");
 
 const {
@@ -54,5 +55,7 @@ router.get("/order/:orderID/picker/:pickerRUT", getBundlesByPicker);
 // Obtener mis bultos de un pedido
 router.get("/:orderID/myBundles/:pickerRUT", getMyBundlesByOrder);
 
+// Productos en bultos
+router.get("/assigned/quantity", getAssignedToPicker);
 
 module.exports = router;
