@@ -88,7 +88,7 @@ const BundlesService = {
     return bundleID;
   },
   updateBundleDraft: async (bundleID, fieldsToUpdate, products) => {
-    // 1) Verificamos si el bulto está en 'draft'
+    // 1) Verificamos si el bulto existe y está en 'draft'
     const bundle = await BundlesRepository.getBundleById(bundleID);
     if (!bundle || bundle.length === 0) {
       return { success: false, statusCode: 404, message: "Bulto no encontrado" };
@@ -100,8 +100,8 @@ const BundlesService = {
         message: "No se puede editar un bulto que no está en 'draft'"
       };
     }
-
-    // 2) Actualizamos campos (dimensiones, location, etc.)
+  
+    // 2) Actualizamos los campos generales del bulto (dimensiones, ubicación, etc.)
     const updated = await BundlesRepository.updateBundleDraft(bundleID, fieldsToUpdate);
     if (!updated) {
       return {
@@ -110,33 +110,52 @@ const BundlesService = {
         message: "No se pudo actualizar el bulto en la base de datos"
       };
     }
-
-    // 3) Si 'products' viene, podría significar:
-    //    - Agregar productos (si no están ya)
-    //    - Eliminar productos (?)
-    //    Lo más simple: “agregar los que no estén”
-    //    Podrías hacer una lógica extra si quieres eliminar o reemplazar
-    if (products && products.length > 0) {
-      // Lógica para insertar o actualizar
-      // Asumo que 'products' es array con { orderProductID, quantity }
-      for (const prod of products) {
-        try {
-          await BundlesService.addOrUpdateProductWithValidation(
-            bundleID,
-            prod.orderProductID,
-            prod.quantity
-          );
-        } catch (err) {
-          return {
-            success: false,
-            statusCode: 400,
-            message: err.message
-          };
-        }
+  
+    // 3) Manejo de los productos:
+    // 3.1 Obtener la lista de productos que ya están en el bulto
+    const existingProducts = await BundlesRepository.getProductsOfBundle(bundleID);
+    // Construir un mapa de los productos actuales, clave: orderProductID, valor: quantity
+    const existingMap = {};
+    existingProducts.forEach(prod => {
+      existingMap[prod.orderProductID] = prod.quantity;
+    });
+  
+    // 3.2 Construir un mapa de los productos enviados en el request
+    const newMap = {};
+    if (products && Array.isArray(products)) {
+      products.forEach(prod => {
+        newMap[prod.orderProductID] = prod.quantity;
+      });
+    }
+  
+    // 3.3 Eliminar los productos que estaban en el bulto pero ya no vienen en el request
+    for (const orderProductID in existingMap) {
+      if (!newMap.hasOwnProperty(orderProductID)) {
+        await BundlesRepository.removeBundleProduct(bundleID, orderProductID);
       }
     }
-
-    // Listo
+  
+    // 3.4 Insertar o actualizar los productos enviados
+    // Para cada producto en el nuevo array, se realiza la validación parcial
+    for (const orderProductID in newMap) {
+      const quantity = newMap[orderProductID];
+      try {
+        // Esta función valida que la cantidad no supere lo disponible y
+        // inserta o actualiza el registro en Bundle_Products
+        await BundlesService.addOrUpdateProductWithValidation(
+          bundleID,
+          orderProductID,
+          quantity
+        );
+      } catch (err) {
+        return {
+          success: false,
+          statusCode: 400,
+          message: err.message
+        };
+      }
+    }
+  
     return { success: true, message: "Bulto en draft actualizado correctamente" };
   },
 

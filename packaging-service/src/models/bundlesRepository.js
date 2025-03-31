@@ -361,6 +361,22 @@ const BundlesRepository = {
 
     return result.affectedRows > 0; // true si se actualizó
   },
+  getProductsOfBundle: async (bundleID) => {
+    const [rows] = await pool.query(`
+      SELECT orderProductID, quantity
+      FROM Bundle_Products
+      WHERE bundleID = ?
+    `, [bundleID]);
+    return rows; // [{orderProductID: 45960, quantity: 4}, ...]
+  },
+  removeBundleProduct: async (bundleID, orderProductID) => {
+    const [result] = await pool.query(`
+      DELETE FROM Bundle_Products
+      WHERE bundleID = ?
+        AND orderProductID = ?
+    `, [bundleID, orderProductID]);
+    return result.affectedRows > 0;
+  },
 };
 
 module.exports = BundlesRepository;
