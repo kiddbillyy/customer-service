@@ -65,8 +65,10 @@ const OrdersService = {
         pickingStatusID = 1; // Hay productos pendientes
       } else if (productStatuses.includes(2)) {
         pickingStatusID = 2; // No hay pendientes, pero hay en picking
+      } else if (productStatuses.includes(3)) {
+        pickingStatusID = 3; // No hay pendientes, pero hay en picking
       } else {
-        pickingStatusID = 3; // Todos los productos están completados
+        pickingStatusID = 4; // Todos los productos están completados
       }
 
       return {
@@ -77,7 +79,9 @@ const OrdersService = {
       };
     });
 
-    return enrichedOrders;
+    const filteredOrders = enrichedOrders.filter(order => order.pickingStatusID !== 4);
+
+    return filteredOrders;
   },
 
   createOrder: async (orderData, products) => {
