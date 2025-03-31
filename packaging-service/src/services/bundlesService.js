@@ -77,13 +77,6 @@ const BundlesService = {
       return null;
     }
   
-    // 3) (Opcional) Emitir evento "bundle.created"
-    await sendMessage("bundle.created", {
-      bundleID,
-      orderID,
-      pickerRUT,
-      status
-    });
   
     return bundleID;
   },
