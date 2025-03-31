@@ -349,7 +349,18 @@ const BundlesRepository = {
       [bundleID]
     );
     return rows;
-  }
+  },
+  markBundleCompleted: async (bundleID, orderID) => {
+    const [result] = await pool.query(`
+      UPDATE Bundles
+      SET status = 'completed'
+      WHERE bundleID = ?
+        AND orderID = ?
+        AND status = 'draft'
+    `, [bundleID, orderID]);
+
+    return result.affectedRows > 0; // true si se actualizó
+  },
 };
 
 module.exports = BundlesRepository;

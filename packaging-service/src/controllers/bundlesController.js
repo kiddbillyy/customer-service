@@ -115,6 +115,33 @@ exports.finalizeOrderPackaging = async (req, res) => {
   }
 };
 
+exports.finalizePackingManual = async (req, res) => {
+  try {
+    const { orderID } = req.params;
+    const { bundles } = req.body;
+
+    if (!bundles || !Array.isArray(bundles) || bundles.length === 0) {
+      return res.status(400).json({
+        message: "Debes enviar al menos un bulto con productos en el body 'bundles'."
+      });
+    }
+
+    const result = await BundlesService.finalizePackingManual(orderID, bundles);
+
+    if (!result.success) {
+      return res.status(400).json({ message: result.message });
+    }
+
+    return res.status(200).json({
+      message: "Packing finalizado con éxito",
+      details: result.details || {},
+    });
+  } catch (error) {
+    console.error("❌ Error finalizando packing manual:", error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
 exports.getBundlesByPicker = async (req, res) => {
   try {
     const { orderID, pickerRUT } = req.params;

@@ -176,6 +176,26 @@ const PickingRepository = {
       console.log(`✅ order_product_picker actualizado: orderProductID=${orderProductID}, bundleID=${bundleID}`);
     }
   },
+  updateProductsToPacked: async (orderProductIDs) =>  {
+    // 1) Genera placeholders para el IN (...)
+    const placeholders = orderProductIDs.map(() => '?').join(', ');
+  
+    // 2) Actualizar order_product_picker
+    let sql = `
+      UPDATE order_product_picker
+      SET pickingStatusID = 4
+      WHERE orderProductID IN (${placeholders})
+    `;
+    await pool.query(sql, orderProductIDs);
+  
+    // 3) Actualizar también la tabla order_product
+    sql = `
+      UPDATE order_product
+      SET pickingStatusID = 4
+      WHERE orderProductID IN (${placeholders})
+    `;
+    await pool.query(sql, orderProductIDs);
+  },
 
   updateStatus: async (orderProductPickerID, pickingStatusID) => {
     const [result] = await pool.query(

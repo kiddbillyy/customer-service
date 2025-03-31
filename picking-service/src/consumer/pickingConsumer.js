@@ -13,7 +13,7 @@ const consumeMessages = async () => {
 
     await consumer.subscribe({ topic: 'new.order.created', fromBeginning: true });
     await consumer.subscribe({ topic: 'order.status.updated', fromBeginning: true });
-    await consumer.subscribe({ topic: 'bundle.created', fromBeginning: true });
+    await consumer.subscribe({ topic: 'bundle.ready', fromBeginning: true });
 
     await consumer.run({
       autoCommit: false,

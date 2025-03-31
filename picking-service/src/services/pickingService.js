@@ -164,6 +164,20 @@ const PickingService = {
     // Delegar a la capa de persistencia
     await PickingRepository.updateOrderProductPicker(bundleID, products);
   },
+  handleBundleReady: async (msg) => {
+    console.log("🎯 handleBundleReady con:", msg);
+
+    // Validaciones mínimas
+    if (!msg.orderProductIDs || msg.orderProductIDs.length === 0) {
+      console.log("⚠️ Ningún orderProductID enviado en bundle.ready, nada que actualizar");
+      return;
+    }
+
+    // Llamas al repositorio para marcar estos productos como '4' (empacado)
+    await PickingRepository.updateProductsToPacked(msg.orderProductIDs);
+
+    console.log(`✅ Se actualizaron ${msg.orderProductIDs.length} productos a estado=4 (empacado).`);
+  },
   
   handleOrderStatusUpdated: async ({ orderID, newStatus }) => {
     if (!orderID || typeof newStatus !== "number") {

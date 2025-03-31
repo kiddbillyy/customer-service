@@ -376,7 +376,48 @@ const BundlesService = {
     });
 
     return bundleDetails;
-  }
+  },
+  finalizePackingManual: async (orderID, bundles) => {
+    try {
+      // 1) Actualizar cada bulto
+      for (const b of bundles) {
+        // Cambiar su estado a 'completed'
+        const updated = await BundlesRepository.markBundleCompleted(b.bundleID, orderID);
+        if (!updated) {
+          return {
+            success: false,
+            message: `No se pudo completar el bulto ${b.bundleID} (no existe o no es 'draft').`,
+          };
+        }
+      }
+
+      // 2) Juntar todos los orderProductID en un array para notificar
+      const allOrderProductIDs = [];
+      for (const b of bundles) {
+        if (b.products && Array.isArray(b.products)) {
+          for (const p of b.products) {
+            allOrderProductIDs.push(p.orderProductID);
+          }
+        }
+      }
+
+      // 3) Emitir el evento "bundle.ready" via Kafka con la lista
+      await sendMessage("bundle.ready", {
+        orderID,
+        orderProductIDs: allOrderProductIDs
+      });
+
+      return {
+        success: true,
+        message: "Finalizado correctamente",
+        details: { totalBundles: bundles.length, totalProducts: allOrderProductIDs.length },
+      };
+
+    } catch (error) {
+      console.error("❌ Error en finalizePackingManual:", error);
+      return { success: false, message: error.message };
+    }
+  },
   
 };
 

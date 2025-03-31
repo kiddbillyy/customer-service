@@ -7,7 +7,7 @@ const {
   getAllBundles,
   updateBundleDimensions,
   updateBundleDraft,
-  finalizeOrderPackaging,
+  finalizePackingManual,
   getBundlesByPicker,
   getMyBundlesByOrder,
   getAssignedToPicker
@@ -47,7 +47,7 @@ router.put("/dimensions/:bundleID", updateBundleDimensionsValidator, validateReq
 router.put("/update/:bundleID", updateBundleDraft);
 
 // Endpoint para finalizar el packaging de una orden
-router.post("/finalize/:orderID", finalizeOrderPackaging);
+router.post("/finalize/:orderID", finalizePackingManual);
 
 // Bultos creados por un picker a un pedido
 router.get("/order/:orderID/picker/:pickerRUT", getBundlesByPicker);

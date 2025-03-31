@@ -23,14 +23,15 @@ module.exports = {
     }
   },
   
-  'bundle.created' : async (msg) => {
-    console.log('📦[picking-service] bundle.created recibido:');
-    try{
-      await pickingService.handleNewBundle(msg);
+  'bundle.ready': async (msg) => {
+    console.log('[picking-service] bundle.ready recibido:', msg);
+    try {
+      // Llamas a la capa de servicio para manejar la actualización
+      await pickingService.handleBundleReady(msg);
       console.log('✅ Bulto procesado correctamente en picking-service');
-    } catch (error){
-      console.error('❌ Error procesando bundle.created: ', error);
+    } catch (error) {
+      console.error('❌ Error procesando bundle.ready:', error);
       throw error;
     }
-  }
+  },
 };
