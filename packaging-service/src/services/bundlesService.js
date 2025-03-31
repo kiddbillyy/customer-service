@@ -334,6 +334,10 @@ const BundlesService = {
       barcode: rows[0].barcode,
       refid: rows[0].refid,
       auditStatusID: rows[0].auditStatusID,
+      height: rows[0].height,
+      width: rows[0].width,
+      length: rows[0].length,
+      weight: rows[0].weight,
       cubage: rows[0].cubage,
       location: rows[0].location,
       products: []
