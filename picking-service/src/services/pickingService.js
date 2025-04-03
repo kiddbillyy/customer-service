@@ -369,37 +369,41 @@ const PickingService = {
     return Object.values(ordersMap);
   },
   markProductAsMissing: async (orderProductID, pickerRUT, missingQuantity) => {
-    // 1) Obtener la asignación actual para ese producto y picker
+    // 1) Obtener la asignación actual (order_product_picker) para ese picker
     const assignment = await PickingRepository.getAssignment(orderProductID, pickerRUT);
     if (!assignment) {
       return { success: false, message: "No se encontró asignación para este producto y picker." };
     }
-    
-    // 2) Calcular lo que aún no se ha recogido:
-    //    available = assignedQuantity - pickedQuantity
-    const available = assignment.assignedQuantity - assignment.pickedQuantity;
-    if (missingQuantity > available) {
+  
+    // 2) Calcular el disponible que aún no se ha pickeado ni declarado missing
+    //    disponibleParaMarcar = assignedQuantity - pickedQuantity - missingQuantity (si ya teníamos algo 'missing')
+    const alreadyMissing = assignment.missingQuantity || 0; // asumiendo la columna nueva
+    const disponibleParaMarcar = assignment.assignedQuantity - assignment.pickedQuantity - alreadyMissing;
+  
+    if (missingQuantity > disponibleParaMarcar) {
       return {
         success: false,
-        message: `La cantidad a marcar como faltante (${missingQuantity}) excede lo disponible (${available}).`
+        message: `No se pueden marcar ${missingQuantity} como faltantes. Solo hay ${disponibleParaMarcar} disponibles.`
       };
     }
-    
-    // 3) Actualizar en order_product: incrementar el campo notFound
-    const updatedProduct = await PickingRepository.updateOrderProductNotFound(orderProductID, missingQuantity);
-    if (!updatedProduct) {
-      return { success: false, message: "No se pudo actualizar el producto en order_product." };
-    }
-    
-    // 4) Calcular la nueva cantidad asignada para ese picker (reducir la asignación)
+  
+    // 3) Actualizar la asignación en order_product_picker:
+    //    - Aumentar missingQuantity en X
+    //    - Disminuir assignedQuantity en la misma cantidad X (para "liberar" esas unidades)
+    const newMissing = alreadyMissing + missingQuantity;
     const newAssigned = assignment.assignedQuantity - missingQuantity;
-    
-    // 5) Actualizar la asignación en order_product_picker
-    const updatedAssignment = await PickingRepository.updateAssignmentQuantityForMissing(orderProductID, pickerRUT, newAssigned);
-    if (!updatedAssignment) {
+  
+    const updated = await PickingRepository.updateAssignmentMissingQuantity(
+      orderProductID,
+      pickerRUT,
+      newMissing,
+      newAssigned
+    );
+  
+    if (!updated) {
       return { success: false, message: "No se pudo actualizar la asignación en order_product_picker." };
     }
-    
+  
     return { success: true };
   },
   

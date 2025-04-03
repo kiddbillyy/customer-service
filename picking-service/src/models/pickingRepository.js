@@ -407,6 +407,18 @@ const PickingRepository = {
     );
     return rows[0]; 
   },
+  updateAssignmentMissingQuantity: async (orderProductID, pickerRUT, newMissingQuantity, newAssignedQuantity) => {
+    const [result] = await pool.query(`
+      UPDATE picking_service_db.order_product_picker
+      SET missingQuantity = ?,
+          assignedQuantity = ?
+      WHERE orderProductID = ?
+        AND pickerRUT = ?
+    `, [newMissingQuantity, newAssignedQuantity, orderProductID, pickerRUT]);
+  
+    // rowsAffected[0] > 0 indica que sí se actualizó
+    return result.rowsAffected[0] > 0;
+  },
 
   getAssignment: async (orderProductID, pickerRUT) => {
     const [rows] = await pool.query(`
