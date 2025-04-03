@@ -4,11 +4,12 @@ const WaveRepository = {
   // 1. Crear Ola
   async createWave(waveData) {
     const sql = `
-      INSERT INTO picking_waves (
+      INSERT INTO picking_service_db.picking_waves (
         pickingPoint, startDate, endDate, 
         ordersPlanned, ordersPicked, itemsPlanned, itemsPicked,
         isBlocked, waveStatus
       ) 
+      OUTPUT INSERTED.waveID
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const {
@@ -29,17 +30,18 @@ const WaveRepository = {
       isBlocked || 0,
       waveStatus || 'Pendiente'
     ]);
-    return result.insertId;
+    return result[0].waveID;
   },
 
   // 2. Crear Ronda
   async createRound(roundData) {
     const sql = `
-      INSERT INTO picking_rounds (
+      INSERT INTO picking_service_db.picking_rounds (
         waveID, pickingPoint, pickerName, pickerEmail, 
         ordersCount, productsCount, itemsCount, missingItems,
         isCompleted, roundStatus
       ) 
+      OUTPUT INSERTED.roundID
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await pool.query(sql, [
@@ -54,14 +56,15 @@ const WaveRepository = {
       roundData.isCompleted || 0,
       roundData.roundStatus || 'Pendiente'
     ]);
-    return result.insertId;
+    return result[0].roundID;
   },
+  
 
   // 3. Asignar productos (o un subset de productos) a la ronda
   async assignProductsToRound(roundID, products) {
     // products: array de { orderID, orderProductID }
     const sql = `
-      INSERT INTO picking_round_products (roundID, orderID, orderProductID) 
+      INSERT INTO picking_service_db.picking_round_products (roundID, orderID, orderProductID) 
       VALUES (?, ?, ?)
     `;
     for (const p of products) {
@@ -69,69 +72,79 @@ const WaveRepository = {
     }
   },
 
-  // 4. Actualizar el estado de la ola (opcional)
+  // 4. Actualizar el estado de la ola
   async updateWaveStatus(waveID, newStatus) {
-    const sql = `UPDATE picking_waves SET waveStatus=? WHERE waveID=?`;
+    const sql = `UPDATE picking_service_db.picking_waves SET waveStatus = ? WHERE waveID = ?`;
     await pool.query(sql, [newStatus, waveID]);
   },
 
-  // 5. Actualizar el estado de la ronda (opcional)
+  // 5. Actualizar el estado de la ronda
   async updateRoundStatus(roundID, newStatus) {
-    const sql = `UPDATE picking_rounds SET roundStatus=? WHERE roundID=?`;
+    const sql = `UPDATE picking_service_db.picking_rounds SET roundStatus = ? WHERE roundID = ?`;
     await pool.query(sql, [newStatus, roundID]);
   },
+
+  // Upsert de producto en la ronda
   async upsertRoundProduct(roundID, orderID, orderProductID) {
-    // Insertar si no existe (ON DUPLICATE KEY nada)
     const sql = `
-      INSERT INTO picking_round_products (roundID, orderID, orderProductID)
-      VALUES (?, ?, ?)
-      ON DUPLICATE KEY UPDATE roundID=roundID
+      MERGE picking_service_db.picking_round_products AS target
+      USING (VALUES (?, ?, ?)) AS source (roundID, orderID, orderProductID)
+      ON target.roundID = source.roundID 
+         AND target.orderID = source.orderID 
+         AND target.orderProductID = source.orderProductID
+      WHEN NOT MATCHED THEN
+        INSERT (roundID, orderID, orderProductID)
+        VALUES (source.roundID, source.orderID, source.orderProductID);
     `;
     await pool.query(sql, [roundID, orderID, orderProductID]);
   },
+
   async getWaves() {
-    const sql = `SELECT * FROM picking_waves`;
+    const sql = `SELECT * FROM picking_service_db.picking_waves`;
     const [rows] = await pool.query(sql);
     return rows;
   },
+
   async getRounds() {
-    const sql = `SELECT * FROM picking_rounds`;
+    const sql = `SELECT * FROM picking_service_db.picking_rounds`;
     const [rows] = await pool.query(sql);
     return rows;
   },
 
   // Obtener una ola por ID
   async getWaveById(waveID) {
-    const sql = `SELECT * FROM picking_waves WHERE waveID = ?`;
+    const sql = `SELECT * FROM picking_service_db.picking_waves WHERE waveID = ?`;
     const [rows] = await pool.query(sql, [waveID]);
     return rows[0];
   },
 
   // Obtener todas las rondas de una ola
   async getRoundsByWaveId(waveID) {
-    const sql = `SELECT * FROM picking_rounds WHERE waveID = ?`;
+    const sql = `SELECT * FROM picking_service_db.picking_rounds WHERE waveID = ?`;
     const [rows] = await pool.query(sql, [waveID]);
     return rows;
   },
 
   // Obtener una ronda por su ID
   async getRoundById(roundID) {
-    const sql = `SELECT * FROM picking_rounds WHERE roundID = ?`;
+    const sql = `SELECT * FROM picking_service_db.picking_rounds WHERE roundID = ?`;
     const [rows] = await pool.query(sql, [roundID]);
     return rows[0];
   },
+
+  // Obtener productos asignados a la ronda
   async getRoundProducts(roundID) {
-    // Devuelve rows con { orderProductID, orderID }
     const [rows] = await pool.query(`
       SELECT orderProductID, orderID
-      FROM picking_round_products
+      FROM picking_service_db.picking_round_products
       WHERE roundID = ?
     `, [roundID]);
     return rows;
   },
+
   async updateRoundCounts(roundID, ordersCount, productsCount, itemsCount) {
     const sql = `
-      UPDATE picking_rounds
+      UPDATE picking_service_db.picking_rounds
       SET ordersCount = ?,
           productsCount = ?,
           itemsCount = ?
@@ -139,7 +152,6 @@ const WaveRepository = {
     `;
     await pool.query(sql, [ordersCount, productsCount, itemsCount, roundID]);
   },
-
 };
 
 module.exports = WaveRepository;

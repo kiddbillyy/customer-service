@@ -103,20 +103,3 @@ exports.getOrdersByPickerRUT = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
-
-exports.createOrder = async (req, res) => {
-  try {
-    // Se espera que el body tenga "orderData" y "products"
-    const { orderData, products } = req.body;
-    const orderID = await OrdersService.createOrder(orderData, products);
-
-    if (!orderID) {
-      return res.status(400).json({ message: "No se pudo crear el pedido" });
-    }
-
-    res.status(201).json({ message: "Pedido creado exitosamente", orderID });
-  } catch (error) {
-    console.error("Error creando el pedido:", error);
-    res.status(500).json({ message: "Error interno del servidor" });
-  }
-};

@@ -2,35 +2,37 @@ const pool = require("../config/db");
 
 const OrdersRepository = {
   getAllOrders: async () => {
-    const [orders] = await pool.query("SELECT * FROM Orders");
+    const [orders] = await pool.query("SELECT * FROM orders_service_db.Orders");
     return orders;
   },
   getOrdersAudit: async () => {
     const [orders] = await pool.query(
-      "SELECT * FROM Orders WHERE orderstatusid = 6"
+      "SELECT * FROM orders_service_db.Orders WHERE orderstatusid = 6"
     );
     return orders;
   },
   getOrdersByIDs: async (idsArray) => {
     if (idsArray.length === 0) return [];
-
+  
+    // Crear placeholders: "?, ?, ?" según la cantidad de elementos
+    const placeholders = idsArray.map(() => '?').join(', ');
     const [rows] = await pool.query(
       `
-      SELECT 
-        orderID, 
-        folionum, 
-        cardname
-      FROM orders
-      WHERE orderID IN (?)
+        SELECT 
+          orderID, 
+          folionum, 
+          cardname
+        FROM orders_service_db.orders
+        WHERE orderID IN (${placeholders})
       `,
-      [idsArray]
+      idsArray
     );
-
+  
     return rows;
   },
 
   getOrderById: async (orderID) => {
-    const [order] = await pool.query("SELECT * FROM Orders WHERE orderID = ?", [
+    const [order] = await pool.query("SELECT * FROM orders_service_db.Orders WHERE orderID = ?", [
       orderID,
     ]);
     return order.length ? order[0] : null;
@@ -62,15 +64,10 @@ const OrdersRepository = {
 
   updateOrderStatus: async (orderID, orderStatusID) => {
     const [result] = await pool.query(
-      "UPDATE Orders SET orderStatusID = ? WHERE orderID = ?",
+      "UPDATE orders_service_db.Orders SET orderStatusID = ? WHERE orderID = ?",
       [orderStatusID, orderID]
     );
-    return result.affectedRows > 0;
-  },
-
-  createOrder: async (orderData) => {
-    const [result] = await pool.query("INSERT INTO Orders SET ?", orderData);
-    return result.insertId;
+    return result.rowsAffected[0] > 0;
   },
 
   // Verificar si una orden está completa
@@ -78,7 +75,7 @@ const OrdersRepository = {
     const [rows] = await pool.query(
       `
       SELECT COUNT(*) as pending 
-      FROM Order_Product
+      FROM orders_service_db.Order_Product
       WHERE orderID = ?
         AND pickingStatusID != (
           SELECT pickingStatusID 
@@ -94,7 +91,7 @@ const OrdersRepository = {
 
   getMaxCreatets: async () => {
     const [rows] = await pool.query(`
-      SELECT MAX(createts) AS createts FROM Orders
+      SELECT MAX(createts) AS createts FROM orders_service_db.Orders
     `);
     console.log("🔎 Query ejecutada: ", rows);
     // Devuelve "000000" si no hay registros
@@ -103,7 +100,7 @@ const OrdersRepository = {
 
   getLastQueryDate: async () => {
     const [rows] = await pool.query(`
-      SELECT MAX(lastquerydate) as lastquerydate FROM Orders 
+      SELECT MAX(lastquerydate) as lastquerydate FROM orders_service_db.Orders 
     `);
     console.log("🔎 Query ejecutada: ", rows);
     // Devuelve "000000" si no hay registros

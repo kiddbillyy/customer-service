@@ -368,8 +368,40 @@ const PickingService = {
     // 3. Convertir el objeto final en un array
     return Object.values(ordersMap);
   },
-  
-
+  markProductAsMissing: async (orderProductID, pickerRUT, missingQuantity) => {
+    // 1) Obtener la asignación actual para ese producto y picker
+    const assignment = await PickingRepository.getAssignment(orderProductID, pickerRUT);
+    if (!assignment) {
+      return { success: false, message: "No se encontró asignación para este producto y picker." };
+    }
+    
+    // 2) Calcular lo que aún no se ha recogido:
+    //    available = assignedQuantity - pickedQuantity
+    const available = assignment.assignedQuantity - assignment.pickedQuantity;
+    if (missingQuantity > available) {
+      return {
+        success: false,
+        message: `La cantidad a marcar como faltante (${missingQuantity}) excede lo disponible (${available}).`
+      };
+    }
+    
+    // 3) Actualizar en order_product: incrementar el campo notFound
+    const updatedProduct = await PickingRepository.updateOrderProductNotFound(orderProductID, missingQuantity);
+    if (!updatedProduct) {
+      return { success: false, message: "No se pudo actualizar el producto en order_product." };
+    }
+    
+    // 4) Calcular la nueva cantidad asignada para ese picker (reducir la asignación)
+    const newAssigned = assignment.assignedQuantity - missingQuantity;
+    
+    // 5) Actualizar la asignación en order_product_picker
+    const updatedAssignment = await PickingRepository.updateAssignmentQuantityForMissing(orderProductID, pickerRUT, newAssigned);
+    if (!updatedAssignment) {
+      return { success: false, message: "No se pudo actualizar la asignación en order_product_picker." };
+    }
+    
+    return { success: true };
+  },
   
 };
 
@@ -380,7 +412,7 @@ const PickingService = {
 async function getorderIDByOrderProduct(orderProductID) {
   const { default: pool } = await import("../config/db.js");
   const [rows] = await pool.query(
-    `SELECT orderID FROM Order_Product WHERE orderProductID = ?`,
+    `SELECT orderID FROM picking_service_db.Order_Product WHERE orderProductID = ?`,
     [orderProductID]
   );
   return rows[0] || {};

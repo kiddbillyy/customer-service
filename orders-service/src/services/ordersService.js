@@ -84,38 +84,6 @@ const OrdersService = {
     return filteredOrders;
   },
 
-  createOrder: async (orderData, products) => {
-    try {
-      // 1. Insertar la orden manualmente
-      const orderID = await OrdersRepository.createOrder(orderData);
-
-      // 2. Verificar que efectivamente se creó en la DB
-      if (!orderID) {
-        console.error("❌ No se pudo insertar la orden en la base de datos");
-        return null;
-      }
-
-      // 3. Recuperar la orden recién insertada con su ID autogenerado
-      const order = await OrdersRepository.getOrderById(orderID);
-      if (!order) {
-        console.error("❌ No se encontró la orden después de crearla");
-        return null;
-      }
-
-      // 4. Enviar mensaje new.order.created con la orden confirmada de DB
-      await sendMessage("new.order.created", { 
-        ...order,    // contiene orderID y demás campos
-        products     // productos que venían en la solicitud
-      });
-      console.log(`📤 Evento new.order.created enviado para orderID=${order.orderID}`);
-
-      return orderID;
-    } catch (error) {
-      console.error("❌ Error en createOrder:", error);
-      throw error;
-    }
-  },
-
   updateOrderStatus: async (orderID, orderStatusID) => {
     const currentOrder = await OrdersRepository.getOrderById(orderID);
     if (!currentOrder) {

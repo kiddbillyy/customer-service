@@ -15,26 +15,23 @@ const BundlesRepository = {
     cubage,
     status
   ) => {
-    const conn = await pool.getConnection();
     try {
-      await conn.beginTransaction();
-
-      // 1) Contamos cuántos bultos hay para hacer nuestro shortBarcode
-      const [rows] = await conn.query(
-        `SELECT COUNT(*) AS count FROM Bundles WHERE orderID = ?`,
+      // 1) Contamos cuántos bultos hay para generar nuestro shortBarcode
+      const [rows] = await pool.query(
+        `SELECT COUNT(*) AS count FROM packaging_service_db.Bundles WHERE orderID = ?`,
         [orderID]
       );
       const currentCount = rows[0].count;
       const nextSequence = currentCount + 1;
-
       const sequenceStr = String(nextSequence).padStart(2, "0");
       const shortBarcode = `PED${orderID}${sequenceStr}`;
       const refid = `${orderID}${sequenceStr}`;
-
-      // 2) Insertar en Bundles (incluyendo status)
-      const [bundleResult] = await conn.query(
-        `INSERT INTO Bundles
+  
+      // 2) Insertar en Bundles con OUTPUT para obtener bundleID
+      const [bundleResult] = await pool.query(
+        `INSERT INTO packaging_service_db.Bundles
          (orderID, pickerRUT, packageTypeID, barcode, refid, height, width, length, weight, location, cubage, status)
+         OUTPUT INSERTED.bundleID
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           orderID,
@@ -51,38 +48,34 @@ const BundlesRepository = {
           status
         ]
       );
-      const bundleID = bundleResult.insertId;
-
+      const bundleID = bundleResult[0].bundleID;
+  
       // 3) Insertar productos (si vienen)
       if (products && products.length > 0) {
         for (const { orderProductID, quantity } of products) {
-          await conn.query(
-            `INSERT INTO Bundle_Products (bundleID, orderProductID, quantity)
+          await pool.query(
+            `INSERT INTO packaging_service_db.Bundle_Products (bundleID, orderProductID, quantity)
              VALUES (?, ?, ?)`,
             [bundleID, orderProductID, quantity || 1]
           );
         }
       }
-
-      await conn.commit();
+  
       return bundleID;
     } catch (error) {
-      await conn.rollback();
       console.error("❌ Error creando bulto:", error);
       return null;
-    } finally {
-      conn.release();
     }
   },
 
   markProductAsLoose: async (orderProductID) => {
     const [result] = await pool.query(
-      `UPDATE order_product_picker
+      `UPDATE packaging_service_db.order_product_picker
        SET bundleID = NULL
        WHERE orderProductID = ?`,
       [orderProductID]
     );
-    return result.affectedRows > 0;
+    return result.rowsAffected[0] > 0;
   },
 
   getAllBundles: async () => {
@@ -93,13 +86,14 @@ const BundlesRepository = {
         barcode AS idEntidad,
         auditRUT AS Controlador,
         auditStatusID AS estado
-      FROM Bundles
+      FROM packaging_service_db.Bundles
     `);
     return rows;
   },
+
   getBundleById: async (bundleID) => {
     const [rows] = await pool.query(
-      `SELECT * FROM Bundles WHERE bundleID = ?`,
+      `SELECT * FROM packaging_service_db.Bundles WHERE bundleID = ?`,
       [bundleID]
     );
     return rows;
@@ -107,25 +101,26 @@ const BundlesRepository = {
 
   getBundlesByOrder: async (orderID) => {
     const [bundles] = await pool.query(
-      `SELECT * FROM Bundles WHERE orderID = ?`,
+      `SELECT * FROM packaging_service_db.Bundles WHERE orderID = ?`,
       [orderID]
     );
     return bundles;
   },
+
   getAlreadyAssignedToPicker: async (orderProductID, pickerRUT, excludeBundleID) => {
-    const [rows] = await pool.query(`
-      SELECT COALESCE(SUM(bp.quantity), 0) as total
-      FROM Bundle_Products bp
-      JOIN Bundles b ON b.bundleID = bp.bundleID
-      WHERE bp.orderProductID = ?
-        AND b.pickerRUT = ?
-        AND b.bundleID != ?
-    `, [orderProductID, pickerRUT, excludeBundleID]);
+    const [rows] = await pool.query(
+      `SELECT ISNULL(SUM(bp.quantity), 0) as total
+       FROM packaging_service_db.Bundle_Products bp
+       JOIN packaging_service_db.Bundles b ON b.bundleID = bp.bundleID
+       WHERE bp.orderProductID = ?
+         AND b.pickerRUT = ?
+         AND b.bundleID != ?`,
+      [orderProductID, pickerRUT, excludeBundleID]
+    );
     return rows[0].total;
   },
 
   updateBundleDraft: async (bundleID, fieldsToUpdate) => {
-    // Construir el query dinámicamente o algo simple:
     const {
       packageTypeID,
       height,
@@ -135,9 +130,8 @@ const BundlesRepository = {
       location
     } = fieldsToUpdate;
 
-    // Query de ejemplo
     const [result] = await pool.query(
-      `UPDATE Bundles
+      `UPDATE packaging_service_db.Bundles
        SET
          packageTypeID = COALESCE(?, packageTypeID),
          height        = COALESCE(?, height),
@@ -148,91 +142,85 @@ const BundlesRepository = {
        WHERE bundleID = ?`,
       [packageTypeID, height, width, length, weight, location, bundleID]
     );
-    return result.affectedRows > 0;
+    return result.rowsAffected[0] > 0;
   },
+
   addOrUpdateBundleProduct: async (bundleID, orderProductID, quantity) => {
-    // Ver si ya existe:
     const [rows] = await pool.query(
-      `SELECT * FROM Bundle_Products
+      `SELECT * FROM packaging_service_db.Bundle_Products
        WHERE bundleID = ? AND orderProductID = ?`,
       [bundleID, orderProductID]
     );
     if (rows.length > 0) {
-      // Ya existe, actualizamos la quantity
       await pool.query(
-        `UPDATE Bundle_Products
+        `UPDATE packaging_service_db.Bundle_Products
          SET quantity = ?
          WHERE bundleID = ? AND orderProductID = ?`,
         [quantity, bundleID, orderProductID]
       );
     } else {
-      // Insertamos
       await pool.query(
-        `INSERT INTO Bundle_Products (bundleID, orderProductID, quantity)
+        `INSERT INTO packaging_service_db.Bundle_Products (bundleID, orderProductID, quantity)
          VALUES (?, ?, ?)`,
         [bundleID, orderProductID, quantity]
       );
     }
   },
-  getBundlesByOrder: async (orderID) => {
-    const [bundles] = await pool.query(
-      `SELECT * FROM Bundles WHERE orderID = ?`,
-      [orderID]
-    );
-    return bundles;
-  },
+
   countProductsInBundle: async (bundleID) => {
-    const [[{ total }]] = await pool.query(
+    const [rows] = await pool.query(
       `SELECT COUNT(*) as total
-       FROM Bundle_Products
+       FROM packaging_service_db.Bundle_Products
        WHERE bundleID = ?`,
       [bundleID]
     );
-    return total;
+    return rows[0].total;
   },
+
   getTotalAssignedToPicker: async (orderProductID, pickerRUT) => {
-    // Suma la cantidad en Bundle_Products para todos los bultos del mismo picker
     const [rows] = await pool.query(`
-      SELECT COALESCE(SUM(bp.quantity), 0) as totalAssigned
-      FROM Bundle_Products bp
-      JOIN Bundles b ON b.bundleID = bp.bundleID
+      SELECT ISNULL(SUM(bp.quantity), 0) as totalAssigned
+      FROM packaging_service_db.Bundle_Products bp
+      JOIN packaging_service_db.Bundles b ON b.bundleID = bp.bundleID
       WHERE bp.orderProductID = ?
         AND b.pickerRUT = ?
     `, [orderProductID, pickerRUT]);
-  
     return rows[0].totalAssigned;
   },
+
   getBundlesByPicker: async (orderID, pickerRUT) => {
     const [rows] = await pool.query(
-      `SELECT * FROM Bundles 
-       WHERE orderID = ? 
-         AND pickerRUT = ?`,
+      `SELECT * FROM packaging_service_db.Bundles 
+       WHERE orderID = ? AND pickerRUT = ?`,
       [orderID, pickerRUT]
     );
     return rows;
   },
+
   countOrderProducts: async (orderID) => {
-    const [[{ total }]] = await pool.query(
+    const [rows] = await pool.query(
       `SELECT COUNT(*) as total
-       FROM Order_Product
+       FROM packaging_service_db.Order_Product
        WHERE orderID = ?`,
       [orderID]
     );
-    return total;
+    return rows[0].total;
   },
+
   countOrderProductsAssignedToBundles: async (orderID) => {
-    const [[{ total }]] = await pool.query(
+    const [rows] = await pool.query(
       `SELECT COUNT(DISTINCT bp.orderProductID) as total
-       FROM Bundle_Products bp
-       INNER JOIN Bundles b ON bp.bundleID = b.bundleID
+       FROM packaging_service_db.Bundle_Products bp
+       INNER JOIN packaging_service_db.Bundles b ON bp.bundleID = b.bundleID
        WHERE b.orderID = ?`,
       [orderID]
     );
-    return total;
+    return rows[0].total;
   },
+
   completeAllBundlesOfOrder: async (orderID) => {
     await pool.query(
-      `UPDATE Bundles
+      `UPDATE packaging_service_db.Bundles
        SET status = 'completed'
        WHERE orderID = ?`,
       [orderID]
@@ -241,30 +229,28 @@ const BundlesRepository = {
 
   getBundleDetails: async (bundleID) => {
     const [rows] = await pool.query(
-      `
-      SELECT 
-        b.bundleID,
-        b.orderID,
-        b.packageTypeID,
-        b.barcode,
-        b.refid,
-        b.auditStatusID,
-        bp.bundleProductID,
-        bp.orderProductID,
-        op.itemcode,
-        p.dscription,
-        bp.quantity AS expected,
-        op.pickedQuantity AS found,
-        op.notFound AS not_found,
-        op.repickedQuantity AS repicked,
-        opp.pickerRUT
-      FROM Bundles b
-      JOIN Bundle_Products bp ON bp.bundleID = b.bundleID
-      JOIN Order_Product op ON op.orderProductID = bp.orderProductID
-      JOIN Products p ON p.itemcode = op.itemcode
-      LEFT JOIN order_product_picker opp ON opp.orderProductID = op.orderProductID
-      WHERE b.bundleID = ?;
-      `,
+      `SELECT 
+         b.bundleID,
+         b.orderID,
+         b.packageTypeID,
+         b.barcode,
+         b.refid,
+         b.auditStatusID,
+         bp.bundleProductID,
+         bp.orderProductID,
+         op.itemcode,
+         p.dscription,
+         bp.quantity AS expected,
+         op.pickedQuantity AS found,
+         op.notFound AS not_found,
+         op.repickedQuantity AS repicked,
+         opp.pickerRUT
+       FROM packaging_service_db.Bundles b
+       JOIN packaging_service_db.Bundle_Products bp ON bp.bundleID = b.bundleID
+       JOIN packaging_service_db.Order_Product op ON op.orderProductID = bp.orderProductID
+       JOIN packaging_service_db.Products p ON p.itemcode = op.itemcode
+       LEFT JOIN packaging_service_db.order_product_picker opp ON opp.orderProductID = op.orderProductID
+       WHERE b.bundleID = ?;`,
       [bundleID]
     );
 
@@ -300,8 +286,8 @@ const BundlesRepository = {
   getOrderProductsWithBundleID: async (orderID) => {
     const [products] = await pool.query(
       `SELECT op.orderProductID, op.itemcode, opp.pickerRUT, opp.bundleID
-       FROM Order_Product op
-       LEFT JOIN order_product_picker opp
+       FROM packaging_service_db.Order_Product op
+       LEFT JOIN packaging_service_db.order_product_picker opp
          ON op.orderProductID = opp.orderProductID
        WHERE op.orderID = ?`,
       [orderID]
@@ -311,76 +297,250 @@ const BundlesRepository = {
 
   updateDimensions: async (bundleID, { height, width, length, weight, cubage, location }) => {
     const [result] = await pool.query(
-      `
-      UPDATE Bundles
-      SET
-        height = ?,
-        width = ?,
-        length = ?,
-        weight = ?,
-        cubage = ?,
-        location = ?
-      WHERE bundleID = ?
-      `,
+      `UPDATE packaging_service_db.Bundles
+       SET
+         height = ?,
+         width = ?,
+         length = ?,
+         weight = ?,
+         cubage = ?,
+         location = ?
+       WHERE bundleID = ?`,
       [height, width, length, weight, cubage, location, bundleID]
     );
-    return result.affectedRows > 0;
+    return result.rowsAffected[0] > 0;
   },
+
   getBundleAndProductsLocal: async (bundleID) => {
-    // OJO: solo consultamos tablas locales: Bundles y Bundle_Products
     const [rows] = await pool.query(
-      `
-      SELECT 
-        b.bundleID,
-        b.orderID,
-        b.packageTypeID,
-        b.barcode,
-        b.refid,
-        b.auditStatusID,
-        b.height,
-        b.width,
-        b.length,
-        b.weight,
-        b.cubage,
-        b.location,
-        bp.bundleProductID,
-        bp.orderProductID,
-        bp.quantity AS expected
-      FROM Bundles b
-      LEFT JOIN Bundle_Products bp ON bp.bundleID = b.bundleID
-      WHERE b.bundleID = ?;
-      `,
+      `SELECT 
+         b.bundleID,
+         b.orderID,
+         b.packageTypeID,
+         b.barcode,
+         b.refid,
+         b.auditStatusID,
+         b.height,
+         b.width,
+         b.length,
+         b.weight,
+         b.cubage,
+         b.location,
+         bp.bundleProductID,
+         bp.orderProductID,
+         bp.quantity AS expected
+       FROM packaging_service_db.Bundles b
+       LEFT JOIN packaging_service_db.Bundle_Products bp ON bp.bundleID = b.bundleID
+       WHERE b.bundleID = ?;`,
       [bundleID]
     );
     return rows;
   },
-  markBundleCompleted: async (bundleID, orderID) => {
-    const [result] = await pool.query(`
-      UPDATE Bundles
-      SET status = 'completed'
-      WHERE bundleID = ?
-        AND orderID = ?
-        AND status = 'draft'
-    `, [bundleID, orderID]);
 
-    return result.affectedRows > 0; // true si se actualizó
+  markBundleCompleted: async (bundleID, orderID) => {
+    const [result] = await pool.query(
+      `UPDATE packaging_service_db.Bundles
+       SET status = 'completed'
+       WHERE bundleID = ? AND orderID = ? AND status = 'draft'`,
+      [bundleID, orderID]
+    );
+    return result.rowsAffected[0] > 0;
   },
+
   getProductsOfBundle: async (bundleID) => {
-    const [rows] = await pool.query(`
-      SELECT orderProductID, quantity
-      FROM Bundle_Products
-      WHERE bundleID = ?
-    `, [bundleID]);
-    return rows; // [{orderProductID: 45960, quantity: 4}, ...]
+    const [rows] = await pool.query(
+      `SELECT orderProductID, quantity
+       FROM packaging_service_db.Bundle_Products
+       WHERE bundleID = ?`,
+      [bundleID]
+    );
+    return rows;
   },
+
   removeBundleProduct: async (bundleID, orderProductID) => {
-    const [result] = await pool.query(`
-      DELETE FROM Bundle_Products
-      WHERE bundleID = ?
-        AND orderProductID = ?
-    `, [bundleID, orderProductID]);
-    return result.affectedRows > 0;
+    const [result] = await pool.query(
+      `DELETE FROM packaging_service_db.Bundle_Products
+       WHERE bundleID = ? AND orderProductID = ?`,
+      [bundleID, orderProductID]
+    );
+    return result.rowsAffected[0] > 0;
   },
+  
+  // ---------------------------
+  // Funciones relacionadas con bundles y asignaciones:
+  
+  getTotalAssignedToPicker: async (orderProductID, pickerRUT) => {
+    const [rows] = await pool.query(`
+      SELECT ISNULL(SUM(bp.quantity), 0) as totalAssigned
+      FROM packaging_service_db.Bundle_Products bp
+      JOIN packaging_service_db.Bundles b ON b.bundleID = bp.bundleID
+      WHERE bp.orderProductID = ? AND b.pickerRUT = ?
+    `, [orderProductID, pickerRUT]);
+    return rows[0].totalAssigned;
+  },
+
+  getBundlesByPicker: async (orderID, pickerRUT) => {
+    const [rows] = await pool.query(
+      `SELECT * FROM packaging_service_db.Bundles WHERE orderID = ? AND pickerRUT = ?`,
+      [orderID, pickerRUT]
+    );
+    return rows;
+  },
+
+  countOrderProducts: async (orderID) => {
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) as total FROM packaging_service_db.Order_Product WHERE orderID = ?`,
+      [orderID]
+    );
+    return rows[0].total;
+  },
+
+  countOrderProductsAssignedToBundles: async (orderID) => {
+    const [rows] = await pool.query(
+      `SELECT COUNT(DISTINCT bp.orderProductID) as total
+       FROM packaging_service_db.Bundle_Products bp
+       INNER JOIN packaging_service_db.Bundles b ON bp.bundleID = b.bundleID
+       WHERE b.orderID = ?`,
+      [orderID]
+    );
+    return rows[0].total;
+  },
+
+  completeAllBundlesOfOrder: async (orderID) => {
+    await pool.query(
+      `UPDATE packaging_service_db.Bundles SET status = 'completed' WHERE orderID = ?`,
+      [orderID]
+    );
+  },
+
+  getBundleDetails: async (bundleID) => {
+    const [rows] = await pool.query(
+      `SELECT 
+         b.bundleID,
+         b.orderID,
+         b.packageTypeID,
+         b.barcode,
+         b.refid,
+         b.auditStatusID,
+         bp.bundleProductID,
+         bp.orderProductID,
+         op.itemcode,
+         p.dscription,
+         bp.quantity AS expected,
+         op.pickedQuantity AS found,
+         op.notFound AS not_found,
+         op.repickedQuantity AS repicked,
+         opp.pickerRUT
+       FROM packaging_service_db.Bundles b
+       JOIN packaging_service_db.Bundle_Products bp ON bp.bundleID = b.bundleID
+       JOIN packaging_service_db.Order_Product op ON op.orderProductID = bp.orderProductID
+       JOIN packaging_service_db.Products p ON p.itemcode = op.itemcode
+       LEFT JOIN packaging_service_db.order_product_picker opp ON opp.orderProductID = op.orderProductID
+       WHERE b.bundleID = ?;`,
+      [bundleID]
+    );
+    if (rows.length === 0) return null;
+    const bundleDetails = {
+      bundleID: rows[0].bundleID,
+      orderID: rows[0].orderID,
+      packageTypeID: rows[0].packageTypeID,
+      barcode: rows[0].barcode,
+      refid: rows[0].refid,
+      auditStatusID: rows[0].auditStatusID,
+      products: []
+    };
+    rows.forEach((row) => {
+      bundleDetails.products.push({
+        bundleProductID: row.bundleProductID,
+        orderProductID: row.orderProductID,
+        itemcode: row.itemcode,
+        dscription: row.dscription,
+        expected: row.expected,
+        found: row.found,
+        not_found: row.not_found,
+        repicked: row.repicked,
+        pickerRUT: row.pickerRUT
+      });
+    });
+    return bundleDetails;
+  },
+
+  getOrderProductsWithBundleID: async (orderID) => {
+    const [products] = await pool.query(
+      `SELECT op.orderProductID, op.itemcode, opp.pickerRUT, opp.bundleID
+       FROM packaging_service_db.Order_Product op
+       LEFT JOIN packaging_service_db.order_product_picker opp
+         ON op.orderProductID = opp.orderProductID
+       WHERE op.orderID = ?`,
+      [orderID]
+    );
+    return products;
+  },
+
+  updateDimensions: async (bundleID, { height, width, length, weight, cubage, location }) => {
+    const [result] = await pool.query(
+      `UPDATE packaging_service_db.Bundles
+       SET height = ?, width = ?, length = ?, weight = ?, cubage = ?, location = ?
+       WHERE bundleID = ?`,
+      [height, width, length, weight, cubage, location, bundleID]
+    );
+    return result.rowsAffected[0] > 0;
+  },
+
+  getBundleAndProductsLocal: async (bundleID) => {
+    const [rows] = await pool.query(
+      `SELECT 
+         b.bundleID,
+         b.orderID,
+         b.packageTypeID,
+         b.barcode,
+         b.refid,
+         b.auditStatusID,
+         b.height,
+         b.width,
+         b.length,
+         b.weight,
+         b.cubage,
+         b.location,
+         bp.bundleProductID,
+         bp.orderProductID,
+         bp.quantity AS expected
+       FROM packaging_service_db.Bundles b
+       LEFT JOIN packaging_service_db.Bundle_Products bp ON bp.bundleID = b.bundleID
+       WHERE b.bundleID = ?;`,
+      [bundleID]
+    );
+    return rows;
+  },
+
+  markBundleCompleted: async (bundleID, orderID) => {
+    const [result] = await pool.query(
+      `UPDATE packaging_service_db.Bundles
+       SET status = 'completed'
+       WHERE bundleID = ? AND orderID = ? AND status = 'draft'`,
+      [bundleID, orderID]
+    );
+    return result.rowsAffected[0] > 0;
+  },
+
+  getProductsOfBundle: async (bundleID) => {
+    const [rows] = await pool.query(
+      `SELECT orderProductID, quantity
+       FROM packaging_service_db.Bundle_Products
+       WHERE bundleID = ?`,
+      [bundleID]
+    );
+    return rows;
+  },
+
+  removeBundleProduct: async (bundleID, orderProductID) => {
+    const [result] = await pool.query(
+      `DELETE FROM packaging_service_db.Bundle_Products
+       WHERE bundleID = ? AND orderProductID = ?`,
+      [bundleID, orderProductID]
+    );
+    return result.rowsAffected[0] > 0;
+  }
 };
 
 module.exports = BundlesRepository;

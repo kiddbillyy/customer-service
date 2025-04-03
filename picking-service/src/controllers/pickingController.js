@@ -255,3 +255,28 @@ exports.getAssignedQuantity = async (req, res) => {
     res.status(500).json({ message: "Error interno de picking-service" });
   }
 };
+
+exports.markProductAsMissing = async (req, res) => {
+  try {
+    const { orderProductID } = req.params;
+    const { missingQuantity, pickerRUT } = req.body;
+
+    if (!missingQuantity || missingQuantity <= 0) {
+      return res.status(400).json({ message: "La cantidad faltante debe ser mayor a 0." });
+    }
+    if (!pickerRUT) {
+      return res.status(400).json({ message: "Falta el pickerRUT." });
+    }
+
+    const result = await PickingService.markProductAsMissing(orderProductID, pickerRUT, missingQuantity);
+
+    if (!result.success) {
+      return res.status(400).json({ message: result.message });
+    }
+
+    return res.status(200).json({ message: "Producto marcado como faltante y asignación actualizada correctamente." });
+  } catch (error) {
+    console.error("❌ Error marcando producto como faltante:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};

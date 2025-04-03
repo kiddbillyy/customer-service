@@ -11,7 +11,7 @@ module.exports = {
     try {
       // 1. Verificar si la orden ya existe en la tabla Orders (por folionum)
       const [existingOrder] = await pool.query(
-        'SELECT 1 FROM Orders WHERE folionum = ? LIMIT 1',
+        'SELECT TOP 1 1 FROM orders_service_db.Orders WHERE folionum = ?',
         [msg.folionum]
       );
       const orderAlreadyExists = existingOrder.length > 0;
@@ -22,43 +22,56 @@ module.exports = {
       // 2. Insertar o actualizar la orden
       await pool.query(
         `
-        INSERT INTO Orders (
-          docentry, docnum, folionum, cardcode, cardname, phone1, e_mail,
-          u_ref1, slpname, docdate, itemsamount, doctotalsy, orderStatusID, paymentMethodID, 
-          deliveryTypeID, salesChannelID, recipient, deliveryDate, createdate, createts
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          docentry       = VALUES(docentry),
-          docnum         = VALUES(docnum),
-          cardcode       = VALUES(cardcode),
-          cardname       = VALUES(cardname),
-          phone1         = VALUES(phone1),
-          e_mail         = VALUES(e_mail),
-          u_ref1         = VALUES(u_ref1),
-          slpname         = VALUES(slpname),
-          docdate        = VALUES(docdate),
-          itemsamount    = VALUES(itemsamount),
-          doctotalsy     = VALUES(doctotalsy),
-          paymentMethodID= VALUES(paymentMethodID),
-          deliveryTypeID = VALUES(deliveryTypeID),
-          salesChannelID = VALUES(salesChannelID),
-          recipient      = VALUES(recipient),
-          deliveryDate   = VALUES(deliveryDate),
-          createdate     = VALUES(createdate),
-          createts       = VALUES(createts)
+        MERGE orders_service_db.Orders AS target
+        USING (SELECT ? AS folionum) AS source
+        ON target.folionum = source.folionum
+        WHEN MATCHED THEN
+          UPDATE SET
+            docentry       = ?,
+            docnum         = ?,
+            cardcode       = ?,
+            cardname       = ?,
+            phone1         = ?,
+            e_mail         = ?,
+            u_ref1         = ?,
+            slpname        = ?,
+            docdate        = ?,
+            itemsamount    = ?,
+            doctotalsy     = ?,
+            orderStatusID  = ?,
+            paymentMethodID= ?,
+            deliveryTypeID = ?,
+            salesChannelID = ?,
+            recipient      = ?,
+            deliveryDate   = ?,
+            createdate     = ?,
+            createts       = ?
+        WHEN NOT MATCHED THEN
+          INSERT (
+            docentry, docnum, folionum, cardcode, cardname, phone1, e_mail,
+            u_ref1, slpname, docdate, itemsamount, doctotalsy, orderStatusID, paymentMethodID, 
+            deliveryTypeID, salesChannelID, recipient, deliveryDate, createdate, createts
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         `,
         [
+          msg.folionum,                      // source.folionum
+          // UPDATE
+          msg.docentry, msg.docnum, msg.cardcode, msg.cardname, msg.phone1, msg.e_mail,
+          msg.u_ref1, msg.slpname, msg.docdate, msg.itemsamount, msg.doctotalsy, orderStatusID,
+          msg.paymentMethodID, msg.deliveryTypeID, msg.salesChannelID, msg.recipient, msg.deliveryDate,
+          msg.createdate, msg.createts,
+          // INSERT
           msg.docentry, msg.docnum, msg.folionum, msg.cardcode, msg.cardname, msg.phone1, msg.e_mail,
-          msg.u_ref1, msg.slpname, msg.docdate, msg.itemsamount, msg.doctotalsy, orderStatusID, msg.paymentMethodID,
-          msg.deliveryTypeID, msg.salesChannelID, msg.recipient, msg.deliveryDate, 
+          msg.u_ref1, msg.slpname, msg.docdate, msg.itemsamount, msg.doctotalsy, orderStatusID,
+          msg.paymentMethodID, msg.deliveryTypeID, msg.salesChannelID, msg.recipient, msg.deliveryDate,
           msg.createdate, msg.createts
         ]
       );
 
       // 3. Recuperar la orden insertada/actualizada
       const [orderRow] = await pool.query(
-        'SELECT * FROM Orders WHERE folionum = ?',
+        'SELECT * FROM orders_service_db.Orders WHERE folionum = ?',
         [msg.folionum]
       );
       if (orderRow.length === 0) {

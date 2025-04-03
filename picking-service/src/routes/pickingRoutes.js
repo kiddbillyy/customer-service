@@ -13,7 +13,8 @@ const {
   updateAssignedProductsByPicker,
   updateProductsBulkStatus,
   getAllOrdersProducts,
-  getAssignedQuantity
+  getAssignedQuantity,
+  markProductAsMissing
 } = require("../controllers/pickingController");
 
 const {
@@ -50,8 +51,7 @@ router.put("/assigned/:pickerRUT", updateAssignedProductsByPicker);
 
 // Obtener todos los pedidos con productos
 router.get("/products/all", getAllOrdersProducts);
-
-
+ 
 // Obtener cantidades asignadas 
 router.get("/get/quantity", getAssignedQuantity); 
 
@@ -86,5 +86,8 @@ router.get(
   validateRequest,
   getProductsFromOrder
 );
+
+// Marcar producto como faltante
+router.put("/product/:orderProductID/missing", markProductAsMissing);
 
 module.exports = router;
