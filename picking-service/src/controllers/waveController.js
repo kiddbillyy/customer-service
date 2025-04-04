@@ -76,39 +76,6 @@ exports.updateRoundStatus = async (req, res) => {
   }
 };
 
-
-// src/controllers/waveController.js
-
-exports.assignProductsAndPickers = async (req, res) => {
-  try {
-    const { waveID, roundID } = req.params;
-    const { orderID, pickerAssignments } = req.body;
-
-    const result = await WaveService.assignProductsAndPickers(waveID, roundID, orderID, pickerAssignments);
-
-    if (!result) {
-      return res.status(404).json({ message: "No hay productos pendientes en esta orden." });
-    }
-
-    const { newStatus, oldStatus } = result;
-    const statusMessage =
-      newStatus === 3
-        ? "Todos los productos tienen pickers asignados. Estado: En Picking"
-        : "Algunos productos aún no tienen pickers asignados. Estado: Asignando Pickers";
-
-    res.json({
-      message: "Productos y pickers asignados correctamente",
-      status: newStatus,
-      oldStatus,
-      statusMessage
-    });
-  } catch (error) {
-    console.error("❌ Error unificando asignación de productos/pickers:", error);
-    res.status(500).json({ message: "Error interno en assignProductsAndPickers" });
-  }
-};
-
-// Obtener todas las olas
 exports.getWaves = async (req, res) => {
   try {
     const waves = await WaveService.getWaves();
