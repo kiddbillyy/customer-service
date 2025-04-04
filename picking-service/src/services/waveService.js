@@ -196,10 +196,10 @@ const WaveService = {
 
     let finalStatus = 2; // 2 => "AsignandoPickers"
     for (const [anOrderID, groupAssignments] of Object.entries(orderGroups)) {
-      // Llamamos un método adaptado que asigne sin filtrar pickingStatus=1/2 
-      // o creamos un method "assignPickersForOrder" con la actual logic
-      const status = await PickingRepository.assignPickersToProducts(parseInt(anOrderID, 10), groupAssignments);
-      // combinamos "status" => si uno es 3 => finalStatus=3
+      const status = await PickingRepository.assignPickersToProductsLeftover(
+        parseInt(anOrderID, 10),
+        groupAssignments
+      );
       if (status === 3) {
         finalStatus = 3;
       }

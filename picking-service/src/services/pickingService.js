@@ -360,7 +360,7 @@ const PickingService = {
         pickedQuantity: row.pickedQuantity,
         pickingStatusID: row.pickingStatusID,
         total: row.total,
-        isAssigned: row.isAssigned
+        leftover: row.leftover
       };
       ordersMap[orderID].products.push(productData);
     }
@@ -399,6 +399,10 @@ const PickingService = {
       newMissing,
       newAssigned
     );
+
+    await PickingRepository.updatePickerStatusAfterMissing(orderProductID, pickerRUT);
+
+    await PickingRepository.updateProductStatusAfterMissing(orderProductID);
   
     if (!updated) {
       return { success: false, message: "No se pudo actualizar la asignación en order_product_picker." };

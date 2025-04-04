@@ -299,14 +299,14 @@ const PickingRepository = {
     // 4) Actualizar pickingStatusID en order_product_picker
     const [pickerUpdate2] = await pool.query(`
       UPDATE opp
-      SET opp.pickingStatusID = CASE
-          WHEN opp.pickedQuantity >= op.quantity THEN 3
-          ELSE 2
+        SET opp.pickingStatusID = CASE
+            WHEN opp.pickedQuantity >= opp.assignedQuantity THEN 3   -- Usar assignedQuantity
+            ELSE 2
         END
-      FROM picking_service_db.order_product_picker opp
-      JOIN picking_service_db.order_product op ON opp.orderProductID = op.orderProductID
-      WHERE opp.orderProductID = ?
-        AND opp.pickerRUT = ?
+        FROM picking_service_db.order_product_picker opp
+        JOIN picking_service_db.order_product op ON opp.orderProductID = op.orderProductID
+        WHERE opp.orderProductID = ?
+          AND opp.pickerRUT = ?
     `, [orderProductID, pickerRUT]);
   
     return pickerUpdate2.rowsAffected[0] > 0;
@@ -418,6 +418,43 @@ const PickingRepository = {
   
     // rowsAffected[0] > 0 indica que sí se actualizó
     return result.rowsAffected[0] > 0;
+  },
+  updatePickerStatusAfterMissing: async (orderProductID, pickerRUT) => {
+    // Usamos la misma lógica que en updatePickedProduct, 
+    // pero comparamos pickedQuantity vs assignedQuantity
+    const [result] = await pool.query(`
+      UPDATE opp
+      SET opp.pickingStatusID = CASE
+        WHEN opp.pickedQuantity >= opp.assignedQuantity THEN 3
+        ELSE 2
+      END
+      FROM picking_service_db.order_product_picker opp
+      WHERE opp.orderProductID = ?
+        AND opp.pickerRUT = ?
+    `, [orderProductID, pickerRUT]);
+  
+    return result.rowsAffected[0] > 0;
+  },
+  updateProductStatusAfterMissing: async (orderProductID) => {
+    // 1. Obtener la suma de pickedQuantity de todos los pickers
+    const [rows] = await pool.query(`
+      SELECT SUM(pickedQuantity) as totalPicked
+      FROM picking_service_db.order_product_picker
+      WHERE orderProductID = ?
+    `, [orderProductID]);
+  
+    const totalPicked = rows[0]?.totalPicked || 0;
+  
+    // 2. Actualizar pickedQuantity y pickingStatusID en order_product usando "?" en lugar de "@"
+    await pool.query(`
+      UPDATE picking_service_db.order_product
+      SET pickedQuantity = ?,
+          pickingStatusID = CASE
+            WHEN ? >= quantity THEN 3
+            ELSE 2
+          END
+      WHERE orderProductID = ?
+    `, [totalPicked, totalPicked, orderProductID]);
   },
 
   getAssignment: async (orderProductID, pickerRUT) => {
@@ -535,6 +572,53 @@ const PickingRepository = {
     
     const [rows] = await pool.query(sql, orderProductIDs);
     return rows;
+  },
+  assignPickersToProductsLeftover: async (orderID, assignments) => {
+    for (const { orderProductID, pickerRUT } of assignments) {
+      // 1) Calcular cuántas unidades quedan por asignar (leftover)
+      const leftover = await PickingRepository.getLeftover(orderProductID);
+      if (leftover <= 0) {
+        // Si no hay sobrante, no hacemos nada
+        continue;
+      }
+  
+      // 2) Siempre insertamos un nuevo registro en order_product_picker
+      //    Asumimos pickingStatusID=1 si está "Asignado pero no iniciado"
+      //    (ajústalo a 2 si prefieres "En Proceso" inmediatamente)
+      await pool.query(`
+        INSERT INTO picking_service_db.order_product_picker
+          (orderProductID, pickerRUT, pickingStatusID, pickedQuantity, assignedQuantity, missingQuantity, assignedAt)
+        VALUES (?, ?, 1, 0, ?, 0, GETDATE())
+      `, [
+        orderProductID,
+        pickerRUT,
+        leftover // El leftover calculado
+      ]);
+  
+      // 3) Actualizar el estado de order_product a 2 ("En Proceso/Asignado")
+      await pool.query(`
+        UPDATE picking_service_db.order_product
+        SET pickingStatusID = 2
+        WHERE orderProductID = ?
+      `, [orderProductID]);
+    }
+  
+    // 4) Verificamos si la orden ya quedó completamente asignada
+    const allAssigned = await PickingRepository.isAllProductsAssigned(orderID);
+    return allAssigned ? 3 : 2;
+  },
+  getLeftover: async (orderProductID) => {
+    const [rows] = await pool.query(`
+      SELECT 
+        (op.quantity - ISNULL(SUM(opp.assignedQuantity), 0)) AS leftover
+      FROM picking_service_db.order_product op
+      LEFT JOIN picking_service_db.order_product_picker opp ON opp.orderProductID = op.orderProductID
+      WHERE op.orderProductID = ?
+      GROUP BY op.quantity
+    `, [orderProductID]);
+  
+    if (rows.length === 0) return 0;
+    return rows[0].leftover || 0;
   },
 
   assignPickersToProducts: async (orderID, pickerAssignments) => {
@@ -667,29 +751,41 @@ const PickingRepository = {
 
   getAllOrderProducts: async () => {
     const [rows] = await pool.query(`
-      SELECT 
-        op.orderProductID,
-        op.orderID,
-        op.itemcode,
-        p.dscription,
-        p.price,
-        op.quantity,
-        op.pickedQuantity,
-        op.pickingStatusID,
-        (op.quantity * p.price) AS total,
-        ISNULL(
-          (SELECT TOP 1 1
-           FROM picking_service_db.order_product_picker opp
-           WHERE opp.orderProductID = op.orderProductID),
-          0
-        ) AS isAssigned
-      FROM picking_service_db.order_product op
-      JOIN picking_service_db.products p ON p.itemcode = op.itemcode
-      WHERE NOT EXISTS (
-        SELECT 1 FROM picking_service_db.order_product_picker opp
-        WHERE opp.orderProductID = op.orderProductID
-      )
-      ORDER BY op.orderID
+      SELECT
+      op.orderProductID,
+      op.orderID,
+      op.itemcode,
+      p.dscription,
+      p.price,
+      op.quantity,
+      op.pickedQuantity,
+      op.pickingStatusID,
+      (op.quantity * p.price) AS total,
+
+      /* Cálculo de leftover: diferencia entre
+         la cantidad total y la suma de assignedQuantity */
+      op.quantity
+      - ISNULL(
+          (
+            SELECT SUM(opp.assignedQuantity)
+            FROM picking_service_db.order_product_picker opp
+            WHERE opp.orderProductID = op.orderProductID
+          ), 0
+        )
+      AS leftover
+
+    FROM picking_service_db.order_product op
+    JOIN picking_service_db.products p ON p.itemcode = op.itemcode
+    WHERE (
+      op.quantity
+      - ISNULL(
+          (SELECT SUM(opp.assignedQuantity)
+          FROM picking_service_db.order_product_picker opp
+          WHERE opp.orderProductID = op.orderProductID
+          ), 0
+        )
+    ) > 0
+    ORDER BY op.orderID
     `);
     return rows;
   },
