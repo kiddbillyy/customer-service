@@ -277,6 +277,6 @@ exports.markProductAsMissing = async (req, res) => {
     return res.status(200).json({ message: "Producto marcado como faltante y asignación actualizada correctamente." });
   } catch (error) {
     console.error("❌ Error marcando producto como faltante:", error);
-    res.status(500).json({ message: "Error interno del servidor" });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
