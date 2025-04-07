@@ -160,6 +160,33 @@ const WaveRepository = {
     `;
     await pool.query(sql, [ordersCount, productsCount, itemsCount, roundID]);
   },
+  sumRoundsInWave: async (waveID) =>  {
+    const [rows] = await pool.query(`
+      SELECT 
+        ISNULL(SUM(ordersCount), 0) AS totalOrders,
+        ISNULL(SUM(itemsCount), 0) AS totalItems
+      FROM picking_service_db.picking_rounds
+      WHERE waveID = ?
+    `, [waveID]);
+    return rows[0] || { totalOrders: 0, totalItems: 0 };
+  },
+  updateWaveCounts: async (waveID, ordersPicked, itemsPicked) => {
+    const sql = `
+      UPDATE picking_service_db.picking_waves
+      SET ordersPicked = ?, 
+          itemsPicked = ?
+      WHERE waveID = ?
+    `;
+    await pool.query(sql, [ordersPicked, itemsPicked, waveID]);
+  },
+  blockWave: async (waveID) =>  {
+    await pool.query(`
+      UPDATE picking_service_db.picking_waves
+      SET isBlocked = 1
+      WHERE waveID = ?
+    `, [waveID]);
+  },
+
 };
 
 module.exports = WaveRepository;

@@ -12,8 +12,21 @@ const WaveService = {
     return waveID;
   },
 
-  async createRound(roundData) {
-    return await WaveRepository.createRound(roundData);
+  createRound: async (roundData) => {
+    // 0) revisamos si la ola está bloqueada
+    const wave = await WaveRepository.getWaveById(roundData.waveID);
+    if (!wave) {
+      throw new Error("No existe la ola con ID=" + roundData.waveID);
+    }
+    if (wave.isBlocked) {
+      throw new Error(`La ola [${wave.waveID}] está bloqueada y no se pueden crear más rondas.`);
+    }
+  
+    // 1) Crear la ronda
+    const roundID = await WaveRepository.createRound(roundData);
+  
+    // 2) Retornar el ID de la nueva ronda
+    return roundID;
   },
 
   async assignProductsToRound(roundID, products) {
@@ -241,6 +254,52 @@ const WaveService = {
       await WaveRepository.updateRoundStatus(roundID, newStatus);
       console.log(`▶️ [roundID=${roundID}] estado actualizado a ${newStatus}`);
     }
+  },
+  updateWaveCounts: async (waveID) =>  {
+    // 1) sumar los counts de todas las rondas de esa ola
+    const { totalOrders, totalItems } = await WaveRepository.sumRoundsInWave(waveID);
+  
+    // 2) actualizar la ola con esos valores
+    await WaveRepository.updateWaveCounts(waveID, totalOrders, totalItems);
+  
+    // 3) revisar si llegamos al tope para bloquear
+    const wave = await WaveRepository.getWaveById(waveID);
+    if (!wave) return;
+  
+    const { ordersPlanned, itemsPlanned, ordersPicked, itemsPicked, isBlocked } = wave;
+    // si ya está bloqueada, no hacemos nada
+    if (isBlocked) return;
+  
+    // verificar topes
+    const reachedOrdersLimit = (ordersPicked >= ordersPlanned);
+    const reachedItemsLimit = (itemsPicked >= itemsPlanned);
+  
+    if (reachedOrdersLimit || reachedItemsLimit) {
+      // Bloquear la ola
+      await WaveRepository.blockWave(waveID);
+      console.log(`⚠️ [waveID=${waveID}] se bloqueó por alcanzar el tope (pedidos o ítems).`);
+    }
+  },
+  calculateRoundTotalsForAssignment: async (products) =>  {
+    // "products": array de { orderProductID, pickerRUT }
+    // Necesitamos:
+    //  1) Cantidad de pedidos (distinct orderID)
+    //  2) Suma total de quantity
+  
+    const distinctOrderIDs = new Set();
+    let totalItems = 0;
+  
+    for (const { orderProductID } of products) {
+      const row = await PickingRepository.getOrderProductAndOrderID(orderProductID);
+      if (!row) continue; 
+      // row tendrá { orderID, quantity }
+  
+      distinctOrderIDs.add(row.orderID);
+      totalItems += row.quantity;
+    }
+  
+    const ordersCount = distinctOrderIDs.size;
+    return { ordersCount, itemsCount: totalItems };
   }
   
 

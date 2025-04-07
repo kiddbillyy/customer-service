@@ -1,5 +1,5 @@
 const WaveService = require('../services/waveService');
-
+const WaveRepository = require('../models/waveRepository');
 // 1. Crear ola
 exports.createWave = async (req, res) => {
   try {
@@ -136,13 +136,50 @@ exports.getRoundById = async (req, res) => {
     res.status(500).json({ message: 'Error interno al obtener ronda' });
   }
 };
-
 exports.createRoundAndAssign = async (req, res) => {
   try {
     const { waveID } = req.params;
     const { roundData, products } = req.body;
 
-    // 1) Crear la ronda con 0 en ordersCount/productsCount/itemsCount (temporal)
+    // 0) Obtener la ola y verificar si está bloqueada
+    const wave = await WaveRepository.getWaveById(waveID);
+    if (!wave) {
+      return res.status(404).json({ message: `No existe la ola con ID=${waveID}` });
+    }
+    if (wave.isBlocked) {
+      return res.status(400).json({ message: `La ola [${waveID}] está bloqueada.` });
+    }
+
+    console.log('🧐 wave actual', wave.ordersPicked, wave.itemsPicked);
+
+    // 1) Calcular cuántos pedidos/ítems sumaría esta nueva ronda
+    const { ordersCount: newOrders, itemsCount: newItems } = 
+      await WaveService.calculateRoundTotalsForAssignment(products);
+
+    // 2) Sumar a lo que YA tiene la ola
+    const futureOrders = Number(wave.ordersPicked) + newOrders;
+    const futureItems = Number(wave.itemsPicked) + newItems;
+
+    console.log('🧐 wave futura', futureOrders, futureItems);
+
+
+    // 3) Si excede, se rechaza con error
+    if (futureOrders > wave.ordersPlanned) {
+      return res.status(400).json({
+        message: `Se excede la cantidad de pedidos planeados (actual=${wave.ordersPicked}, 
+                  nuevo=${newOrders}, plan=${wave.ordersPlanned}).`
+      });
+    }
+    if (futureItems > wave.itemsPlanned) {
+      return res.status(400).json({
+        message: `Se excede la cantidad de ítems planeados (actual=${wave.itemsPicked}, 
+                  nuevo=${newItems}, plan=${wave.itemsPlanned}).`
+      });
+    }
+
+    // (Si <= plan, continuamos)
+
+    // 4) Crear la ronda (valida si ola.isBlocked=0)
     const roundID = await WaveService.createRound({
       waveID,
       pickingPoint: roundData.pickingPoint,
@@ -156,23 +193,24 @@ exports.createRoundAndAssign = async (req, res) => {
       roundStatus: "Pendiente"
     });
 
-    // 2) Unificar la lógica de asignar
+    // 5) Asignar productos/pickers
     const result = await WaveService.assignProductsAndPickersNoOrderID(waveID, roundID, products);
     if (!result) {
       return res.status(400).json({
         message: "No se asignaron productos (o no estaban pendientes)."
       });
     }
-    const { newStatus, oldStatus } = result;
 
-    // 3) Calcular ordersCount, productsCount, itemsCount
+    // 6) Actualizar la ronda => ordersCount, productsCount, itemsCount
     await WaveService.updateRoundCounts(roundID);
 
-    // 4) Construir un mensaje final
-    const statusMessage =
-      newStatus === 3
-        ? "Todos los productos tienen pickers asignados. Estado: En Picking"
-        : "Algunos productos aún no tienen pickers asignados. Estado: Asignando Pickers";
+    // 7) Actualizar la ola => se bloquea si EXACTAMENTE llegó a 20 (o si excede)
+    await WaveService.updateWaveCounts(waveID);
+
+    const { newStatus, oldStatus } = result;
+    const statusMessage = (newStatus === 3)
+      ? "Todos los productos tienen pickers asignados. Estado: En Picking"
+      : "Algunos productos aún no tienen pickers asignados. Estado: Asignando Pickers";
 
     return res.json({
       roundID,
@@ -181,6 +219,7 @@ exports.createRoundAndAssign = async (req, res) => {
       oldStatus,
       statusMessage
     });
+
   } catch (error) {
     console.error("❌ Error creando ronda y asignando productos/pickers:", error);
     return res.status(500).json({
