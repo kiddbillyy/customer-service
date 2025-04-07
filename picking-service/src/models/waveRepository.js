@@ -32,6 +32,14 @@ const WaveRepository = {
     ]);
     return result[0].waveID;
   },
+  findRoundsByOrderProductID: async (orderProductID) =>  {
+    const [rows] = await pool.query(`
+      SELECT roundID
+      FROM picking_service_db.picking_round_products
+      WHERE orderProductID = ?
+    `, [orderProductID]);
+    return rows;  // Devuelve un array de { roundID: X }
+  },
 
   // 2. Crear Ronda
   async createRound(roundData) {

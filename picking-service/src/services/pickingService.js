@@ -1,5 +1,7 @@
 const PickingRepository = require("../models/pickingRepository");
 const packagingServiceClient = require("../client/packagingServiceClient.js")
+const WaveRepository = require("../models/waveRepository");
+const WaveService = require("./waveService");
 const { sendMessage } = require("../producer");
 const axios = require("axios");
 
@@ -150,6 +152,13 @@ const PickingService = {
         await sendMessage("order.status.updated", { orderID, newStatus: 5 });
         console.log(`📤 Estado de la orden ${orderID} actualizado a 5 (Picking Completado)`);
       }
+    }
+
+    
+    // 2) Para cada ronda en que esté este producto, verificas y actualizas el estado
+    const roundIDs = await WaveRepository.findRoundsByOrderProductID(orderProductID);
+    for (const r of roundIDs) {
+      await WaveService.checkAndUpdateRoundStatus(r.roundID);
     }
   
     return updated;
@@ -329,9 +338,24 @@ const PickingService = {
     return updatedCount; // Retorna el número de filas afectadas
   },
   setProductsInProcess: async (orderID, orderProductIDs) => {
-    // Llamar al repositorio para update a pickingStatusID=2
-    // en order_product y order_product_picker
-    return await PickingRepository.bulkSetProductsInProcess(orderID, orderProductIDs);
+    const updatedCount = await PickingRepository.bulkSetProductsInProcess(orderID, orderProductIDs);
+  
+    if (updatedCount > 0) {
+      // 1) Recolectar todos los roundID en un set
+      const allRoundIDs = new Set();
+      for (const opID of orderProductIDs) {
+        const rounds = await WaveRepository.findRoundsByOrderProductID(opID);
+        for (const r of rounds) {
+          allRoundIDs.add(r.roundID);
+        }
+      }
+      // 2) Invocar checkAndUpdateRoundStatus únicamente 1 vez por roundID
+      for (const roundID of allRoundIDs) {
+        await WaveService.checkAndUpdateRoundStatus(roundID);
+      }
+    }
+  
+    return updatedCount;
   },
   getAllOrdersProducts: async () => {
     // 1. Obtenemos todas las filas de order_product (JOIN con products)
@@ -406,6 +430,10 @@ const PickingService = {
   
     if (!updated) {
       return { success: false, message: "No se pudo actualizar la asignación en order_product_picker." };
+    }
+    const roundIDs = await WaveRepository.findRoundsByOrderProductID(orderProductID);
+    for (const r of roundIDs) {
+      await WaveService.checkAndUpdateRoundStatus(r.roundID);
     }
   
     return { success: true };

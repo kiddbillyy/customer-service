@@ -177,6 +177,72 @@ const WaveService = {
     // 3) Update la ronda
     await WaveRepository.updateRoundCounts(roundID, ordersCount, productsCount, itemsCount);
   },
+  checkAndUpdateRoundStatus: async (roundID) =>  {
+    // 1) Obtener la lista de todos los productos de la ronda
+    const roundProducts = await WaveRepository.getRoundProducts(roundID);
+    if (!roundProducts || roundProducts.length === 0) {
+      // Sin productos => asumes "Pendiente" o "Finalizada", tú decides
+      return;
+    }
+  
+    let hasStarted = false;
+    let allAreComplete = true;
+  
+    // 2) Para cada orderProductID, buscamos *todas* las asignaciones en order_product_picker
+    for (const rp of roundProducts) {
+      const assignments = await PickingRepository.getAssignmentsByOrderProduct(rp.orderProductID);
+      // Este método `getAssignmentsByOrderProduct` retornaría las filas de `order_product_picker`
+      // [ { orderProductID, pickerRUT, pickingStatusID, ... }, ...]
+  
+      if (!assignments || assignments.length === 0) {
+        // Si no hay asignaciones, interpretamos que no ha iniciado
+        allAreComplete = false;
+        continue;
+      }
+  
+      // Vemos si "alguna" está en >=2 => ya inició
+      // Y si "todas" están en ==3 => está completado
+      let productIsCompletelyPicked = true;
+      let productHasStartedSomething = false;
+  
+      for (const asg of assignments) {
+        if (asg.pickingStatusID >= 2) {
+          productHasStartedSomething = true;
+        }
+        if (asg.pickingStatusID !== 3) {
+          productIsCompletelyPicked = false;
+        }
+      }
+  
+      // Si AL MENOS un assignment está "en proceso" (>=2), la ronda ya inició
+      if (productHasStartedSomething) {
+        hasStarted = true;
+      }
+  
+      // Con que un solo assignment *no* esté en 3, no se puede considerar la ronda "Finalizada" todavía
+      if (!productIsCompletelyPicked) {
+        allAreComplete = false;
+      }
+    }
+  
+    // 3) Determinar el nuevo estado de la ronda
+    let newStatus;
+    if (allAreComplete) {
+      newStatus = "Finalizada";
+    } else if (hasStarted) {
+      newStatus = "En curso";
+    } else {
+      newStatus = "Pendiente";
+    }
+  
+    // 4) Actualizar si cambió
+    const round = await WaveRepository.getRoundById(roundID);
+    if (round && round.roundStatus !== newStatus) {
+      await WaveRepository.updateRoundStatus(roundID, newStatus);
+      console.log(`▶️ [roundID=${roundID}] estado actualizado a ${newStatus}`);
+    }
+  }
+  
 
 };
 

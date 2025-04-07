@@ -729,6 +729,20 @@ const PickingRepository = {
   
     return matchedCount;
   },
+  getAssignmentsByOrderProduct: async (orderProductID) =>  {
+    const [rows] = await pool.query(`
+      SELECT orderProductPickerID,
+             orderProductID,
+             pickerRUT,
+             pickingStatusID,
+             pickedQuantity,
+             assignedQuantity,
+             missingQuantity
+      FROM picking_service_db.order_product_picker
+      WHERE orderProductID = ?
+    `, [orderProductID]);
+    return rows;
+  },
 
   bulkSetProductsInProcess: async (orderID, orderProductIDs) => {
     if (!orderProductIDs.length) return 0;
