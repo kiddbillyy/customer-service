@@ -3,12 +3,12 @@ const pool = require("../config/db");
 const AuditRepository = {
   auditBundle: async (bundleID, auditStatusID, comments, auditorRUT) => {
     const [result] = await pool.query(
-      `UPDATE Bundles
-       SET auditStatusID = ?, auditComments = ?, auditedAt = NOW(), auditRUT = ?
+      `UPDATE packaging_service_db.bundles
+       SET auditStatusID = ?, auditComments = ?, auditedAt = GETDATE(), auditRUT = ?
        WHERE bundleID = ?`,
       [auditStatusID, comments, auditorRUT, bundleID]
     );
-    return result.affectedRows > 0;
+    return result.rowsAffected[0] > 0;
   }
 };
 

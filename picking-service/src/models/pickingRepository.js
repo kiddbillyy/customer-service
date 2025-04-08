@@ -124,7 +124,7 @@ const PickingRepository = {
       USING (VALUES (?, ?, ?)) AS source (orderID, itemcode, quantity)
       ON target.orderID = source.orderID AND target.itemcode = source.itemcode
       WHEN MATCHED THEN
-        UPDATE SET quantity = source.quantity
+      UPDATE SET quantity = target.quantity + source.quantity
       WHEN NOT MATCHED THEN
         INSERT (orderID, itemcode, quantity, pickedQuantity, pickingStatusID)
         VALUES (source.orderID, source.itemcode, source.quantity, 0, 1);
