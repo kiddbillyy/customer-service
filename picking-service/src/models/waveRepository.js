@@ -160,14 +160,22 @@ const WaveRepository = {
     `;
     await pool.query(sql, [ordersCount, productsCount, itemsCount, roundID]);
   },
-  sumRoundsInWave: async (waveID) =>  {
+  sumRoundsInWave: async (waveID) => {
     const [rows] = await pool.query(`
       SELECT 
-        ISNULL(SUM(ordersCount), 0) AS totalOrders,
-        ISNULL(SUM(itemsCount), 0) AS totalItems
-      FROM picking_service_db.picking_rounds
-      WHERE waveID = ?
+        COUNT(*) AS totalOrders,
+        ISNULL(SUM(t.totalQuantity), 0) AS totalItems
+      FROM (
+        SELECT prp.orderID, SUM(op.quantity) AS totalQuantity
+        FROM picking_service_db.picking_round_products prp
+        JOIN picking_service_db.picking_rounds r ON r.roundID = prp.roundID
+        JOIN picking_service_db.order_product op ON op.orderProductID = prp.orderProductID
+        WHERE r.waveID = ?
+        GROUP BY prp.orderID
+      ) t
     `, [waveID]);
+    
+    // Retorna { totalOrders, totalItems }
     return rows[0] || { totalOrders: 0, totalItems: 0 };
   },
   updateWaveCounts: async (waveID, ordersPicked, itemsPicked) => {

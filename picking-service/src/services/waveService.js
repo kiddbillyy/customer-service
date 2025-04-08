@@ -7,19 +7,16 @@ const ORDERS_SERVICE_URL = "http://orders-service:5000/api/orders";
 
 const WaveService = {
   async createWave(waveData) {
-    // Ejemplo: waveData = { pickingPoint: 'Palermo', startDate, endDate, ... }
+    // Se crea la ola sin preocuparse del bloqueo
     const waveID = await WaveRepository.createWave(waveData);
     return waveID;
   },
 
   createRound: async (roundData) => {
-    // 0) revisamos si la ola está bloqueada
+    // 0) Revisamos que la ola exista (se elimina la verificación de bloqueo)
     const wave = await WaveRepository.getWaveById(roundData.waveID);
     if (!wave) {
       throw new Error("No existe la ola con ID=" + roundData.waveID);
-    }
-    if (wave.isBlocked) {
-      throw new Error(`La ola [${wave.waveID}] está bloqueada y no se pueden crear más rondas.`);
     }
   
     // 1) Crear la ronda
@@ -32,7 +29,6 @@ const WaveService = {
   async assignProductsToRound(roundID, products) {
     // products = [ { orderID, orderProductID }, ... ]
     await WaveRepository.assignProductsToRound(roundID, products);
-    // Podrías actualizar "productsCount" e "itemsCount" en picking_rounds si quieres
   },
 
   async updateWaveStatus(waveID, newStatus) {
@@ -42,85 +38,67 @@ const WaveService = {
   async updateRoundStatus(roundID, newStatus) {
     await WaveRepository.updateRoundStatus(roundID, newStatus);
   },
+
   async getWaves() {
     return await WaveRepository.getWaves();
   },
+
   async getRounds() {
     return await WaveRepository.getRounds();
   },
 
-  // Función para obtener una ola por ID
+  // Obtener una ola por ID
   async getWaveById(waveID) {
     return await WaveRepository.getWaveById(waveID);
   },
 
-  // Función para obtener todas las rondas de una ola
+  // Obtener todas las rondas de una ola
   async getRoundsByWave(waveID) {
     return await WaveRepository.getRoundsByWaveId(waveID);
   },
 
-  // Función para obtener una ronda por ID (y opcionalmente validar que pertenezca a la ola)
+  // Obtener una ronda por ID (opcionalmente verificando que pertenezca a la ola)
   async getRoundById(waveID, roundID) {
     const round = await WaveRepository.getRoundById(roundID);
-    // Opcional: verificar que la ronda pertenece a la ola solicitada
     if (round && round.waveID == waveID) {
       return round;
     }
     return null;
   },
+
   async assignProductsAndPickersNoOrderID(waveID, roundID, products) {
-    // 1) Agrupemos "orderID" para el 'oldStatus' logic
-    //    Podríamos tener varios orderIDs. 
-    //    Si deseas un estado "global", debes decidir cómo unificarlo
-    //    (Por simplicidad, obtendremos oldStatus solo del PRIMER pedido).
     let oldStatus = null;
     let firstOrderID = null;
-
-    // 2) Recorremos cada item, consultamos su orderID
     const itemDetails = [];
+
     for (const { orderProductID, pickerRUT } of products) {
-      // SELECT orderID from order_product
       const row = await PickingRepository.getOrderProductAndOrderID(orderProductID);
       if (!row) continue;
 
       const { orderID, quantity } = row;
-      // guardar en itemDetails para el picking assignment
       itemDetails.push({ orderProductID, pickerRUT, orderID, quantity });
 
-      // upsert en picking_round_products
+      // Insertar en picking_round_products
       await WaveRepository.upsertRoundProduct(roundID, orderID, orderProductID);
 
-      // Lógica para "oldStatus" => solo si no lo tenemos
       if (firstOrderID == null) {
         firstOrderID = orderID;
       }
     }
 
     if (itemDetails.length === 0) {
-      // No hay nada que asignar
       return false;
     }
 
-    // 3) Obtener oldStatus del primer orderID (opcional, si deseas mandar a orders-service)
     if (firstOrderID) {
       try {
         const response = await axios.get(`${ORDERS_SERVICE_URL}/${firstOrderID}`);
         oldStatus = response.data.orderStatusID;
       } catch (error) {
         console.error(`❌ Error obteniendo estado de la orden ${firstOrderID} desde orders-service:`, error.message);
-        // Podrías ignorar o retornar false
       }
     }
 
-    // 4) Asignar pickers en order_product_picker
-    //    NOTA: Podrías crear un pickingRepository method que reciba itemDetails con {orderProductID, pickerRUT}
-    //    y no requiera un orderID global. 
-    //    Reusamos 'assignPickersToProducts' con un "falso" orderID => 
-    //    Realmente, assignPickersToProducts revisa "SELECT orderProductID FROM order_product WHERE orderID=? and pickingstatusid=1/2" => 
-    //    Esto asume un solo orderID. 
-    //    MEJOR: crear un method "assignPickersItems(items)" que no requiera orderID global.
-
-    // 4a) Creamos un array de "fake" group by orderID
     const orderGroups = {};
     for (const item of itemDetails) {
       if (!orderGroups[item.orderID]) {
@@ -143,31 +121,20 @@ const WaveService = {
       }
     }
 
-    // 5) oldStatus vs newStatus => si deseas mandar "order.status.updated"
-    //    OJO: Podrías mandar 1 evento por cada orderID. 
-    //    Por simplicidad, mandar uno por el "primer" orderID:
     if (oldStatus != null && finalStatus !== false && oldStatus != finalStatus && firstOrderID) {
       await sendMessage("order.status.updated", { orderID: firstOrderID, newStatus: finalStatus });
       console.log(`📤 Estado de la orden ${firstOrderID} actualizado a ${finalStatus}`);
     }
 
-    // devolvemos un objeto con newStatus=finalStatus, oldStatus
     return { newStatus: finalStatus, oldStatus };
   },
 
-  /**
-   * Actualiza las columnas 'ordersCount', 'productsCount', 'itemsCount' en picking_rounds 
-   * en base a picking_round_products (para saber cuántos 'orderID' únicos hay, cuántos 'orderProductID', y suma de quantity).
-   */
   async updateRoundCounts(roundID) {
-    // 1) Obtener la lista de (orderID, orderProductID) en picking_round_products
     const roundProds = await WaveRepository.getRoundProducts(roundID);
     if (!roundProds || roundProds.length === 0) {
-      // no hay nada
       await WaveRepository.updateRoundCounts(roundID, 0, 0, 0);
       return;
     }
-    // 2) Calcular distinct orderIDs, distinct products, sum of quantity
     const distinctOrders = new Set();
     const distinctProducts = new Set();
     let totalItems = 0;
@@ -176,7 +143,6 @@ const WaveService = {
       distinctOrders.add(rp.orderID);
       distinctProducts.add(rp.orderProductID);
 
-      // Buscar la "quantity" en order_product
       const row = await PickingRepository.getOrderProduct(rp.orderProductID);
       if (row) {
         totalItems += row.quantity;
@@ -186,35 +152,25 @@ const WaveService = {
     const ordersCount = distinctOrders.size;
     const productsCount = distinctProducts.size;
     const itemsCount = totalItems;
-
-    // 3) Update la ronda
     await WaveRepository.updateRoundCounts(roundID, ordersCount, productsCount, itemsCount);
   },
+
   checkAndUpdateRoundStatus: async (roundID) =>  {
-    // 1) Obtener la lista de todos los productos de la ronda
     const roundProducts = await WaveRepository.getRoundProducts(roundID);
     if (!roundProducts || roundProducts.length === 0) {
-      // Sin productos => asumes "Pendiente" o "Finalizada", tú decides
       return;
     }
   
     let hasStarted = false;
     let allAreComplete = true;
   
-    // 2) Para cada orderProductID, buscamos *todas* las asignaciones en order_product_picker
     for (const rp of roundProducts) {
       const assignments = await PickingRepository.getAssignmentsByOrderProduct(rp.orderProductID);
-      // Este método `getAssignmentsByOrderProduct` retornaría las filas de `order_product_picker`
-      // [ { orderProductID, pickerRUT, pickingStatusID, ... }, ...]
-  
       if (!assignments || assignments.length === 0) {
-        // Si no hay asignaciones, interpretamos que no ha iniciado
         allAreComplete = false;
         continue;
       }
   
-      // Vemos si "alguna" está en >=2 => ya inició
-      // Y si "todas" están en ==3 => está completado
       let productIsCompletelyPicked = true;
       let productHasStartedSomething = false;
   
@@ -227,18 +183,15 @@ const WaveService = {
         }
       }
   
-      // Si AL MENOS un assignment está "en proceso" (>=2), la ronda ya inició
       if (productHasStartedSomething) {
         hasStarted = true;
       }
   
-      // Con que un solo assignment *no* esté en 3, no se puede considerar la ronda "Finalizada" todavía
       if (!productIsCompletelyPicked) {
         allAreComplete = false;
       }
     }
   
-    // 3) Determinar el nuevo estado de la ronda
     let newStatus;
     if (allAreComplete) {
       newStatus = "Finalizada";
@@ -248,52 +201,68 @@ const WaveService = {
       newStatus = "Pendiente";
     }
   
-    // 4) Actualizar si cambió
     const round = await WaveRepository.getRoundById(roundID);
     if (round && round.roundStatus !== newStatus) {
       await WaveRepository.updateRoundStatus(roundID, newStatus);
       console.log(`▶️ [roundID=${roundID}] estado actualizado a ${newStatus}`);
     }
   },
-  updateWaveCounts: async (waveID) =>  {
-    // 1) sumar los counts de todas las rondas de esa ola
-    const { totalOrders, totalItems } = await WaveRepository.sumRoundsInWave(waveID);
-  
-    // 2) actualizar la ola con esos valores
-    await WaveRepository.updateWaveCounts(waveID, totalOrders, totalItems);
-  
-    // 3) revisar si llegamos al tope para bloquear
+
+  async createRoundAndAssign({ waveID, roundData, products }) {
     const wave = await WaveRepository.getWaveById(waveID);
-    if (!wave) return;
-  
-    const { ordersPlanned, itemsPlanned, ordersPicked, itemsPicked, isBlocked } = wave;
-    // si ya está bloqueada, no hacemos nada
-    if (isBlocked) return;
-  
-    // verificar topes
-    const reachedOrdersLimit = (ordersPicked >= ordersPlanned);
-    const reachedItemsLimit = (itemsPicked >= itemsPlanned);
-  
-    if (reachedOrdersLimit || reachedItemsLimit) {
-      // Bloquear la ola
-      await WaveRepository.blockWave(waveID);
-      console.log(`⚠️ [waveID=${waveID}] se bloqueó por alcanzar el tope (pedidos o ítems).`);
+    if (!wave) {
+      throw new Error(`No existe la ola con ID=${waveID}`);
     }
+
+    // Se elimina la validación de topes para pedidos o ítems
+    const roundID = await WaveService.createRound({
+      waveID,
+      pickingPoint: roundData.pickingPoint,
+      pickerName: roundData.pickerName,
+      pickerEmail: roundData.pickerEmail,
+      ordersCount: 0,
+      productsCount: 0,
+      itemsCount: 0,
+      missingItems: 0,
+      isCompleted: 0,
+      roundStatus: "Pendiente"
+    });
+
+    const result = await WaveService.assignProductsAndPickersNoOrderID(waveID, roundID, products);
+    if (!result) {
+      throw new Error("No se asignaron productos (o no estaban pendientes).");
+    }
+
+    await WaveService.updateRoundCounts(roundID);
+
+    // Se actualizan los conteos de la ola sin verificar topes ni bloquear la ola
+    await WaveService.updateWaveCounts(waveID);
+
+    const { newStatus, oldStatus } = result;
+    return {
+      roundID,
+      newStatus,
+      oldStatus,
+      statusMessage: (newStatus === 3)
+         ? "Todos los productos tienen pickers asignados. Estado: En Picking"
+         : "Algunos productos aún no tienen pickers asignados. Estado: Asignando Pickers"
+    };
   },
+
+  updateWaveCounts: async (waveID) =>  {
+    const { totalOrders, totalItems } = await WaveRepository.sumRoundsInWave(waveID);
+    // Actualizar la ola con los nuevos conteos
+    await WaveRepository.updateWaveCounts(waveID, totalOrders, totalItems);
+    // Se eliminó la lógica que bloquea la ola cuando se alcanzan ciertos topes
+  },
+
   calculateRoundTotalsForAssignment: async (products) =>  {
-    // "products": array de { orderProductID, pickerRUT }
-    // Necesitamos:
-    //  1) Cantidad de pedidos (distinct orderID)
-    //  2) Suma total de quantity
-  
     const distinctOrderIDs = new Set();
     let totalItems = 0;
   
     for (const { orderProductID } of products) {
       const row = await PickingRepository.getOrderProductAndOrderID(orderProductID);
-      if (!row) continue; 
-      // row tendrá { orderID, quantity }
-  
+      if (!row) continue;
       distinctOrderIDs.add(row.orderID);
       totalItems += row.quantity;
     }
@@ -301,8 +270,6 @@ const WaveService = {
     const ordersCount = distinctOrderIDs.size;
     return { ordersCount, itemsCount: totalItems };
   }
-  
-
 };
 
 module.exports = WaveService;
