@@ -197,8 +197,8 @@ const PickingService = {
     const nonPackedCount = await PickingRepository.countNonPackedProducts(orderID);
     if (nonPackedCount === 0) {
       // Si todos los productos ya están en estado 4, se envía el mensaje con newStatus: 6.
-      await sendMessage("order.status.updated", { orderID, newStatus: 6 });
-      console.log(`📤 Estado de la orden ${orderID} actualizado a 6 (Todos los productos empacados).`);
+      await sendMessage("order.status.updated", { orderID, newStatus: 7 });
+      console.log(`📤 Estado de la orden ${orderID} actualizado a 7 (Todos los productos empacados).`);
     } else {
       console.log(`ℹ️ Aún quedan ${nonPackedCount} productos sin empacar en la orden ${orderID}.`);
     }
