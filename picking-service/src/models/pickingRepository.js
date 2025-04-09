@@ -384,6 +384,7 @@ const PickingRepository = {
       FROM picking_service_db.order_product
       WHERE orderID = ?
         AND pickingStatusID != 3
+        AND pickingStatusID != 4
       `,
       [orderID]
     );
@@ -822,7 +823,16 @@ const PickingRepository = {
     if (rows.length === 0) return 0;
     const { quantity, pickedQuantity, notFound } = rows[0];
     return Math.max(quantity - pickedQuantity - notFound, 0);
-  }
+  },
+  countNonPackedProducts: async (orderID) => {
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) as nonPackedCount 
+       FROM picking_service_db.order_product 
+       WHERE orderID = ? AND pickingStatusID <> 4`,
+      [orderID]
+    );
+    return rows[0].nonPackedCount;
+  },
   
 };
 

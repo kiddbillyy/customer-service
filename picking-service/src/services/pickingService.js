@@ -174,18 +174,34 @@ const PickingService = {
     await PickingRepository.updateOrderProductPicker(bundleID, products);
   },
   handleBundleReady: async (msg) => {
-    console.log("🎯 handleBundleReady con:", msg);
-
-    // Validaciones mínimas
+    console.log('[picking-service] bundle.ready recibido:', msg);
+  
+    // Validación mínima
     if (!msg.orderProductIDs || msg.orderProductIDs.length === 0) {
       console.log("⚠️ Ningún orderProductID enviado en bundle.ready, nada que actualizar");
       return;
     }
-
-    // Llamas al repositorio para marcar estos productos como '4' (empacado)
+  
+    // Actualizamos el estado de los productos a 4 (empacado).
     await PickingRepository.updateProductsToPacked(msg.orderProductIDs);
-
     console.log(`✅ Se actualizaron ${msg.orderProductIDs.length} productos a estado=4 (empacado).`);
+  
+    // Suponiendo que msg incluye orderID; si no, debe llegarse a él de otra forma.
+    const orderID = msg.orderID;
+    if (!orderID) {
+      console.warn("⚠️ No se recibió orderID en bundle.ready, no se puede hacer el chequeo");
+      return;
+    }
+  
+    // Ahora, verificamos si existen productos que NO estén en estado 4 para ese pedido.
+    const nonPackedCount = await PickingRepository.countNonPackedProducts(orderID);
+    if (nonPackedCount === 0) {
+      // Si todos los productos ya están en estado 4, se envía el mensaje con newStatus: 6.
+      await sendMessage("order.status.updated", { orderID, newStatus: 6 });
+      console.log(`📤 Estado de la orden ${orderID} actualizado a 6 (Todos los productos empacados).`);
+    } else {
+      console.log(`ℹ️ Aún quedan ${nonPackedCount} productos sin empacar en la orden ${orderID}.`);
+    }
   },
   
   handleOrderStatusUpdated: async ({ orderID, newStatus }) => {
