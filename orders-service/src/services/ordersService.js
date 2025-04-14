@@ -3,7 +3,7 @@ const { sendMessage } = require("../producer");
 const axios = require("axios");
 
 // Ajusta la URL según tu configuración real (IP, puertos, etc.).
-const PICKING_SERVICE_URL = "http://192.168.0.83:5001/api/picking";
+const PICKING_SERVICE_URL = "http://192.168.0.254:5001/api/picking";
 
 const OrdersService = {
   getAllOrders: async () => {
