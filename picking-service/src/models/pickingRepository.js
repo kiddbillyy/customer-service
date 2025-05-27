@@ -97,47 +97,107 @@ const PickingRepository = {
   },
   
   // Upsert de producto usando MERGE
-  insertOrUpdateProduct: async ({ itemcode, dscription, price, codebars, whscode, U_Subcategoria }) => {
-    await pool.query(`
-      MERGE picking_service_db.Products AS target
-      USING (VALUES (?, ?, ?, ?, ?, ?)) AS source (itemcode, dscription, price, codebars, whscode, U_Subcategoria)
-      ON target.itemcode = source.itemcode
-      WHEN MATCHED THEN 
-        UPDATE SET 
-           dscription = source.dscription,
-           price = source.price,
-           codebars = source.codebars,
-           whscode = source.whscode,
-           U_Subcategoria = source.U_Subcategoria
-      WHEN NOT MATCHED THEN
-        INSERT (itemcode, dscription, price, codebars, whscode, U_Subcategoria)
-        VALUES (source.itemcode, source.dscription, source.price, source.codebars, source.whscode, source.U_Subcategoria);
-    `, [itemcode, dscription, price, codebars, whscode, U_Subcategoria]);
-  
-    console.log(`✅ Producto ${itemcode} actualizado en la BD`);
-  },
+  insertOrUpdateProduct: async ({ itemcode, dscription, priceAfterVAT, codebars, whscode, U_Subcategoria }) => {
+  await pool.query(`
+    MERGE picking_service_db.Products AS target
+    USING (VALUES (?, ?, ?, ?, ?, ?)) AS source (
+      itemcode,
+      dscription,
+      priceAfterVat,    -- aquí el nombre interno del parámetro
+      codebars,
+      whscode,
+      U_Subcategoria
+    )
+    ON target.itemcode = source.itemcode
+    WHEN MATCHED THEN 
+      UPDATE SET 
+         dscription     = source.dscription,
+         price           = source.priceAfterVat,  -- asignas priceAfterVat a tu columna price
+         codebars        = source.codebars,
+         whscode         = source.whscode,
+         U_Subcategoria  = source.U_Subcategoria
+    WHEN NOT MATCHED THEN
+      INSERT (
+        itemcode, 
+        dscription, 
+        price,           -- la columna price
+        codebars, 
+        whscode, 
+        U_Subcategoria
+      )
+      VALUES (
+        source.itemcode, 
+        source.dscription, 
+        source.priceAfterVat,  -- aquí también
+        source.codebars, 
+        source.whscode, 
+        source.U_Subcategoria
+      );
+  `, [
+    itemcode,
+    dscription,
+    priceAfterVAT,   // le pasas tu valor de VTEX
+    codebars,
+    whscode,
+    U_Subcategoria
+  ]);
+
+  console.log(`✅ Producto ${itemcode} actualizado en la BD`);
+},
+
 
   // Upsert de order_product usando MERGE
-  insertOrUpdateOrderProduct: async (orderID, { itemcode, quantity }) => {
-    await pool.query(`
+  insertOrUpdateOrderProduct: async (orderID, { itemcode, quantity, lineNum }) => {
+    await pool.query(
+      `
       MERGE picking_service_db.order_product AS target
-      USING (VALUES (?, ?, ?)) AS source (orderID, itemcode, quantity)
-      ON target.orderID = source.orderID AND target.itemcode = source.itemcode
-      WHEN MATCHED THEN
-      UPDATE SET quantity = target.quantity + source.quantity
-      WHEN NOT MATCHED THEN
-        INSERT (orderID, itemcode, quantity, pickedQuantity, pickingStatusID)
-        VALUES (source.orderID, source.itemcode, source.quantity, 0, 1);
-    `, [orderID, itemcode, quantity]);
+      USING (VALUES (?, ?, ?, ?)) 
+        AS source (orderID, itemcode, quantity, lineNum)
+        ON target.orderID = source.orderID
+       AND target.itemcode = source.itemcode
   
-    console.log(`✅ Producto ${itemcode} agregado a order_product en orden ${orderID}`);
+      WHEN MATCHED THEN
+        UPDATE SET
+          -- acumula la cantidad y actualiza lineNum si cambió
+          quantity = target.quantity + source.quantity,
+          lineNum  = source.lineNum
+  
+      WHEN NOT MATCHED THEN
+        INSERT (
+          orderID,
+          itemcode,
+          quantity,
+          pickedQuantity,
+          pickingStatusID,
+          lineNum
+        )
+        VALUES (
+          source.orderID,
+          source.itemcode,
+          source.quantity,
+          0,            -- pickedQuantity por defecto
+          1,            -- pickingStatusID por defecto
+          source.lineNum
+        );
+      `,
+      [orderID, itemcode, quantity, lineNum]
+    );
+  
+    console.log(`✅ Producto ${itemcode} (lineNum=${lineNum}) agregado/actualizado en order_product de orden ${orderID}`);
   },
   
   getProductsFromOrder: async (orderID) => {
     const [products] = await pool.query(
-      `SELECT op.orderProductID, op.orderID, op.itemcode, 
-              p.dscription, p.price, op.quantity, op.pickedQuantity, op.pickingStatusID, 
-              (op.quantity * p.price) as total
+      `  SELECT op.orderProductID, 
+		  op.orderID, 
+		  op.itemcode, 
+        p.dscription, 
+		p.price, 
+		op.quantity, 
+		op.pickedQuantity, 
+		op.pickingStatusID, 
+		op.lineNum,
+        (op.quantity * p.price) as total
        FROM picking_service_db.order_product op
        JOIN picking_service_db.products p ON p.itemcode = op.itemcode
        WHERE orderID = ?`,
@@ -775,6 +835,7 @@ const PickingRepository = {
       op.quantity,
       op.pickedQuantity,
       op.pickingStatusID,
+      op.lineNum,
       (op.quantity * p.price) AS total,
 
       /* Cálculo de leftover: diferencia entre
@@ -833,6 +894,17 @@ const PickingRepository = {
     );
     return rows[0].nonPackedCount;
   },
+  updatePickerUbicacion: async (orderProductID, pickerRUT, ubicacion) => {
+    const [result] = await pool.query(`
+      UPDATE picking_service_db.order_product_picker
+      SET ubicacion = ?
+      WHERE orderProductID = ?
+        AND pickerRUT = ?
+    `, [ubicacion, orderProductID, pickerRUT]);
+  
+    return result.rowsAffected[0] > 0;
+  },
+  
   
 };
 

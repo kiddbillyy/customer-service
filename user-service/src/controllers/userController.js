@@ -17,6 +17,16 @@ exports.getAllActiveUsers = async (req, res, next) => {
   }
 };
 
+exports.getAllPickers = async (req, res, next) => {
+  try {
+    const users = await UserService.getAllPickers();
+    res.json(users);
+  } catch (err) {
+    next(err);
+  }
+};
+
+
 
 
 exports.getUserByRut = async (req, res, next) => {

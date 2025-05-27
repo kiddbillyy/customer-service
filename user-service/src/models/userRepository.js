@@ -52,10 +52,49 @@ const UserRepository = {
   // Lista todos los usuarios
   getAllUsers: async () => {
     const [rows] = await pool.query(`
-      SELECT u.rut, u.name, u.email, r.roleName, s.statusName
-      FROM user_service_db.users u
+      
+  SELECT 
+	u.img,
+	u.rut, 
+	u.name, 
+	u.email, 
+	r.roleName, 
+	u.location,
+	u.picking,
+	u.emp,
+	s.statusID,
+	s.statusName,
+	u.user_created,
+	u.createdAt,
+	u.updatedAt
+
+    FROM user_service_db.users u
+      LEFT JOIN user_service_db.roles r ON u.roleID = r.roleID
+      LEFT JOIN user_service_db.user_status s ON u.statusID = s.statusID    `);
+    return rows;
+  },
+  getAllPickers: async () => {
+    const [rows] = await pool.query(`
+       
+  SELECT 
+	u.img,
+	u.rut, 
+	u.name, 
+	u.email, 
+	r.roleName, 
+	u.location,
+	u.picking,
+	u.emp,
+	s.statusID,
+	s.statusName,
+	u.user_created,
+	u.createdAt,
+	u.updatedAt
+
+    FROM user_service_db.users u
       LEFT JOIN user_service_db.roles r ON u.roleID = r.roleID
       LEFT JOIN user_service_db.user_status s ON u.statusID = s.statusID
+	where u.roleID = 2
     `);
     return rows;
   },

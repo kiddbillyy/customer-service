@@ -4,6 +4,9 @@ const UserService = {
   getAllUsers: () => {
     return UserRepository.getAllUsers();
   },
+  getAllPickers: () => {
+    return UserRepository.getAllPickers();
+  },
   getAllActiveUsers: () => {
     return UserRepository.getAllActiveUsers();
   },

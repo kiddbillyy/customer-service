@@ -4,15 +4,19 @@ const cors = require('cors');
 const orderRoutes = require('./routes/ordersRoutes');
 const consumeMessages = require('./consumer/ordersConsumer');
 const errorHandler = require('./middleware/errorHandler');
-
+const sapRoutes = require('./routes/sapRoutes');
 dotenv.config();
-
 const app = express();
+
+
+
 app.use(cors());
+
 app.use(express.json());
 
 // Rutas
 app.use('/api/orders', orderRoutes);
+app.use('/api/sap', sapRoutes)
 
 // Middleware de manejo de errores
 app.use(errorHandler);

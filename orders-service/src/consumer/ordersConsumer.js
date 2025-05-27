@@ -14,6 +14,7 @@ const consumeMessages = async () => {
     // Suscribirse a los tópicos que deseamos escuchar
     await consumer.subscribe({ topic: 'sap.order.imported', fromBeginning: true });
     await consumer.subscribe({ topic: 'order.status.updated', fromBeginning: true });
+    await consumer.subscribe({ topic: 'vtex.order.imported', fromBeginning: true });
 
     await consumer.run({
       autoCommit: false,

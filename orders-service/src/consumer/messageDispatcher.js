@@ -119,4 +119,21 @@ module.exports = {
         break;
     }
   },
+
+  'vtex.order.imported': async (msg) => {
+    try {
+      const orderId = msg.orderId;
+      if (!orderId) {
+        console.error('❌ "vtex.order.imported" sin orderId');
+        return;
+      }
+
+      // Inserta/actualiza la orden VTEX
+      const { orderRow, isNew } = await OrdersService.ingestVtexOrder(orderId);
+
+      console.log(`✅ VTEX order ${orderId} procesada (id interno = ${orderRow.orderID})`);
+    } catch (err) {
+      console.error('❌ Error en vtex.order.imported:', err);
+    }
+  },
 };

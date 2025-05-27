@@ -2,6 +2,7 @@ const PickingRepository = require("../models/pickingRepository");
 const packagingServiceClient = require("../client/packagingServiceClient.js")
 const WaveRepository = require("../models/waveRepository");
 const WaveService = require("./waveService");
+const { getOrderById } = require("../client/ordersClient.js");
 const { sendMessage } = require("../producer");
 const axios = require("axios");
 
@@ -81,7 +82,7 @@ const PickingService = {
     return await PickingRepository.getProductsAssignedToPicker(pickerRUT);
   },
 
-  updatePickedProduct: async (orderProductID, providedCode, pickerRUT, pickedQuantity) => {
+  updatePickedProduct: async (orderProductID, providedCode, pickerRUT, pickedQuantity, ubicacion) => {
 
 
     // 1) Obtener información actual de la DB (incluyendo codebars)
@@ -103,6 +104,10 @@ const PickingService = {
       console.error(
         `❌ El code proporcionado (${providedCode}) no coincide con itemcode=(${orderProduct.itemcode}) ni codebars=(${orderProduct.codebars}).`
       );
+      return false;
+    }
+    if (!ubicacion) {
+       console.error(`❌ Debe asignar un contenedor al producto ${orderProductID}.`);
       return false;
     }
   
@@ -137,6 +142,11 @@ const PickingService = {
     if (!updated) {
       console.error(`❌ Error actualizando el producto ${orderProductID}`);
       return false;
+    }
+
+    if (ubicacion) {
+      await PickingRepository.updatePickerUbicacion(orderProductID, pickerRUT, ubicacion);
+      console.log(`ℹ️ [orderProductID=${orderProductID}] ubicación actualizada a '${ubicacion}'`);
     }
   
     console.log(
@@ -374,40 +384,46 @@ const PickingService = {
     return updatedCount;
   },
   getAllOrdersProducts: async () => {
-    // 1. Obtenemos todas las filas de order_product (JOIN con products)
-    const rows = await PickingRepository.getAllOrderProducts();
-    if (!rows || rows.length === 0) {
-      return [];
-    }
+   /* 1. Productos con leftover > 0 */
+  const rows = await PickingRepository.getAllOrderProducts();
+  if (!rows?.length) return [];
 
-    // 2. Agrupar por orderID
-    const ordersMap = {};
-    for (const row of rows) {
-      const orderID = row.orderID;
-      if (!ordersMap[orderID]) {
-        ordersMap[orderID] = {
-          orderID,
-          products: []
-        };
+  /* 2. Agrupar por orderID */
+  const ordersMap = {};
+  for (const r of rows) {
+    if (!ordersMap[r.orderID]) {
+      ordersMap[r.orderID] = { orderID: r.orderID, products: [] };
+    }
+    ordersMap[r.orderID].products.push({
+      orderProductID : r.orderProductID,
+      itemcode       : r.itemcode,
+      dscription     : r.dscription,
+      price          : r.price,
+      quantity       : r.quantity,
+      pickedQuantity : r.pickedQuantity,
+      pickingStatusID: r.pickingStatusID,
+      lineNum        : r.lineNum,
+      total          : r.total,
+      leftover       : r.leftover
+    });
+  }
+
+  /* 3. Pedir metadatos al orders-service en paralelo */
+  await Promise.all(
+    Object.keys(ordersMap).map(async id => {
+      try {
+        const { docentry, u_ref1, cardcode } = await getOrderById(id);  // GET /orders/:id
+        Object.assign(ordersMap[id], { docentry, u_ref1, cardcode });
+      } catch (e) {
+        console.error(`❌ orderID ${id}: ${e.message}`);
+        Object.assign(ordersMap[id], { docentry: null, u_ref1: null, cardcode: null });
       }
-      // Construir objeto de producto
-      const productData = {
-        orderProductID: row.orderProductID,
-        itemcode: row.itemcode,
-        dscription: row.dscription,
-        price: row.price,
-        quantity: row.quantity,
-        pickedQuantity: row.pickedQuantity,
-        pickingStatusID: row.pickingStatusID,
-        total: row.total,
-        leftover: row.leftover
-      };
-      ordersMap[orderID].products.push(productData);
-    }
+    })
+  );
 
-    // 3. Convertir el objeto final en un array
-    return Object.values(ordersMap);
-  },
+  /* 4. Devolver como array */
+  return Object.values(ordersMap);
+},
   markProductAsMissing: async (orderProductID, pickerRUT, missingQuantity) => {
     // 1) Obtener la asignación actual (order_product_picker) para ese picker
     const assignment = await PickingRepository.getAssignment(orderProductID, pickerRUT);

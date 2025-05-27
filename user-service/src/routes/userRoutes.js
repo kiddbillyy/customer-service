@@ -13,6 +13,7 @@ const router = express.Router();
 
 // Obtener todos los usuarios (solo Admin)
 router.get('/', userController.getAllUsers);
+router.get('/pickers', userController.getAllUsers);
 
 router.get('/active', userController.getAllActiveUsers);
 

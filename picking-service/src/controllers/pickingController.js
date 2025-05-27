@@ -32,13 +32,14 @@ exports.assignPickers = async (req, res) => {
 
 exports.updatePickedProduct = async (req, res) => {
   try {
-    const { pickedQuantity, providedCode, pickerRUT } = req.body;
-    
+    const { pickedQuantity, providedCode, pickerRUT, ubicacion } = req.body;
+
     const updated = await PickingService.updatePickedProduct(
       req.params.orderProductID,
       providedCode,
       pickerRUT,
-      pickedQuantity
+      pickedQuantity,
+      ubicacion  
     );
 
     if (!updated) {

@@ -57,19 +57,10 @@ router.get("/get/quantity", getAssignedQuantity);
 
 // Actualizar cantidad pickeada de un producto en una orden
 router.put(
-  "/product/:orderProductID",
-  updatePickedProductValidator,
-  validateRequest,
-  updatePickedProduct
-);
+  "/product/:orderProductID", updatePickedProduct);
 
 // Completar picking de una orden
-router.put(
-  "/complete/:orderID",
-  completePickingValidator,
-  validateRequest,
-  completePicking
-);
+router.put("/complete/:orderID", completePicking);
 
 // Endpoint para reasignar picking de un producto
 router.put(

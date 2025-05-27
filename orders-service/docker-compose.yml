@@ -38,6 +38,13 @@ services:
       - "5000:5000"
     depends_on:
       - kafka
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "win-hp03dio6fsk:192.168.0.165"
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8         
+      - 1.1.1.1  
     environment:
       PORT: 5000
       DB_HOST: host.docker.internal
@@ -45,6 +52,13 @@ services:
       DB_PASSWORD: admin123
       DB_NAME: orders_service_db
       DB_PORT: 1433
+      VTEX_APP_KEY: ${VTEX_APP_KEY}
+      VTEX_APP_TOKEN: ${VTEX_APP_TOKEN}
+      SAP_SL_BASE_URL:   ${SAP_SL_BASE_URL}
+      SAP_SL_COMPANYDB:  ${SAP_SL_COMPANYDB}
+      SAP_SL_USER:       ${SAP_SL_USER}
+      SAP_SL_PASSWORD:   ${SAP_SL_PASSWORD}
+      SAP_SL_SESSION:     ${SAP_SL_SESSION}
       KAFKA_BROKER: kafka:9092  # Asegura que Kafka es accesible usando el hostname "kafka"
       KAFKA_CLIENT_ID: orders-service
     networks:
