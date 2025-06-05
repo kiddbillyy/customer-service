@@ -40,3 +40,28 @@ exports.getAllProducts = async (req, res) => {
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
+
+exports.checkAvailability = async (req, res) => {
+  try {
+    const products = req.body.products; // [{ sku, quantity }]
+    if (!Array.isArray(products)) {
+      return res.status(400).json({ message: 'Formato inválido de entrada.' });
+    }
+
+    const result = await InventoryService.findStockForProducts(products);
+
+    const insufficient = result.filter(p => !p.stockSufficient);
+
+    if (insufficient.length > 0) {
+      return res.status(422).json({
+        message: 'No hay stock suficiente para uno o más productos prioritarios.',
+        missing: insufficient
+      });
+    }
+
+    return res.status(200).json({ data: result });
+  } catch (err) {
+    console.error('Error en checkAvailability:', err);
+    return res.status(500).json({ message: 'Error interno del servidor.' });
+  }
+};

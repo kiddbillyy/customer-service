@@ -37,7 +37,27 @@ const InventoryRepository = {
     );
     return rows;
   },
+getInventoriesWithPriorityOnly: async (sku) => {
+  const request = pool.request();
+  request.input('sku', sql.VarChar, sku);
 
+  const query = `
+    SELECT
+      inv.sku,
+      inv.id_almacen,
+      alm.nombre,
+      alm.prioridad,
+      inv.disponible
+    FROM inventario inv
+    JOIN almacenes alm ON alm.id_almacen = inv.id_almacen
+    WHERE inv.sku = @sku
+      AND alm.status = 'Activo'
+      AND alm.prioridad IS NOT NULL
+  `;
+
+  const result = await request.query(query);
+  return { data: result.recordset };
+},
   getAllProducts: async (filters, page = 1) => {
   const pageNum = Math.max(1, Number(page) || 1);
   const offset = (pageNum - 1) * PAGE_SIZE;

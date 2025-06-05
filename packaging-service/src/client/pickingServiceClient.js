@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const PICKING_BASE_URL = process.env.PICKING_SERVICE_URL || "http://192.168.0.254:5001/api/picking";
+const PICKING_BASE_URL = process.env.PICKING_SERVICE_URL || "http://192.168.0.164:5001/api/picking";
 
 const pickingServiceClient = {
   fetchOrderProductDetails: async (orderProductIDs) => {

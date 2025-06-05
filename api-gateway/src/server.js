@@ -11,8 +11,7 @@ import errorHandler from './middlewares/errorHandler.js';
 const app = express();
 app.use(helmet());
 app.use(compression());
-app.use(cors({ origin: '*' }));
-app.use(express.json());
+app.use(cors());
 app.use(logger);
 app.use(rateLimiter);
 
@@ -21,6 +20,8 @@ Object.values(services).forEach((cfg) => {
   const { mountPoint, handler } = makeRoute(cfg);
   app.use(mountPoint, handler);
 });
+
+app.use(express.json());
 
 app.get('/health', (_req, res) => res.send('OK'));
 

@@ -329,7 +329,7 @@ async function createInvoiceInSap(payloadFromFrontend) {
   const vtexOrderId = payloadFromFrontend.U_REF1;          // debe venir del front
   if (!vtexOrderId) throw new Error("Falta U_REF1 (orderId VTEX)");
 
-  const vtexOrder = await fetchVtexOrder(vtexOrderId);     // ya lo tienes importado
+  const vtexOrder = await fetchVtexOrder(vtexOrderId);     
 
   const hasRazonSocial = !!(
     vtexOrder.clientProfileData?.corporateName &&
@@ -403,8 +403,8 @@ async function createInvoiceInSap(payloadFromFrontend) {
 
 
 
-  /* -----------------------------------------------------------
-   CREA PAGO luego de la reserva
+/* -----------------------------------------------------------
+  CREA PAGO luego de la reserva
 ------------------------------------------------------------ */
 async function createIncomingPaymentInSap({ cardCode, invoiceDocEntry, vtexOrderId, invoiceAmount }) {
   try{
