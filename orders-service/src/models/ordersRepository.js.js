@@ -37,6 +37,13 @@ const OrdersRepository = {
     ]);
     return order.length ? order[0] : null;
   },
+  
+  getOrderByVtexId: async (orderID) => {
+    const [order] = await pool.query("SELECT * FROM orders_service_db.Orders WHERE u_ref1 = ?", [
+      orderID,
+    ]);
+    return order.length ? order[0] : null;
+  },
   getHistory: async (orderID) => {
     const [order] = await pool.query(
       `
@@ -187,12 +194,12 @@ const OrdersRepository = {
     console.log("🔎 getInscription ejecutada:", rows);
     return rows[0]?.Nombre ?? null;
   },
-  saveSapIds: async (orderId, docEntry, docNum) => {
+  saveSapIds: async (orderID, docEntry, docNum) => {
     await pool.query(
       `UPDATE orders_service_db.Orders
          SET docentry = ?, docnum = ?, INTEGRATION_STATUS = 'sent-to-sap'
        WHERE orderID = ?`,
-      [docEntry, docNum, orderId]
+      [docEntry, docNum, orderID]
     );
   },
   saveSapPaymentIds: async (orderID, payDocEntry, payDocNum) => {

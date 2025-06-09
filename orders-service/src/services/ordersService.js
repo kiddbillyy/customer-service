@@ -1,9 +1,10 @@
 const OrdersRepository = require("../models/ordersRepository.js");
 const { sendMessage } = require("../producer");
 const axios = require("axios");
-const { buildSapOrderPayload, sendToSap} = require("./sapService.js")
+const { buildSapOrderPayload, sendToSap, buildReserveInvoicePayload, createInvoiceInSap } = require("./sapService.js")
+const { setOrderStartHandling, sendInvoiceToVtex  } = require("../services/vtexService.js")
 // Ajusta la URL según tu configuración real (IP, puertos, etc.).
-const PICKING_SERVICE_URL = "http://192.168.0.164:5001/api/picking";
+const PICKING_SERVICE_URL = "http://localhost:5001/api/picking";
 
 
 
@@ -300,6 +301,15 @@ const OrdersService = {
       try {
         // 5.1) Crear OV en SAP
         const { docEntry, docNum, lineInfo } = await sendToSap(raw, orderRow, baseProducts);
+        /* 5.2-bis) Notificar a VTEX → start-handling */
+        try {
+          await setOrderStartHandling(orderId);   // ← el mismo orderId VTEX que recibiste al inicio
+        } catch (err) {
+          const msg = JSON.stringify(err.response?.data || err.message);
+          await OrdersRepository.saveIntegrationError(orderRow.orderID, msg);
+          console.error("❌ Error cambiando estado VTEX:", msg);
+        }
+
 
         // 5.2) Guardar DocEntry/DocNum en BD
         await OrdersRepository.saveSapIds(orderRow.orderID, docEntry, docNum);
@@ -320,6 +330,55 @@ const OrdersService = {
           products: productsWithLine
         });
         console.log(`📤 new.order.created → picking (orderID=${orderRow.orderID}, items=${productsWithLine.length})`);
+
+        /* 5.5) Crear factura de reserva e IncomingPayment */
+        try {
+          // A) payload
+            const invoicePayload = buildReserveInvoicePayload({
+            orderRow,
+            docEntry,              
+            products: productsWithLine
+          });
+       
+          console.log(`INVOICE PAYLOAD: ${JSON.stringify(invoicePayload)} `)
+          // B) crear factura + pago
+          const { docEntry: invDocEntry, payDocEntry, invoiceAmount, vtexItems } = await createInvoiceInSap(invoicePayload);
+
+          console.log(
+            `📄 Reserva OK (DocEntry=${invDocEntry} – `+
+            `💰 Pago OK (DocEntry=${payDocEntry}`
+          );
+
+
+          /* 5.6) Notificar “invoice” a VTEX */
+          try {
+            const issuanceDate = dayjs().toISOString(); // con hora
+            const invoiceValue = String(Math.round(invoiceAmount * 100)); // a centavos
+        
+            await sendInvoiceToVtex({
+              orderId,
+              invoiceNumber: invDocEntry,   
+              issuanceDate,
+              invoiceValue,
+              items: vtexItems              // ya trae id, price, quantity
+            });
+          } catch (err) {
+            const msg = JSON.stringify(err.response?.data || err.message);
+            await OrdersRepository.saveIntegrationError(orderRow.orderID, msg);
+            console.error("❌ Error invoice VTEX:", msg);
+          }
+      
+
+          // C) guardar IDs en BD de invoice
+          // await OrdersRepository.saveSapInvoiceIds(orderRow.orderID, invDocEntry, invDocNum, payDocEntry, payDocNum);
+       
+        } catch (err) {
+          const msg = JSON.stringify(err.response?.data || err.message);
+          await OrdersRepository.saveIntegrationError(orderRow.orderID, msg);
+          console.error("❌ Error factura/pago:", msg);
+        }
+
+
 
       } catch (err) {
         /* ======== A) Error creando OV o emitiendo evento ========= */

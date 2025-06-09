@@ -3,7 +3,7 @@ const axios  = require("axios");
 const dayjs  = require("dayjs");
 const https  = require("https");
 const OrdersRepository = require("../models/ordersRepository.js");
-const { fetchVtexOrder } = require("./vtexService.js");
+const { fetchVtexOrder, setOrderStartHandling} = require("./vtexService.js");
 const paymentMap  = require("../constants/paymentMaps.js");
 
 const baseURL    = process.env.SAP_SL_BASE_URL;
@@ -12,6 +12,30 @@ const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 // ──────────────────────────────────────────────────────────
 // HELPERS
 // ──────────────────────────────────────────────────────────
+function buildReserveInvoicePayload({ orderRow, docEntry, products }) {
+  // DocumentLines que “referencian” la OV (BaseEntry/Line)
+  const docLines = products
+    .filter(p => p.lineNum !== null)           // descarta líneas sin LineNum
+    .map(p => ({
+      BaseType  : 17,                          // 17 = Sales Order
+      BaseEntry : docEntry,
+      BaseLine  : p.lineNum,
+      Quantity  : p.quantity                   // respeta cantidades originales
+    }));
+
+  const { cardCode } = parseRut(orderRow.cardcode || "");
+
+  return {
+    CardCode        : cardCode,
+    DocDate         : dayjs(orderRow.createdate).format("YYYY-MM-DD"),
+    DocDueDate      : dayjs(orderRow.createdate).format("YYYY-MM-DD"),
+    U_REF1          : orderRow.u_ref1,        // orderId VTEX – lo usa createInvoiceInSap
+    ReserveInvoice  : "tYES",                 // ← CLAVE
+    SalesPersonCode : 401,                    // usa el que corresponda (ej. 401)
+    /* ——— LÍNEAS ——— */
+    DocumentLines   : docLines
+  };
+}
 
 
 function profileFields(vtexOrder) {
@@ -385,6 +409,8 @@ async function createInvoiceInSap(payloadFromFrontend) {
     docNum        : inv.DocNum,
     payDocEntry,
     payDocNum,
+    invoiceAmount : totalReserva,
+    vtexItems     : vtexOrder.items,
     documentLines : inv.DocumentLines?.map(l => ({
       lineNum : l.LineNum,
       itemCode: l.ItemCode,
@@ -556,5 +582,6 @@ module.exports = {
   sendToSap,
   createInvoiceInSap,
   createIncomingPaymentInSap,
-  createDeliveryNoteInSap
+  createDeliveryNoteInSap,
+  buildReserveInvoicePayload 
 };
