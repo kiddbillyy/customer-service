@@ -21,7 +21,7 @@ const config = {
 const pool = new sql.ConnectionPool(config);
 
 pool.connect()
-  .then(() => console.log('✅ Conectado a SQL Server'))
+  .then(() => console.log('✅ Conectado a Catalog-Service-db'))
   .catch(err => console.error('❌ Error al conectar con SQL Server:', err));
 
 // Wrapper para mantener interfaz similar a mysql2

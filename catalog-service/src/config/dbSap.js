@@ -29,8 +29,9 @@ pool.query = async (query, params) => {
       request.input(`param${i + 1}`, param);
     });
   }
-
+  console.log("Query: ", query)
   const result = await request.query(query);
+  console.log("Result: ",result)
 
   // Si es SELECT, retorna el recordset
   if (result.recordset !== undefined) {

@@ -7,10 +7,10 @@ networks:
 services:
   inventory-service:
     build: .
-    container_name: inventory-service
+    container_name: catalog-service
     restart: always
     ports:
-      - "5005:5005"
+      - "5006:5006"
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "win-hp03dio6fsk:192.168.0.165"
@@ -19,10 +19,10 @@ services:
       - 8.8.8.8         
       - 1.1.1.1  
     environment:
-      PORT: 5005
+      PORT: 5006
       DB_HOST: host.docker.internal
-      DB_USER: windburst
-      DB_PASSWORD: admin123
+      DB_USER: Marcelo
+      DB_PASSWORD: Mimbral_!234
       DB_NAME: inventory_service_db
       DB_PORT: 1433
       KAFKA_BROKER: kafka:9092

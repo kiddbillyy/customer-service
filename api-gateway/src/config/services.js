@@ -11,5 +11,6 @@ export default {
   vtex:        { path: '/api/vtex',     target: 'http://sap-integration-service:5004' },
   inventory:   { path: '/api/inventory',target: 'http://inventory-service:5005' },
   store:       { path: '/api/store',    target: 'http://inventory-service:5005' },
-  pricing:     { path: '/api/pricing',  target: 'http://inventory-service:5005' }
+  pricing:     { path: '/api/pricing',  target: 'http://inventory-service:5005' },
+  catalog:     { path: '/api/catalog',  target: 'http://catalog-service:5006' },
 };

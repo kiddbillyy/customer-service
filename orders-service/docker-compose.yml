@@ -13,6 +13,10 @@ services:
       - "2181:2181"
     networks:
       - kafka_network
+    healthcheck:
+      test: echo ruok | nc localhost 2181 | grep imok || exit 1
+      interval: 10s
+      retries: 5
 
   kafka:
     image: wurstmeister/kafka
@@ -28,8 +32,11 @@ services:
     depends_on:
       - zookeeper
     networks:
-      - kafka_network
-
+      - kafka_network 
+    healthcheck:
+      test: echo > /dev/tcp/localhost/9092 || exit 1
+      interval: 10s
+      retries: 5
   orders-service:
     build: .
     container_name: orders-service
@@ -41,15 +48,15 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "win-hp03dio6fsk:192.168.0.165"
-    dns:
-      - 127.0.0.1
-      - 8.8.8.8         
-      - 1.1.1.1  
+    #dns:
+    #  - 127.0.0.1
+    #  - 8.8.8.8         
+    #  - 1.1.1.1  
     environment:
       PORT: 5000
       DB_HOST: host.docker.internal
-      DB_USER: windburst
-      DB_PASSWORD: admin123
+      DB_USER: Marcelo
+      DB_PASSWORD: Mimbral_!234
       DB_NAME: orders_service_db
       DB_PORT: 1433
       VTEX_APP_KEY: ${VTEX_APP_KEY}
