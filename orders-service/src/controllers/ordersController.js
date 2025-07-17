@@ -103,3 +103,25 @@ exports.getOrdersByPickerRUT = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
+
+//REPROCESAR
+exports.reprocessOrder = async (req, res) => {
+  try {
+    const orderID = Number(req.params.id);
+    const result  = await OrdersService.reprocessOrder(orderID);
+    res.json({ message: "Reproceso iniciado", ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+//EDITAR ORDEN
+exports.patchOrder = async (req, res) => {
+  try {
+    const orderID = Number(req.params.id);
+    const result  = await OrdersService.patchOrder(orderID, req.body);
+    res.json({ message: "Orden actualizada", result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

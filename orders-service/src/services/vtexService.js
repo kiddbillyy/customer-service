@@ -51,7 +51,7 @@ exports.sendInvoiceToVtex = async ({
   invoiceValue,
   items
 }) => {
-  const url = `${VTEX_BASE_URL}/api/oms/pvt/orders/${orderId}/invoice`;
+  const url = `https://mimbralb2c.vtexcommercestable.com.br/api/oms/pvt/orders/${orderId}/invoice`;
 
   const payload = {
     type: "Output",

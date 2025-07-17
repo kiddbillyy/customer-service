@@ -7,7 +7,9 @@ const {
   getLastQueryDate,
   getHistory,
   getOrdersAudit,
-  getOrdersByPickerRUT
+  getOrdersByPickerRUT,
+  reprocessOrder,
+  patchOrder          
 } = require("../controllers/ordersController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -24,6 +26,12 @@ router.put("/:id/status", updateOrderStatus); // API para actualizar el estado d
 router.get("/max/createts", getMaxCreatets); // API para obtener la fecha de la última orden creada
 router.get("/max/lastQueryDate", getLastQueryDate); // API para obtener la fecha de la última consulta
 router.get("/history/:id", getHistory); // API para obtener el historial de una orden
+
+// ── REPROCESO MANUAL ──────────────────────────────────────────
+ router.post("/:id/reprocess", reprocessOrder);
+
+ //ACTUALIZAR ORDEN
+ router.patch("/:id", patchOrder);
 
 // authMiddleware([userRole.ADMIN, userRole.ASSIGNER]) para asignar múltiples roles
 module.exports = router;

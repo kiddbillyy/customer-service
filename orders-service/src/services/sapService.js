@@ -107,6 +107,24 @@ async function loginToSap() {
   return cookie;
 }
 
+
+async function logoutSap(cookie) {
+  try {
+    await axios.post(
+      `${baseURL}/Logout`,
+      null,                                  // sin cuerpo
+      { httpsAgent,
+        headers: { Cookie: cookie },
+        timeout: 10_000
+      });
+    console.log("🔒 Logout SAP OK");
+  } catch (e) {
+    // Que falle el logout no debería detener tu flujo,
+    // solo avisa en log para depuración.
+    console.warn("⚠️  Logout SAP falló:", e.response?.data || e.message);
+  }
+}
+
 // ──────────────────────────────────────────────────────────
 // Campos que sincronizamos y detectamos diferencias
 // ──────────────────────────────────────────────────────────
@@ -140,6 +158,7 @@ function buildSapCustomerPayload(vtexOrder, giroNombre) {
 
   const street = `${sel.street || "-"}${sel.number ? " " + sel.number : ""}${sel.complement ? " " + sel.complement : ""}`;
   const city   = sel.city || sel.state || "";
+  const county= sel.neighborhood || "";
 
   return {
     CardCode     : rut.cardCode,                // ← cuerpo + "C"
@@ -155,15 +174,17 @@ function buildSapCustomerPayload(vtexOrder, giroNombre) {
       {
         AddressName: "Envio",
         AddressType: "bo_ShipTo",
-        Street     : street,
+        Street     : street?.substring(0, 100),
         City       : city,
+        County:county,
         Country    : "CL"
       },
       {
         AddressName: "Facturación",
         AddressType: "bo_BillTo",
-        Street     : street,
+        Street     : street?.substring(0, 100),
         City       : city,
+         County:county,
         Country    : "CL"
       }
     ]
@@ -173,8 +194,8 @@ function buildSapCustomerPayload(vtexOrder, giroNombre) {
 // ──────────────────────────────────────────────────────────
 // Crea o actualiza BusinessPartner
 // ──────────────────────────────────────────────────────────
-async function upsertCustomer(vtexOrder) {
-  const cookie     = await loginToSap();
+async function upsertCustomer(vtexOrder,cookie) {
+  //const cookie     = await loginToSap();
   const giroCodigo = vtexOrder.clientProfileData?.stateInscription;
   const giroNombre = giroCodigo
     ? await OrdersRepository.getInscription(giroCodigo)
@@ -304,12 +325,15 @@ function buildSapOrderPayload(orderRow, products, vtexOrder) {
 // ──────────────────────────────────────────────────────────
 // Envía OV a SAP
 // ──────────────────────────────────────────────────────────
-async function sendToSap(vtexOrder, orderRow, products) {
+async function sendToSap(vtexOrder, orderRow, products,cookieExtern = null) {
   // 1) Asegura que el BP exista o esté actualizado
-  await upsertCustomer(vtexOrder);
+  const cookie = cookieExtern ?? await loginToSap();
+  try{
+
+  
+  await upsertCustomer(vtexOrder,cookie);
 
   // 2) Login & envío de la OV
-  const cookie  = await loginToSap();
   const payload = buildSapOrderPayload(orderRow, products, vtexOrder);
 
   console.log("📦 Payload OV:", JSON.stringify(payload, null, 2));
@@ -338,6 +362,10 @@ async function sendToSap(vtexOrder, orderRow, products) {
     docNum   : data.DocNum,
     lineInfo : lines                                 // ← nuevo
   };
+
+  } finally {
+    if (!cookieExtern) await logoutSap(cookie);
+  }
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -347,7 +375,8 @@ async function sendToSap(vtexOrder, orderRow, products) {
 const SERIES_BOLETA  = 151;   // boleta electrónica
 const SERIES_FACTURA = 139;   // factura electrónica
 
-async function createInvoiceInSap(payloadFromFrontend) {
+async function createInvoiceInSap(payloadFromFrontend, cookieExtern = null) {
+  const cookie = cookieExtern ?? await loginToSap();
   try {
   /* A) Obtener los datos de la orden VTEX para decidir la serie -------- */
   const vtexOrderId = payloadFromFrontend.U_REF1;          // debe venir del front
@@ -370,7 +399,7 @@ async function createInvoiceInSap(payloadFromFrontend) {
   };
 
   /* C) Crear la factura de reserva en SAP ------------------------------ */
-  const cookie = await loginToSap();
+  //const cookie = await loginToSap();
 
   const { data: inv } = await axios.post(
     `${baseURL}/Invoices`,
@@ -400,7 +429,8 @@ async function createInvoiceInSap(payloadFromFrontend) {
     cardCode,
     invoiceDocEntry: inv.DocEntry,
     vtexOrderId,
-    invoiceAmount : totalReserva
+    invoiceAmount : totalReserva,
+    cookieExtern : cookie 
   });
 
   /* F) Devolver lo necesario al controlador --------------------------- */
@@ -421,9 +451,12 @@ async function createInvoiceInSap(payloadFromFrontend) {
     // B) Error al crear la factura de reserva
     const orderId = payloadFromFrontend.U_REF1;
     const msg = JSON.stringify(err.response?.data || err.message);
-    await OrdersRepository.saveIntegrationError(orderId, msg);
+    await OrdersRepository.saveIntegrationErrorVTEX(orderId, msg);
     console.error("❌ Error factura reserva:", msg);
     throw err; // re-lanzamos si quieres que el controlador lo capture
+  }
+  finally {
+    if (!cookieExtern) await logoutSap(cookie);
   }
 }
 
@@ -432,7 +465,8 @@ async function createInvoiceInSap(payloadFromFrontend) {
 /* -----------------------------------------------------------
   CREA PAGO luego de la reserva
 ------------------------------------------------------------ */
-async function createIncomingPaymentInSap({ cardCode, invoiceDocEntry, vtexOrderId, invoiceAmount }) {
+async function createIncomingPaymentInSap({ cardCode, invoiceDocEntry, vtexOrderId, invoiceAmount, cookieExtern = null }) {
+   const cookie = cookieExtern ?? await loginToSap();
   try{
   // 1) Obtener datos de VTEX
   const vtexOrder = await fetchVtexOrder(vtexOrderId);
@@ -492,12 +526,13 @@ async function createIncomingPaymentInSap({ cardCode, invoiceDocEntry, vtexOrder
       VoucherNum        : tid,
       ConfirmationNum   : tid,
       CardValidUntil    : `${dayjs().add(10, "year").year()}-01-01T00:00:00`,
-      CreditSum         : invoiceAmount
+      CreditSum         : invoiceAmount,
+      SplitPayments     : cuotasEf > 1 ? 'tYES' : 'tNO'
     }]
   };
 
   // 6) Enviar a SAP
-  const cookie = await loginToSap();
+  //const cookie = await loginToSap();
   const { data } = await axios.post(
     `${baseURL}/IncomingPayments`,
     payload,
@@ -521,6 +556,10 @@ async function createIncomingPaymentInSap({ cardCode, invoiceDocEntry, vtexOrder
     console.error("❌ Error pago:", msg);
     throw err;
   }
+  finally {
+    if (!cookieExtern) await logoutSap(cookie);
+  }
+
 }
 
 
@@ -583,5 +622,6 @@ module.exports = {
   createInvoiceInSap,
   createIncomingPaymentInSap,
   createDeliveryNoteInSap,
-  buildReserveInvoicePayload 
+  buildReserveInvoicePayload,
+  logoutSap
 };

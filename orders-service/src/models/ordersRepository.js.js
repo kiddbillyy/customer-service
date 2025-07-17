@@ -2,7 +2,7 @@ const pool = require("../config/db");
 
 const OrdersRepository = {
   getAllOrders: async () => {
-    const [orders] = await pool.query("SELECT * FROM orders_service_db.Orders");
+    const [orders] = await pool.query("SELECT * FROM orders_service_db.Orders order by orderID desc");
     return orders;
   },
   getOrdersAudit: async () => {
@@ -213,10 +213,42 @@ const OrdersRepository = {
   await pool.query(
     `UPDATE orders_service_db.Orders
         SET integrationError = ?
+      WHERE orderid = ?`,
+    [errorMsg, orderId]
+  );
+  },
+  saveIntegrationErrorVTEX: async (orderId, errorMsg) => {
+  await pool.query(
+    `UPDATE orders_service_db.Orders
+        SET integrationError = ?
       WHERE u_ref1 = ?`,
     [errorMsg, orderId]
   );
   },
+
+ async  patchOrder(orderID, changes) {
+  if (!changes || Object.keys(changes).length === 0) {
+    return { updated: [] };
+  }
+
+  /* 1) Construye el SET dinámico */
+  const setClauses = Object.keys(changes)
+    .map(col => `[${col}] = ?`)
+    .join(", ");
+
+  /* 2) Valores en el mismo orden de las columnas,
+        y al final el orderID para el WHERE            */
+  const values = [...Object.values(changes), orderID];
+
+  /* 3) Ejecuta el UPDATE */
+  const sql = `
+    UPDATE orders_service_db.Orders
+       SET ${setClauses}
+     WHERE orderID = ?;`;
+
+  await pool.query(sql, values);
+  return { updated: Object.keys(changes) };
+}
 
 };
 

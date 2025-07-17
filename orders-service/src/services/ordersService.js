@@ -1,14 +1,32 @@
 const OrdersRepository = require("../models/ordersRepository.js");
 const { sendMessage } = require("../producer");
 const axios = require("axios");
-const { buildSapOrderPayload, sendToSap, buildReserveInvoicePayload, createInvoiceInSap } = require("./sapService.js")
+const {
+loginToSap,          // ← NUEVO
+logoutSap,           // ← opcional si quieres usarlo directo
+buildSapOrderPayload,
+sendToSap,
+buildReserveInvoicePayload,
+createInvoiceInSap
+} = require("./sapService.js");
 const { setOrderStartHandling, sendInvoiceToVtex  } = require("../services/vtexService.js")
 // Ajusta la URL según tu configuración real (IP, puertos, etc.).
 const PICKING_SERVICE_URL = "http://localhost:5001/api/picking";
-
-
+const dayjs  = require("dayjs");
 
 // --- helpers -------------------------------------------------
+function rutToFederal(body) {
+  // body: solo dígitos (ej. "77268446")
+  let sum = 0, mul = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += parseInt(body[i], 10) * mul;
+    mul = mul === 7 ? 2 : mul + 1;
+  }
+  const rest = 11 - (sum % 11);
+  const dv   = rest === 11 ? "0" : rest === 10 ? "K" : String(rest);
+  return { federal: `${body}-${dv}`, dv };
+}
+
 function getProfileFields(o) {
   const p = o.clientProfileData;
 
@@ -262,6 +280,9 @@ const OrdersService = {
 
 
   ingestVtexOrder: async (orderId) => {
+    let cookie;
+    try{
+    cookie = await loginToSap();
     // 1) Traemos la orden de VTEX
     const raw      = await fetchVtexOrder(orderId);
     const vtex     = mapVtexToDB(raw);
@@ -287,24 +308,26 @@ const OrdersService = {
     const { orderRow, isNew } = await OrdersRepository.ingestVtexOrder(vtex);
 
     // VALIDAR RUT
-      const { rutRaw } = getProfileFields(raw);
+      const { rutRaw, isCorp } = getProfileFields(raw);
       const rutOk = isRutValid(rutRaw);
+
+      
       if (!rutOk) {
-        const msg = "RUT INVALIDO";
-        console.log('Guardar error: ', orderRow.orderID, msg)
+        const msg = `RUT inválido (${isCorp ? "corporateDocument" : "document"})`;
         await OrdersRepository.saveIntegrationError(orderRow.orderID, msg);
         console.error(`❌ ${msg}: ${rutRaw}`);
-        return { orderRow, isNew: false };   // corta la integración
+        return { orderRow, isNew: false };
       }
     // 5) Si es nueva, integramos en SAP y luego emitimos mensaje
     if (isNew) {
       try {
         // 5.1) Crear OV en SAP
-        const { docEntry, docNum, lineInfo } = await sendToSap(raw, orderRow, baseProducts);
+        const { docEntry, docNum, lineInfo } = await sendToSap(raw, orderRow, baseProducts,cookie);
         /* 5.2-bis) Notificar a VTEX → start-handling */
         try {
           await setOrderStartHandling(orderId);   // ← el mismo orderId VTEX que recibiste al inicio
         } catch (err) {
+          console.log(`ERROR 0: ` +  err.message)
           const msg = JSON.stringify(err.response?.data || err.message);
           await OrdersRepository.saveIntegrationError(orderRow.orderID, msg);
           console.error("❌ Error cambiando estado VTEX:", msg);
@@ -339,10 +362,9 @@ const OrdersService = {
             docEntry,              
             products: productsWithLine
           });
-       
-          console.log(`INVOICE PAYLOAD: ${JSON.stringify(invoicePayload)} `)
+      
           // B) crear factura + pago
-          const { docEntry: invDocEntry, payDocEntry, invoiceAmount, vtexItems } = await createInvoiceInSap(invoicePayload);
+          const { docEntry: invDocEntry, payDocEntry, invoiceAmount, vtexItems } = await createInvoiceInSap(invoicePayload,cookie);
 
           console.log(
             `📄 Reserva OK (DocEntry=${invDocEntry} – `+
@@ -364,6 +386,7 @@ const OrdersService = {
             });
           } catch (err) {
             const msg = JSON.stringify(err.response?.data || err.message);
+            console.log(`ERROR 1: ` +  err.message)
             await OrdersRepository.saveIntegrationError(orderRow.orderID, msg);
             console.error("❌ Error invoice VTEX:", msg);
           }
@@ -374,6 +397,7 @@ const OrdersService = {
        
         } catch (err) {
           const msg = JSON.stringify(err.response?.data || err.message);
+          console.log(`ERROR 2: ` +  err.message)
           await OrdersRepository.saveIntegrationError(orderRow.orderID, msg);
           console.error("❌ Error factura/pago:", msg);
         }
@@ -383,14 +407,213 @@ const OrdersService = {
       } catch (err) {
         /* ======== A) Error creando OV o emitiendo evento ========= */
         const msg = JSON.stringify(err.response?.data || err.message);
+        console.log(`ERROR 3: ` + err.message)
         await OrdersRepository.saveIntegrationError(orderRow.orderID, msg);
         console.error("❌ Error integrando OV:", msg);
       }
+    }else{
+      console.log('venta no integrada pq ya existia')
     }
 
     return { orderRow, isNew };
+    } 
+    finally {
+     if (cookie) await logoutSap(cookie);           // ← cierre único
+    }
   },
+
+
+
+
+  //REPROCESAR
+   /*reprocessOrder: async (orderID) => {
+    // 1. Carga la orden y cliente desde tu BD
+    const orderRow = await OrdersRepository.getOrderById(orderID);
+    if (!orderRow) throw new Error(`Orden ${orderID} no existe en la BD`);
+    if (orderRow.docentry) {
+      throw new Error(
+        `Orden ${orderID} ya integrada (DocEntry=${orderRow.docentry})`
+      );
+    }
+
+    // 2. Consulta VTEX SOLO para obtener los ítems y precios actuales
+    const raw = await fetchVtexOrder(orderRow.u_ref1);
+    
+    let baseProducts = raw.items.map(mapVtexItemToPicking);
+    const shippingVal = raw.totals?.find(t => t.id === "Shipping")?.value || 0;
+    if (shippingVal > 0) {
+      baseProducts.push({
+        itemcode       : "701001008",
+        dscription     : "Flete",
+        quantity       : 1,
+        priceAfterVAT  : shippingVal / 100,
+        codebars       : null,
+        whscode        : null,
+        U_Subcategoria : "Flete"
+      });
+    }
+
+    // 3. Integra en SAP (igual que en ingestVtexOrder)
+    try {
+      const { docEntry, docNum, lineInfo } = await sendToSap(
+        raw,
+        orderRow,
+        baseProducts
+      );
+
+      await OrdersRepository.saveSapIds(orderID, docEntry, docNum);
+
+      const lookup = Object.fromEntries(
+        lineInfo.map(l => [l.itemcode, l.lineNum])
+      );
+      const productsWithLine = baseProducts.map(p => ({
+        ...p,
+        lineNum: lookup[p.itemcode] ?? null
+      }));
+
+      await sendMessage("new.order.created", {
+        ...orderRow,
+        docentry: docEntry,
+        docnum  : docNum,
+        products: productsWithLine
+      });
+
+      // Reserva, pago e invoice en VTEX (reutiliza tu mismo flujo)
+      const invoicePayload = buildReserveInvoicePayload({
+        orderRow,
+        docEntry,
+        products: productsWithLine
+      });
+      const {
+        docEntry: invDocEntry,
+        payDocEntry,
+        invoiceAmount,
+        vtexItems
+      } = await createInvoiceInSap(invoicePayload);
+
+      await sendInvoiceToVtex({
+        orderId: orderRow.u_ref1,
+        invoiceNumber: invDocEntry,
+        issuanceDate: dayjs().toISOString(),
+        invoiceValue: String(Math.round(invoiceAmount * 100)),
+        items: vtexItems
+      });
+
+      return { ok: true, docEntry, docNum };
+    } catch (err) {
+      const msg = JSON.stringify(err.response?.data || err.message);
+      await OrdersRepository.saveIntegrationError(orderID, msg);
+      throw new Error(`Reproceso falló: ${msg}`);
+    }
+  }
+*/
+
+reprocessOrder: async (orderID) => {
+  /* 1. Orden en la BD */
+  const orderRow = await OrdersRepository.getOrderById(orderID);
+  if (!orderRow) throw new Error(`Orden ${orderID} no existe en la BD`);
+  if (orderRow.docentry) {
+    throw new Error(`Orden ${orderID} ya integrada (DocEntry=${orderRow.docentry})`);
+  }
+
+  /* 2. Traer VTEX solo para ítems/precios */
+  const raw = await fetchVtexOrder(orderRow.u_ref1);
+
+  /* ── Inyectar RUT corregido ───────────────────────────── */
+  const body        = (orderRow.fixed_rut || orderRow.cardcode).replace(/C$/i, ""); // solo números
+const { federal } = rutToFederal(body);                                           // cuerpo-DV
+const isCorp      = !!raw.clientProfileData?.corporateName?.trim();
+
+/* 1) Sobrescribe el documento del perfil */
+if (isCorp) {
+  raw.clientProfileData.corporateDocument = federal;   // empresa = cuerpo-DV
+} else {
+  raw.clientProfileData.document = federal;            // consumidor = cuerpo-DV
+}
+
+/* 2) Sobrescribe también el receptor de la dirección (si existe) */
+const selAddr = raw.shippingData?.selectedAddresses?.[0];
+if (selAddr) selAddr.receiverDocument = federal;
+  /* ─────────────────────────────────────────────────────── */
+
+  /* 3. Mapear productos (igual que ingestVtexOrder) */
+  let baseProducts = raw.items.map(mapVtexItemToPicking);
+  const shipVal = raw.totals?.find(t => t.id === "Shipping")?.value || 0;
+  if (shipVal > 0) {
+    baseProducts.push({
+      itemcode       : "701001008",
+      dscription     : "Flete",
+      quantity       : 1,
+      priceAfterVAT  : shipVal / 100,
+      codebars       : null,
+      whscode        : null,
+      U_Subcategoria : "Flete"
+    });
+  }
+
+  /* 4. Integrar en SAP + resto del flujo */
+  try {
+    const { docEntry, docNum, lineInfo } = await sendToSap(raw, orderRow, baseProducts);
+    await OrdersRepository.saveSapIds(orderID, docEntry, docNum);
+
+    const lookup = Object.fromEntries(lineInfo.map(l => [l.itemcode, l.lineNum]));
+    const productsWithLine = baseProducts.map(p => ({ ...p, lineNum: lookup[p.itemcode] ?? null }));
+
+    await sendMessage("new.order.created", {
+      ...orderRow,
+      docentry: docEntry,
+      docnum  : docNum,
+      products: productsWithLine
+    });
+
+    /* Reserva + pago + invoice */
+    const invoicePayload = buildReserveInvoicePayload({ orderRow, docEntry, products: productsWithLine });
+    const { docEntry: invDocEntry, payDocEntry, invoiceAmount, vtexItems } =
+      await createInvoiceInSap(invoicePayload);
+
+    await sendInvoiceToVtex({
+      orderId      : orderRow.u_ref1,
+      invoiceNumber: invDocEntry,
+      issuanceDate : dayjs().toISOString(),
+      invoiceValue : String(Math.round(invoiceAmount * 100)),
+      items        : vtexItems
+    });
+
+    return { ok: true, docEntry, docNum };
+  } catch (err) {
+    const msg = JSON.stringify(err.response?.data || err.message);
+    await OrdersRepository.saveIntegrationError(orderID, msg);
+    throw new Error(`Reproceso falló: ${msg}`);
+  }
+},
+
+
+
+//EDITAR ORDEN
+patchOrder: async (orderID, changes) => {
+  // Lista blanca de campos editables
+  const ALLOWED = [
+    "cardcode", "cardname", "phone1", "e_mail",
+    "folionum", "orderStatusID", "integrationError", "INTEGRATION_STATUS",
+    "fixed_rut"
+  ];
+
+  const updates = {};
+  for (const [k, v] of Object.entries(changes)) {
+    if (!ALLOWED.includes(k)) {
+      throw new Error(`Campo no permitido: ${k}`);
+    }
+    updates[k] = v;
+  }
+  if (Object.keys(updates).length === 0) {
+    throw new Error("Sin cambios válidos");
+  }
+  return await OrdersRepository.patchOrder(orderID, updates);
+},
+  
   
 };
+
+
 
 module.exports = OrdersService;

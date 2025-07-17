@@ -2,7 +2,7 @@ const kafka = require('../config/kafka');
 const dispatcher = require('./messageDispatcher');
 
 const consumer = kafka.consumer({ 
-  groupId: 'orders-service-group',
+  groupId: 'orders-service-group-prod',
   retry: { retries: 5 } 
 });
 
@@ -14,7 +14,7 @@ const consumeMessages = async () => {
     // Suscribirse a los tópicos que deseamos escuchar
     await consumer.subscribe({ topic: 'sap.order.imported', fromBeginning: true });
     await consumer.subscribe({ topic: 'order.status.updated', fromBeginning: true });
-    await consumer.subscribe({ topic: 'vtex.order.imported', fromBeginning: true });
+    await consumer.subscribe({ topic: 'vtex.order.imported'});
 
     await consumer.run({
       autoCommit: false,

@@ -42,7 +42,7 @@ services:
       - "host.docker.internal:host-gateway"
       - "win-hp03dio6fsk:192.168.0.165"
     dns:
-      - 127.0.0.11
+      - 127.0.0.1
       - 8.8.8.8         
       - 1.1.1.1  
     environment:
