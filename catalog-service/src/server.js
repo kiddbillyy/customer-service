@@ -1,7 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-require('./jobs/stockSyncJob');   
+require('./jobs/scheduler');   
 
 const pruebaRoutes = require('./routes/prueba.Routes');
 
@@ -15,5 +15,5 @@ app.use('/api/catalog', pruebaRoutes);
 
 const PORT = process.env.PORT || 5006;
 app.listen(PORT, async () => {
-  console.log(`🚀 Inventory Service running on port ${PORT}`);
+  console.log(`🚀 Catalog Service running on port ${PORT}`);
 });
