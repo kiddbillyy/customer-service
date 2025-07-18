@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 require('./jobs/scheduler');   
+require('./jobs/catalogCategoryScheduler');
 
 const pruebaRoutes = require('./routes/prueba.Routes');
 
