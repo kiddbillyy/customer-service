@@ -1,0 +1,292 @@
+const { performance } = require('perf_hooks');
+const { sql, sapPool } = require('../config/dbnewsap');
+const { catalogPool } = require('../config/dbnew');
+
+const SAFETY_LAG_MS = 60 * 1000;
+const BATCH_SIZE = 500;
+const CHUNK_INSERT = 1000;
+const DEST_COLLATION = 'SQL_Latin1_General_CP850_CI_AS';
+
+async function syncPriceList() {
+  const t0 = performance.now();
+
+  if (sapPool.connected !== true) await sapPool.connect();
+  if (catalogPool.connected !== true) await catalogPool.connect();
+
+  const tx = new sql.Transaction(catalogPool);
+  await tx.begin();
+
+  const metrics = {
+    initialLoad: false,
+    watermarkFrom: null,
+    watermarkTo: null,
+    changedItems: 0,
+    scannedPrices: 0,
+    inserted: 0,
+    updated: 0,
+    batches: 0,
+    batchesDetail: [],
+    duration: {
+      totalMs: 0,
+      fetchWatermarkMs: 0,
+      fullLoadFetchMs: 0,
+      changedItemsMs: 0,
+      batchesFetchMs: 0,
+      batchesMergeMs: 0,
+      watermarkUpdateMs: 0,
+      commitMs: 0
+    }
+  };
+
+  try {
+    // 1. Watermark
+    const tWM0 = performance.now();
+    const wmReq = new sql.Request(tx);
+    const wmRes = await wmReq.query(`
+      SELECT LastSyncDT FROM dbo.SyncMeta WHERE JobName='PriceSync_OITM'
+    `);
+    metrics.duration.fetchWatermarkMs = performance.now() - tWM0;
+    const lastSync = wmRes.recordset.length ? wmRes.recordset[0].LastSyncDT : null;
+
+    if (!lastSync) {
+      metrics.initialLoad = true;
+
+      // CARGA INICIAL
+      const tFull0 = performance.now();
+      const sapReq = new sql.Request(sapPool);
+      const allRes = await sapReq.query(`
+        SELECT 
+          ItemCode = ItemCode COLLATE ${DEST_COLLATION},
+          PriceList,
+          Price
+        FROM ITM1
+      `);
+      metrics.duration.fullLoadFetchMs = performance.now() - tFull0;
+
+      metrics.scannedPrices = allRes.recordset.length;
+
+      const tMerge0 = performance.now();
+      const { inserted, updated } = await bulkMergePricesTx(tx, allRes.recordset, metrics);
+      metrics.duration.batchesMergeMs += (performance.now() - tMerge0);
+      metrics.inserted = inserted;
+      metrics.updated = updated;
+
+      // Watermark
+      const tWMU0 = performance.now();
+      const upReq = new sql.Request(tx);
+      upReq.input('dt', sql.DateTime, new Date());
+      await upReq.query(`
+        MERGE dbo.SyncMeta AS T
+        USING (SELECT 'PriceSync_OITM' AS JobName, @dt AS LastSyncDT) AS S
+          ON T.JobName = S.JobName
+        WHEN MATCHED THEN UPDATE SET LastSyncDT = S.LastSyncDT
+        WHEN NOT MATCHED THEN INSERT (JobName, LastSyncDT) VALUES (S.JobName, S.LastSyncDT);
+      `);
+      metrics.duration.watermarkUpdateMs = performance.now() - tWMU0;
+
+      const tCommit0 = performance.now();
+      await tx.commit();
+      metrics.duration.commitMs = performance.now() - tCommit0;
+      metrics.duration.totalMs = performance.now() - t0;
+
+      logMetrics(metrics);
+      return metrics;
+    }
+
+    // Incremental
+    const now = new Date();
+    const from = new Date(lastSync.getTime() - SAFETY_LAG_MS);
+    metrics.watermarkFrom = from.toISOString();
+    metrics.watermarkTo = now.toISOString();
+
+    const tChanged0 = performance.now();
+    const changedReq = new sql.Request(sapPool);
+    changedReq.input('from', sql.DateTime, from);
+    changedReq.input('now', sql.DateTime, now);
+
+    const changedRes = await changedReq.query(`
+      WITH ChangedItems AS (
+        SELECT 
+          ItemCode = i.ItemCode COLLATE ${DEST_COLLATION},
+          FullUpdateDT = DATEADD(SECOND,
+             ((i.UpdateTS / 10000) * 3600) +
+             (((i.UpdateTS % 10000) / 100) * 60) +
+             (i.UpdateTS % 100),
+             CAST(i.UpdateDate AS DATETIME))
+        FROM OITM i
+        WHERE DATEADD(SECOND,
+             ((i.UpdateTS / 10000) * 3600) +
+             (((i.UpdateTS % 10000) / 100) * 60) +
+             (i.UpdateTS % 100),
+             CAST(i.UpdateDate AS DATETIME)) >  @from
+          AND DATEADD(SECOND,
+             ((i.UpdateTS / 10000) * 3600) +
+             (((i.UpdateTS % 10000) / 100) * 60) +
+             (i.UpdateTS % 100),
+             CAST(i.UpdateDate AS DATETIME)) <= @now
+      )
+      SELECT DISTINCT ItemCode
+      FROM ChangedItems;
+    `);
+    metrics.duration.changedItemsMs = performance.now() - tChanged0;
+
+    const changedItems = changedRes.recordset.map(r => r.ItemCode);
+    metrics.changedItems = changedItems.length;
+
+    if (!changedItems.length) {
+      const tWMU0 = performance.now();
+      const upReq = new sql.Request(tx);
+      upReq.input('dt', sql.DateTime, now);
+      await upReq.query(`
+        MERGE dbo.SyncMeta AS T
+        USING (SELECT 'PriceSync_OITM' AS JobName, @dt AS LastSyncDT) AS S
+          ON T.JobName = S.JobName
+        WHEN MATCHED THEN UPDATE SET LastSyncDT = S.LastSyncDT
+        WHEN NOT MATCHED THEN INSERT (JobName, LastSyncDT) VALUES (S.JobName, S.LastSyncDT);
+      `);
+      metrics.duration.watermarkUpdateMs = performance.now() - tWMU0;
+
+      const tCommit0 = performance.now();
+      await tx.commit();
+      metrics.duration.commitMs = performance.now() - tCommit0;
+      metrics.duration.totalMs = performance.now() - t0;
+
+      logMetrics(metrics);
+      return metrics;
+    }
+
+    // Batches
+    const batches = [];
+    for (let i = 0; i < changedItems.length; i += BATCH_SIZE) {
+      batches.push(changedItems.slice(i, i + BATCH_SIZE));
+    }
+    metrics.batches = batches.length;
+
+    for (let b = 0; b < batches.length; b++) {
+      const codes = batches[b];
+      const priceReq = new sql.Request(sapPool);
+      codes.forEach((code, idx) =>
+        priceReq.input('code' + idx, sql.NVarChar(50), code)
+      );
+      const inList = codes.map((_, idx) => '@code' + idx).join(',');
+
+      const tFetchB0 = performance.now();
+      const priceRes = await priceReq.query(`
+        SELECT 
+          ItemCode = ItemCode COLLATE ${DEST_COLLATION},
+          PriceList,
+          Price
+        FROM ITM1
+        WHERE ItemCode IN (${inList})
+      `);
+      const fetchMs = performance.now() - tFetchB0;
+      metrics.duration.batchesFetchMs += fetchMs;
+
+      metrics.scannedPrices += priceRes.recordset.length;
+
+      const tMergeB0 = performance.now();
+      const { inserted, updated } = await bulkMergePricesTx(tx, priceRes.recordset, metrics);
+      const mergeMs = performance.now() - tMergeB0;
+      metrics.duration.batchesMergeMs += mergeMs;
+
+      metrics.inserted += inserted;
+      metrics.updated += updated;
+
+      metrics.batchesDetail.push({
+        batchIndex: b,
+        fetchMs,
+        mergeMs,
+        rows: priceRes.recordset.length,
+        inserted,
+        updated
+      });
+    }
+
+    // Watermark update
+    const tWMU0 = performance.now();
+    const wmUpReq = new sql.Request(tx);
+    wmUpReq.input('dt', sql.DateTime, now);
+    await wmUpReq.query(`
+      MERGE dbo.SyncMeta AS T
+      USING (SELECT 'PriceSync_OITM' AS JobName, @dt AS LastSyncDT) AS S
+        ON T.JobName = S.JobName
+      WHEN MATCHED THEN UPDATE SET LastSyncDT = S.LastSyncDT
+      WHEN NOT MATCHED THEN INSERT (JobName, LastSyncDT) VALUES (S.JobName, S.LastSyncDT);
+    `);
+    metrics.duration.watermarkUpdateMs = performance.now() - tWMU0;
+
+    const tCommit0 = performance.now();
+    await tx.commit();
+    metrics.duration.commitMs = performance.now() - tCommit0;
+    metrics.duration.totalMs = performance.now() - t0;
+
+    logMetrics(metrics);
+    return metrics;
+
+  } catch (err) {
+    try { await tx.rollback(); } catch {}
+    metrics.duration.totalMs = performance.now() - t0;
+    logMetrics(metrics, true, err);
+    throw err;
+  }
+}
+
+async function bulkMergePricesTx(tx, rows /*, metrics */) {
+  if (!rows.length) return { inserted: 0, updated: 0 };
+
+  const createReq = new sql.Request(tx);
+  await createReq.batch(`
+    IF OBJECT_ID('tempdb..#Delta') IS NOT NULL DROP TABLE #Delta;
+    CREATE TABLE #Delta (
+      ItemCode NVARCHAR(50) COLLATE ${DEST_COLLATION},
+      PriceList SMALLINT,
+      Price NUMERIC(19,6)
+    );
+  `);
+
+  for (let i = 0; i < rows.length; i += CHUNK_INSERT) {
+    const chunk = rows.slice(i, i + CHUNK_INSERT);
+    const tvp = new sql.Table('#Delta');
+    tvp.create = false;
+    tvp.columns.add('ItemCode', sql.NVarChar(50), { nullable: true });
+    tvp.columns.add('PriceList', sql.SmallInt, { nullable: true });
+    tvp.columns.add('Price', sql.Numeric(19, 6), { nullable: true });
+    chunk.forEach(r => tvp.rows.add(r.ItemCode, r.PriceList, r.Price));
+    const bulkReq = new sql.Request(tx);
+    await bulkReq.bulk(tvp);
+  }
+
+  const mergeReq = new sql.Request(tx);
+  const mergeRes = await mergeReq.query(`
+    MERGE dbo.ITM1_ListPrice AS T
+    USING #Delta AS S
+      ON T.ItemCode COLLATE ${DEST_COLLATION} = S.ItemCode COLLATE ${DEST_COLLATION}
+     AND T.PriceList = S.PriceList
+    WHEN MATCHED AND T.Price <> S.Price THEN
+      UPDATE SET T.Price = S.Price, T.UpdatedAt = GETUTCDATE()
+    WHEN NOT MATCHED THEN
+      INSERT (ItemCode, PriceList, Price, CreatedAt)
+      VALUES (S.ItemCode, S.PriceList, S.Price, GETUTCDATE())
+    OUTPUT $action AS MergeAction;
+  `);
+
+  let inserted = 0, updated = 0;
+  mergeRes.recordset.forEach(r => {
+    if (r.MergeAction === 'INSERT') inserted++;
+    else if (r.MergeAction === 'UPDATE') updated++;
+  });
+
+  return { inserted, updated };
+}
+
+function logMetrics(m, isError = false, errObj) {
+  const out = {
+    level: isError ? 'error' : 'info',
+    scope: 'PriceSync',
+    metrics: m
+  };
+  if (errObj) out.error = { message: errObj.message, stack: errObj.stack?.split('\n')[0] };
+  console.log(JSON.stringify(out));
+}
+
+module.exports = { syncPriceList };

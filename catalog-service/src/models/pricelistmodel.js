@@ -1,12 +1,12 @@
 
-const pool = require('../config/dbSap');
+const pool = require('../config/db');
 const sql = require('mssql');
 
 async function getListaPrecios() {
   try {
     const conn = await pool;
     const result = await conn.request()
-      .query(`SELECT * FROM ITM1;`);
+      .query(`SELECT * FROM ITM1_ListPrice;`);
       
     //const result = await conn.request().query(``)
     return result.recordset[0];
