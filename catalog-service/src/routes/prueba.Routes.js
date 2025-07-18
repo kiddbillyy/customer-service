@@ -2,7 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const { obtenerItemFijo } = require('../controllers/prueba');
+const {obtenerListaDePrecios} = require('../controllers/price-list')
 
-router.get('/item-cemento', obtenerItemFijo); // Ruta fija
 
+router.get('/lista-precios',obtenerListaDePrecios)
+router.get('/item-cemento', obtenerItemFijo);
 module.exports = router;
