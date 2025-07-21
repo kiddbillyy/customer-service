@@ -71,7 +71,7 @@ async function syncPriceList() {
       metrics.scannedPrices = allRes.recordset.length;
 
       const tMerge0 = performance.now();
-      const { inserted, updated } = await bulkMergePricesTx(tx, allRes.recordset, metrics);
+      const { inserted, updated } = await bulkMergePricesTx(tx, allRes.recordset);
       metrics.duration.batchesMergeMs += (performance.now() - tMerge0);
       metrics.inserted = inserted;
       metrics.updated = updated;
@@ -122,35 +122,47 @@ async function syncPriceList() {
     const changedReq = new sql.Request(sapPool);
 
     changedReq.input('from', sql.DateTime, fromSAPLocal);
-    changedReq.input('now', sql.DateTime, nowSAPLocal);
+    changedReq.input('to', sql.DateTime, nowSAPLocal);
 
     /* changedReq.input('from', sql.DateTime, from);
     changedReq.input('now', sql.DateTime, now);
  */
     const changedRes = await changedReq.query(`
-      WITH ChangedItems AS (
-        SELECT 
-          ItemCode = i.ItemCode COLLATE ${DEST_COLLATION},
-          FullUpdateDT = DATEADD(SECOND,
-                ((i.UpdateTS / 10000) * 3600) +
-                (((i.UpdateTS % 10000) / 100) * 60) +
-                (i.UpdateTS % 100),
-                CAST(i.UpdateDate AS DATETIME))
-        FROM OITM i
-        WHERE DATEADD(SECOND,
-              ((i.UpdateTS / 10000) * 3600) +
-              (((i.UpdateTS % 10000) / 100) * 60) +
-              (i.UpdateTS % 100),
-              CAST(i.UpdateDate AS DATETIME)) > @from
-          AND DATEADD(SECOND,
-              ((i.UpdateTS / 10000) * 3600) +
-              (((i.UpdateTS % 10000) / 100) * 60) +
-              (i.UpdateTS % 100),
-              CAST(i.UpdateDate AS DATETIME)) <= @now
-      )
-      SELECT DISTINCT ItemCode
-      FROM ChangedItems;
-    `);
+            WITH ItemEvents AS (
+                -- Eventos de ACTUALIZACIÓN de ítems existentes
+                SELECT
+                    ItemCode = i.ItemCode COLLATE ${DEST_COLLATION},
+                    EventDT = DATEADD(SECOND,
+                        ((i.UpdateTS / 10000) * 3600) + (((i.UpdateTS % 10000) / 100) * 60) + (i.UpdateTS % 100),
+                        CAST(i.UpdateDate AS DATETIME))
+                FROM OITM i
+                WHERE
+                    DATEADD(SECOND,
+                        ((i.UpdateTS / 10000) * 3600) + (((i.UpdateTS % 10000) / 100) * 60) + (i.UpdateTS % 100),
+                        CAST(i.UpdateDate AS DATETIME)) > @from
+                    AND DATEADD(SECOND,
+                        ((i.UpdateTS / 10000) * 3600) + (((i.UpdateTS % 10000) / 100) * 60) + (i.UpdateTS % 100),
+                        CAST(i.UpdateDate AS DATETIME)) <= @to
+
+                UNION ALL
+
+                -- Eventos de CREACIÓN de ítems nuevos
+                SELECT
+                    ItemCode = i.ItemCode COLLATE ${DEST_COLLATION},
+                    EventDT = DATEADD(SECOND,
+                        ((i.CreateTS / 10000) * 3600) + (((i.CreateTS % 10000) / 100) * 60) + (i.CreateTS % 100),
+                        CAST(i.CreateDate AS DATETIME))
+                FROM OITM i
+                WHERE
+                    DATEADD(SECOND,
+                        ((i.CreateTS / 10000) * 3600) + (((i.CreateTS % 10000) / 100) * 60) + (i.CreateTS % 100),
+                        CAST(i.CreateDate AS DATETIME)) > @from
+                    AND DATEADD(SECOND,
+                        ((i.CreateTS / 10000) * 3600) + (((i.CreateTS % 10000) / 100) * 60) + (i.CreateTS % 100),
+                        CAST(i.CreateDate AS DATETIME)) <= @to
+            )
+            SELECT DISTINCT ItemCode FROM ItemEvents;
+        `);
     metrics.duration.changedItemsMs = performance.now() - tChanged0;
 
     const changedItems = changedRes.recordset.map(r => r.ItemCode);
@@ -208,7 +220,7 @@ async function syncPriceList() {
       metrics.scannedPrices += priceRes.recordset.length;
 
       const tMergeB0 = performance.now();
-      const { inserted, updated } = await bulkMergePricesTx(tx, priceRes.recordset, metrics);
+      const { inserted, updated } = await bulkMergePricesTx(tx, priceRes.recordset);
       const mergeMs = performance.now() - tMergeB0;
       metrics.duration.batchesMergeMs += mergeMs;
 
@@ -254,7 +266,7 @@ async function syncPriceList() {
   }
 }
 
-async function bulkMergePricesTx(tx, rows /*, metrics */) {
+async function bulkMergePricesTx(tx, rows ) {
   if (!rows.length) return { inserted: 0, updated: 0 };
 
   const createReq = new sql.Request(tx);

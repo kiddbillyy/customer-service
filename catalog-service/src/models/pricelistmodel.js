@@ -9,7 +9,7 @@ async function getListaPrecios() {
       .query(`SELECT * FROM ITM1_ListPrice;`);
       
     //const result = await conn.request().query(``)
-    return result.recordset[0];
+    return result.recordset[20000];
   } catch (error) {
     throw new Error('Error al obtener el ítem fijo: ' + error.message);
   }
