@@ -1,11 +1,14 @@
 const { performance } = require('perf_hooks');
 const { sql, sapPool } = require('../config/dbnewsap');
 const { catalogPool } = require('../config/dbnew');
+const { toZonedTime, zonedTimeToUtc, formatInTimeZone } = require('date-fns-tz');
 
 const SAFETY_LAG_MS = 60 * 1000;
 const BATCH_SIZE = 500;
 const CHUNK_INSERT = 1000;
 const DEST_COLLATION = 'SQL_Latin1_General_CP850_CI_AS';
+const SAP_SERVER_TIMEZONE = 'America/Santiago';
+const REFERENCE_TIMEZONE = 'UTC';
 
 async function syncPriceList() {
   const t0 = performance.now();
@@ -48,6 +51,8 @@ async function syncPriceList() {
     metrics.duration.fetchWatermarkMs = performance.now() - tWM0;
     const lastSync = wmRes.recordset.length ? wmRes.recordset[0].LastSyncDT : null;
 
+    const nowUTC = new Date();
+
     if (!lastSync) {
       metrics.initialLoad = true;
 
@@ -74,10 +79,17 @@ async function syncPriceList() {
       // Watermark
       const tWMU0 = performance.now();
       const upReq = new sql.Request(tx);
-      upReq.input('dt', sql.DateTime, new Date());
-      await upReq.query(`
+      //upReq.input('dt', sql.DateTime, new Date());
+      /* await upReq.query(`
         MERGE dbo.SyncMeta AS T
         USING (SELECT 'PriceSync_OITM' AS JobName, @dt AS LastSyncDT) AS S
+          ON T.JobName = S.JobName
+        WHEN MATCHED THEN UPDATE SET LastSyncDT = S.LastSyncDT
+        WHEN NOT MATCHED THEN INSERT (JobName, LastSyncDT) VALUES (S.JobName, S.LastSyncDT);
+      `); */
+      await upReq.query(`
+        MERGE dbo.SyncMeta AS T
+        USING (SELECT 'PriceSync_OITM' AS JobName, GETUTCDATE() AS LastSyncDT) AS S
           ON T.JobName = S.JobName
         WHEN MATCHED THEN UPDATE SET LastSyncDT = S.LastSyncDT
         WHEN NOT MATCHED THEN INSERT (JobName, LastSyncDT) VALUES (S.JobName, S.LastSyncDT);
@@ -94,36 +106,47 @@ async function syncPriceList() {
     }
 
     // Incremental
-    const now = new Date();
-    const from = new Date(lastSync.getTime() - SAFETY_LAG_MS);
-    metrics.watermarkFrom = from.toISOString();
-    metrics.watermarkTo = now.toISOString();
+    //const now = new Date();
+    //const from = new Date(lastSync.getTime() - SAFETY_LAG_MS);
+    const fromUTC = new Date(lastSync.getTime() - SAFETY_LAG_MS);
+
+    /* metrics.watermarkFrom = from.toISOString();
+    metrics.watermarkTo = now.toISOString(); */
+    metrics.watermarkFrom = fromUTC.toISOString();
+    metrics.watermarkTo = nowUTC.toISOString();
+
+    const fromSAPLocal = toZonedTime(fromUTC, SAP_SERVER_TIMEZONE);
+    const nowSAPLocal = toZonedTime(nowUTC, SAP_SERVER_TIMEZONE);
 
     const tChanged0 = performance.now();
     const changedReq = new sql.Request(sapPool);
-    changedReq.input('from', sql.DateTime, from);
-    changedReq.input('now', sql.DateTime, now);
 
+    changedReq.input('from', sql.DateTime, fromSAPLocal);
+    changedReq.input('now', sql.DateTime, nowSAPLocal);
+
+    /* changedReq.input('from', sql.DateTime, from);
+    changedReq.input('now', sql.DateTime, now);
+ */
     const changedRes = await changedReq.query(`
       WITH ChangedItems AS (
         SELECT 
           ItemCode = i.ItemCode COLLATE ${DEST_COLLATION},
           FullUpdateDT = DATEADD(SECOND,
-             ((i.UpdateTS / 10000) * 3600) +
-             (((i.UpdateTS % 10000) / 100) * 60) +
-             (i.UpdateTS % 100),
-             CAST(i.UpdateDate AS DATETIME))
+                ((i.UpdateTS / 10000) * 3600) +
+                (((i.UpdateTS % 10000) / 100) * 60) +
+                (i.UpdateTS % 100),
+                CAST(i.UpdateDate AS DATETIME))
         FROM OITM i
         WHERE DATEADD(SECOND,
-             ((i.UpdateTS / 10000) * 3600) +
-             (((i.UpdateTS % 10000) / 100) * 60) +
-             (i.UpdateTS % 100),
-             CAST(i.UpdateDate AS DATETIME)) >  @from
+              ((i.UpdateTS / 10000) * 3600) +
+              (((i.UpdateTS % 10000) / 100) * 60) +
+              (i.UpdateTS % 100),
+              CAST(i.UpdateDate AS DATETIME)) > @from
           AND DATEADD(SECOND,
-             ((i.UpdateTS / 10000) * 3600) +
-             (((i.UpdateTS % 10000) / 100) * 60) +
-             (i.UpdateTS % 100),
-             CAST(i.UpdateDate AS DATETIME)) <= @now
+              ((i.UpdateTS / 10000) * 3600) +
+              (((i.UpdateTS % 10000) / 100) * 60) +
+              (i.UpdateTS % 100),
+              CAST(i.UpdateDate AS DATETIME)) <= @now
       )
       SELECT DISTINCT ItemCode
       FROM ChangedItems;
@@ -136,10 +159,10 @@ async function syncPriceList() {
     if (!changedItems.length) {
       const tWMU0 = performance.now();
       const upReq = new sql.Request(tx);
-      upReq.input('dt', sql.DateTime, now);
+      //upReq.input('dt', sql.DateTime, now);
       await upReq.query(`
         MERGE dbo.SyncMeta AS T
-        USING (SELECT 'PriceSync_OITM' AS JobName, @dt AS LastSyncDT) AS S
+        USING (SELECT 'PriceSync_OITM' AS JobName, GETUTCDATE() AS LastSyncDT) AS S
           ON T.JobName = S.JobName
         WHEN MATCHED THEN UPDATE SET LastSyncDT = S.LastSyncDT
         WHEN NOT MATCHED THEN INSERT (JobName, LastSyncDT) VALUES (S.JobName, S.LastSyncDT);
@@ -205,10 +228,10 @@ async function syncPriceList() {
     // Watermark update
     const tWMU0 = performance.now();
     const wmUpReq = new sql.Request(tx);
-    wmUpReq.input('dt', sql.DateTime, now);
+    //wmUpReq.input('dt', sql.DateTime, now);
     await wmUpReq.query(`
       MERGE dbo.SyncMeta AS T
-      USING (SELECT 'PriceSync_OITM' AS JobName, @dt AS LastSyncDT) AS S
+      USING (SELECT 'PriceSync_OITM' AS JobName, GETUTCDATE() AS LastSyncDT) AS S
         ON T.JobName = S.JobName
       WHEN MATCHED THEN UPDATE SET LastSyncDT = S.LastSyncDT
       WHEN NOT MATCHED THEN INSERT (JobName, LastSyncDT) VALUES (S.JobName, S.LastSyncDT);
