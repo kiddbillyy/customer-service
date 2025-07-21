@@ -1,8 +1,8 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-require('./jobs/scheduler');   
-require('./jobs/catalogCategoryScheduler');
+require('./sheduler/scheduler_OITM_ITM1');   
+require('./sheduler/catalogCategoryScheduler');
 
 const pruebaRoutes = require('./routes/prueba.Routes');
 
