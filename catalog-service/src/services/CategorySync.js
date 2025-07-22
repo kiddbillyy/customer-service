@@ -19,7 +19,7 @@ async function syncAuxCatalogs() {
         WHEN MATCHED THEN
           UPDATE SET Name = ?, U_PRIMER_NIVEL = ?
         WHEN NOT MATCHED THEN
-          INSERT (Code, Name, U_PRIMER_NIVEL) VALUES (?, ?, ?)
+          INSERT (Code, Name, U_PRIMER_NIVEL) VALUES (?, ?, ?);
       `
     },
     {
@@ -32,7 +32,7 @@ async function syncAuxCatalogs() {
         WHEN MATCHED THEN
           UPDATE SET Name = ?
         WHEN NOT MATCHED THEN
-          INSERT (Code, Name) VALUES (?, ?)
+          INSERT (Code, Name) VALUES (?, ?);
       `
     },
     {
@@ -45,7 +45,7 @@ async function syncAuxCatalogs() {
         WHEN MATCHED THEN
           UPDATE SET Name = ?, U_CATEGORIA = ?
         WHEN NOT MATCHED THEN
-          INSERT (Code, Name, U_CATEGORIA) VALUES (?, ?, ?)
+          INSERT (Code, Name, U_CATEGORIA) VALUES (?, ?, ?);
       `
     },
     {
@@ -58,7 +58,7 @@ async function syncAuxCatalogs() {
         WHEN MATCHED THEN
           UPDATE SET Name = ?
         WHEN NOT MATCHED THEN
-          INSERT (Code, Name) VALUES (?, ?)
+          INSERT (Code, Name) VALUES (?, ?);
       `
     },
     {
@@ -71,7 +71,7 @@ async function syncAuxCatalogs() {
         WHEN MATCHED THEN
           UPDATE SET Name = ?
         WHEN NOT MATCHED THEN
-          INSERT (Code, Name) VALUES (?, ?)
+          INSERT (Code, Name) VALUES (?, ?);
       `
     }
   ];

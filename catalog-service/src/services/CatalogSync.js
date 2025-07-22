@@ -5,12 +5,12 @@ const { catalogPool } = require('../config/dbnew');
 const { toZonedTime } = require('date-fns-tz');
 
 // Configuración de sincronización
-const SAFETY_LAG_MS = 60 * 1000;      
-const BATCH_SIZE = 500;             
-const CHUNK_INSERT = 1000;          
+const SAFETY_LAG_MS = 60 * 1000;
+const BATCH_SIZE = 500;
+const CHUNK_INSERT = 1000;
 const JOB_NAME = 'OITM_ProductSync';
-const DEST_COLLATION = 'SQL_Latin1_General_CP850_CI_AS'; 
-const SAP_SERVER_TIMEZONE = 'America/Santiago'; 
+const DEST_COLLATION = 'SQL_Latin1_General_CP850_CI_AS';
+const SAP_SERVER_TIMEZONE = 'America/Santiago';
 const REFERENCE_TIMEZONE = 'UTC';
 
 async function syncProducts() {
@@ -60,7 +60,7 @@ async function syncProducts() {
       ? wmRes.recordset[0].LastSyncDT
       : null;
 
-    const nowUTC = new Date(); 
+    const nowUTC = new Date();
 
     // 3) Primera ejecución: full load (si no hay watermark previo)
     if (!lastSync) {
@@ -76,7 +76,8 @@ async function syncProducts() {
           U_ValVcto, U_ReqPicking, ValidFor, InvntItem, ItmsGrpCod,
           U_Nombre_Fam, U_Nombre_SubFam, TaxCodeAR, SellItem, U_RPRO,
           CodeBars, InvntryUom, U_PRIMER_NIVEL, U_Imagen,
-          CreateDate, CreateTS, UpdateDate, UpdateTS
+          CreateDate, CreateTS, UpdateDate, UpdateTS,
+          UserSign, AvgPrice, ValidFrom, ValidTo, PrchseItem, MinLevel -- Nuevas columnas
         FROM OITM
       `);
       metrics.duration.fullLoadFetchMs = performance.now() - tFull0;
@@ -132,7 +133,6 @@ async function syncProducts() {
 
     const changedRes = await changedReq.query(`
       WITH Events AS (
-        -- Eventos basados en la fecha/hora de ACTUALIZACIÓN (para ítems existentes modificados)
         SELECT
           ItemCode = i.ItemCode COLLATE ${DEST_COLLATION},
           EventDT = DATEADD(SECOND,
@@ -175,7 +175,7 @@ async function syncProducts() {
               (i.CreateTS % 100),
               CAST(i.CreateDate AS DATETIME)) <= @to
       )
-      SELECT DISTINCT ItemCode FROM Events; 
+      SELECT DISTINCT ItemCode FROM Events;
     `);
     metrics.duration.changedItemsMs = performance.now() - tChanged0;
 
@@ -232,7 +232,8 @@ async function syncProducts() {
           U_ValVcto, U_ReqPicking, ValidFor, InvntItem, ItmsGrpCod,
           U_Nombre_Fam, U_Nombre_SubFam, TaxCodeAR, SellItem, U_RPRO,
           CodeBars, InvntryUom, U_PRIMER_NIVEL, U_Imagen,
-          CreateDate, CreateTS, UpdateDate, UpdateTS
+          CreateDate, CreateTS, UpdateDate, UpdateTS,
+          UserSign, AvgPrice, ValidFrom, ValidTo, PrchseItem, MinLevel -- Nuevas columnas
         FROM OITM
         WHERE ItemCode IN (${inList})
       `);
@@ -294,31 +295,37 @@ async function bulkMergeProductsTx(tx, rows) {
   await createReq.batch(`
     IF OBJECT_ID('tempdb..#Delta') IS NOT NULL DROP TABLE #Delta;
     CREATE TABLE #Delta (
-      ItemCode           NVARCHAR(50) COLLATE ${DEST_COLLATION},
-      ItemName           NVARCHAR(100),
-      U_CCosto           NVARCHAR(10),
-      SalUnitMsr         NVARCHAR(100),
-      U_Marca            NVARCHAR(30),
-      U_Categoria        NVARCHAR(200),
-      U_Subcategoria     NVARCHAR(200),
-      U_ValVcto          NVARCHAR(10),
-      U_ReqPicking       NVARCHAR(10),
-      ValidFor           CHAR(1),
-      InvntItem          CHAR(1),
-      ItmsGrpCod         SMALLINT,
-      U_Nombre_Fam       NVARCHAR(50),
-      U_Nombre_SubFam    NVARCHAR(50),
-      TaxCodeAR          NVARCHAR(8),
-      SellItem           CHAR(1),
-      U_RPRO             NVARCHAR(10),
-      CodeBars           NVARCHAR(254),
-      InvntryUom         NVARCHAR(100),
-      U_PRIMER_NIVEL     NVARCHAR(200),
-      U_Imagen           NVARCHAR(254),
-      CreateDate         DATETIME,
-      CreateTS           INT,
-      UpdateDate         DATETIME,
-      UpdateTS           INT
+      ItemCode            NVARCHAR(50) COLLATE ${DEST_COLLATION},
+      ItemName            NVARCHAR(100),
+      U_CCosto            NVARCHAR(10),
+      SalUnitMsr          NVARCHAR(100),
+      U_Marca             NVARCHAR(30),
+      U_Categoria         NVARCHAR(200),
+      U_Subcategoria      NVARCHAR(200),
+      U_ValVcto           NVARCHAR(10),
+      U_ReqPicking        NVARCHAR(10),
+      ValidFor            CHAR(1),
+      InvntItem           CHAR(1),
+      ItmsGrpCod          SMALLINT,
+      U_Nombre_Fam        NVARCHAR(50),
+      U_Nombre_SubFam     NVARCHAR(50),
+      TaxCodeAR           NVARCHAR(8),
+      SellItem            CHAR(1),
+      U_RPRO              NVARCHAR(10),
+      CodeBars            NVARCHAR(254),
+      InvntryUom          NVARCHAR(100),
+      U_PRIMER_NIVEL      NVARCHAR(200),
+      U_Imagen            NVARCHAR(254),
+      CreateDate          DATETIME,
+      CreateTS            INT,
+      UpdateDate          DATETIME,
+      UpdateTS            INT,
+      UserSign            INT,         -- Nueva columna
+      AvgPrice            NUMERIC(19,6), -- Nueva columna
+      ValidFrom           DATETIME,    -- Nueva columna
+      ValidTo             DATETIME,    -- Nueva columna
+      PrchseItem          CHAR(1),     -- Nueva columna
+      MinLevel            NUMERIC(19,6)  -- Nueva columna
     );
   `);
 
@@ -354,6 +361,12 @@ async function bulkMergeProductsTx(tx, rows) {
     tvp.columns.add('CreateTS', sql.Int, { nullable: true });
     tvp.columns.add('UpdateDate', sql.DateTime, { nullable: true });
     tvp.columns.add('UpdateTS', sql.Int, { nullable: true });
+    tvp.columns.add('UserSign', sql.Int, { nullable: true });        // Nueva columna
+    tvp.columns.add('AvgPrice', sql.Numeric(19, 6), { nullable: true }); // Nueva columna
+    tvp.columns.add('ValidFrom', sql.DateTime, { nullable: true });   // Nueva columna
+    tvp.columns.add('ValidTo', sql.DateTime, { nullable: true });     // Nueva columna
+    tvp.columns.add('PrchseItem', sql.Char(1), { nullable: true });   // Nueva columna
+    tvp.columns.add('MinLevel', sql.Numeric(19, 6), { nullable: true }); // Nueva columna
 
     chunk.forEach(r => {
       tvp.rows.add(
@@ -362,9 +375,15 @@ async function bulkMergeProductsTx(tx, rows) {
         r.ItmsGrpCod, r.U_Nombre_Fam, r.U_Nombre_SubFam, r.TaxCodeAR, r.SellItem,
         r.U_RPRO, r.CodeBars, r.InvntryUom, r.U_PRIMER_NIVEL, r.U_Imagen,
         r.CreateDate,
-        Number.isInteger(r.CreateTS) ? r.CreateTS : null, // Asegura que CreateTS sea un número entero o null
+        Number.isInteger(r.CreateTS) ? r.CreateTS : null,
         r.UpdateDate,
-        Number.isInteger(r.UpdateTS) ? r.UpdateTS : null // Asegura que UpdateTS sea un número entero o null
+        Number.isInteger(r.UpdateTS) ? r.UpdateTS : null,
+        r.UserSign, // Nueva columna
+        r.AvgPrice, // Nueva columna
+        r.ValidFrom, // Nueva columna
+        r.ValidTo, // Nueva columna
+        r.PrchseItem, // Nueva columna
+        r.MinLevel // Nueva columna
       );
     });
 
@@ -379,64 +398,78 @@ async function bulkMergeProductsTx(tx, rows) {
     USING #Delta AS S
       ON T.ItemCode COLLATE ${DEST_COLLATION} = S.ItemCode COLLATE ${DEST_COLLATION}
     WHEN MATCHED AND (
-
-        T.ItemName         <> S.ItemName COLLATE ${DEST_COLLATION} OR
-        T.U_CCosto         <> S.U_CCosto COLLATE ${DEST_COLLATION} OR
-        T.SalUnitMsr       <> S.SalUnitMsr COLLATE ${DEST_COLLATION} OR
-        T.U_Marca          <> S.U_Marca COLLATE ${DEST_COLLATION} OR
-        T.U_Categoria      <> S.U_Categoria COLLATE ${DEST_COLLATION} OR
-        T.U_Subcategoria   <> S.U_Subcategoria COLLATE ${DEST_COLLATION} OR
-        T.U_ValVcto        <> S.U_ValVcto COLLATE ${DEST_COLLATION} OR
-        T.U_ReqPicking     <> S.U_ReqPicking COLLATE ${DEST_COLLATION} OR
-        T.ValidFor         <> S.ValidFor COLLATE ${DEST_COLLATION} OR
-        T.InvntItem        <> S.InvntItem COLLATE ${DEST_COLLATION} OR
-        T.ItmsGrpCod       <> S.ItmsGrpCod OR
-        T.U_Nombre_Fam     <> S.U_Nombre_Fam COLLATE ${DEST_COLLATION} OR
-        T.U_Nombre_SubFam  <> S.U_Nombre_SubFam COLLATE ${DEST_COLLATION} OR
-        T.TaxCodeAR        <> S.TaxCodeAR COLLATE ${DEST_COLLATION} OR
-        T.SellItem         <> S.SellItem COLLATE ${DEST_COLLATION} OR
-        T.U_RPRO           <> S.U_RPRO COLLATE ${DEST_COLLATION} OR
-        T.CodeBars         <> S.CodeBars COLLATE ${DEST_COLLATION} OR
-        T.InvntryUom       <> S.InvntryUom COLLATE ${DEST_COLLATION} OR
-        T.U_PRIMER_NIVEL   <> S.U_PRIMER_NIVEL COLLATE ${DEST_COLLATION} OR
-        T.U_Imagen         <> S.U_Imagen COLLATE ${DEST_COLLATION} OR
-        T.CreateDate       <> S.CreateDate OR
-        T.CreateTS         <> S.CreateTS OR
-        T.UpdateDate       <> S.UpdateDate OR
-        T.UpdateTS         <> S.UpdateTS
+        T.ItemName           <> S.ItemName COLLATE ${DEST_COLLATION} OR
+        T.U_CCosto           <> S.U_CCosto COLLATE ${DEST_COLLATION} OR
+        T.SalUnitMsr         <> S.SalUnitMsr COLLATE ${DEST_COLLATION} OR
+        T.U_Marca            <> S.U_Marca COLLATE ${DEST_COLLATION} OR
+        T.U_Categoria        <> S.U_Categoria COLLATE ${DEST_COLLATION} OR
+        T.U_Subcategoria     <> S.U_Subcategoria COLLATE ${DEST_COLLATION} OR
+        T.U_ValVcto          <> S.U_ValVcto COLLATE ${DEST_COLLATION} OR
+        T.U_ReqPicking       <> S.U_ReqPicking COLLATE ${DEST_COLLATION} OR
+        T.ValidFor           <> S.ValidFor COLLATE ${DEST_COLLATION} OR
+        T.InvntItem          <> S.InvntItem COLLATE ${DEST_COLLATION} OR
+        T.ItmsGrpCod         <> S.ItmsGrpCod OR
+        T.U_Nombre_Fam       <> S.U_Nombre_Fam COLLATE ${DEST_COLLATION} OR
+        T.U_Nombre_SubFam    <> S.U_Nombre_SubFam COLLATE ${DEST_COLLATION} OR
+        T.TaxCodeAR          <> S.TaxCodeAR COLLATE ${DEST_COLLATION} OR
+        T.SellItem           <> S.SellItem COLLATE ${DEST_COLLATION} OR
+        T.U_RPRO             <> S.U_RPRO COLLATE ${DEST_COLLATION} OR
+        T.CodeBars           <> S.CodeBars COLLATE ${DEST_COLLATION} OR
+        T.InvntryUom         <> S.InvntryUom COLLATE ${DEST_COLLATION} OR
+        T.U_PRIMER_NIVEL     <> S.U_PRIMER_NIVEL COLLATE ${DEST_COLLATION} OR
+        T.U_Imagen           <> S.U_Imagen COLLATE ${DEST_COLLATION} OR
+        T.CreateDate         <> S.CreateDate OR
+        T.CreateTS           <> S.CreateTS OR
+        T.UpdateDate         <> S.UpdateDate OR
+        T.UpdateTS           <> S.UpdateTS OR
+        -- Comparaciones para las nuevas columnas
+        T.UserSign           <> S.UserSign OR
+        T.AvgPrice           <> S.AvgPrice OR
+        T.ValidFrom          <> S.ValidFrom OR
+        T.ValidTo            <> S.ValidTo OR
+        T.PrchseItem         <> S.PrchseItem COLLATE ${DEST_COLLATION} OR
+        T.MinLevel           <> S.MinLevel
     ) THEN
       UPDATE SET
-        ItemName          = S.ItemName,
-        U_CCosto          = S.U_CCosto,
-        SalUnitMsr        = S.SalUnitMsr,
-        U_Marca           = S.U_Marca,
-        U_Categoria       = S.U_Categoria,
-        U_Subcategoria    = S.U_Subcategoria, 
-        U_ValVcto         = S.U_ValVcto,
-        U_ReqPicking      = S.U_ReqPicking,
-        ValidFor          = S.ValidFor,
-        InvntItem         = S.InvntItem,
-        ItmsGrpCod        = S.ItmsGrpCod,
-        U_Nombre_Fam      = S.U_Nombre_Fam,
-        U_Nombre_SubFam   = S.U_Nombre_SubFam,
-        TaxCodeAR         = S.TaxCodeAR,
-        SellItem          = S.SellItem,
-        U_RPRO            = S.U_RPRO,
-        CodeBars          = S.CodeBars,
-        InvntryUom        = S.InvntryUom,
-        U_PRIMER_NIVEL    = S.U_PRIMER_NIVEL,
-        U_Imagen          = S.U_Imagen,
-        CreateDate        = S.CreateDate,
-        CreateTS          = S.CreateTS,
-        UpdateDate        = S.UpdateDate,
-        UpdateTS          = S.UpdateTS
+        ItemName            = S.ItemName,
+        U_CCosto            = S.U_CCosto,
+        SalUnitMsr          = S.SalUnitMsr,
+        U_Marca             = S.U_Marca,
+        U_Categoria         = S.U_Categoria,
+        U_Subcategoria      = S.U_Subcategoria,
+        U_ValVcto           = S.U_ValVcto,
+        U_ReqPicking        = S.U_ReqPicking,
+        ValidFor            = S.ValidFor,
+        InvntItem           = S.InvntItem,
+        ItmsGrpCod          = S.ItmsGrpCod,
+        U_Nombre_Fam        = S.U_Nombre_Fam,
+        U_Nombre_SubFam     = S.U_Nombre_SubFam,
+        TaxCodeAR           = S.TaxCodeAR,
+        SellItem            = S.SellItem,
+        U_RPRO              = S.U_RPRO,
+        CodeBars            = S.CodeBars,
+        InvntryUom          = S.InvntryUom,
+        U_PRIMER_NIVEL      = S.U_PRIMER_NIVEL,
+        U_Imagen            = S.U_Imagen,
+        CreateDate          = S.CreateDate,
+        CreateTS            = S.CreateTS,
+        UpdateDate          = S.UpdateDate,
+        UpdateTS            = S.UpdateTS,
+        -- Actualización de las nuevas columnas
+        UserSign            = S.UserSign,
+        AvgPrice            = S.AvgPrice,
+        ValidFrom           = S.ValidFrom,
+        ValidTo             = S.ValidTo,
+        PrchseItem          = S.PrchseItem,
+        MinLevel            = S.MinLevel
     WHEN NOT MATCHED THEN
       INSERT (
         ItemCode, ItemName, U_CCosto, SalUnitMsr, U_Marca, U_Categoria,
         U_Subcategoria, U_ValVcto, U_ReqPicking, ValidFor, InvntItem,
         ItmsGrpCod, U_Nombre_Fam, U_Nombre_SubFam, TaxCodeAR, SellItem,
         U_RPRO, CodeBars, InvntryUom, U_PRIMER_NIVEL, U_Imagen,
-        CreateDate, CreateTS, UpdateDate, UpdateTS
+        CreateDate, CreateTS, UpdateDate, UpdateTS,
+        UserSign, AvgPrice, ValidFrom, ValidTo, PrchseItem, MinLevel -- Nuevas columnas
       )
       VALUES (
         S.ItemCode, S.ItemName, S.U_CCosto, S.SalUnitMsr, S.U_Marca,
@@ -444,7 +477,8 @@ async function bulkMergeProductsTx(tx, rows) {
         S.ValidFor, S.InvntItem, S.ItmsGrpCod, S.U_Nombre_Fam,
         S.U_Nombre_SubFam, S.TaxCodeAR, S.SellItem, S.U_RPRO,
         S.CodeBars, S.InvntryUom, S.U_PRIMER_NIVEL, S.U_Imagen,
-        S.CreateDate, S.CreateTS, S.UpdateDate, S.UpdateTS
+        S.CreateDate, S.CreateTS, S.UpdateDate, S.UpdateTS,
+        S.UserSign, S.AvgPrice, S.ValidFrom, S.ValidTo, S.PrchseItem, S.MinLevel -- Nuevas columnas
       )
     OUTPUT $action AS MergeAction;
   `);
