@@ -1,8 +1,8 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-require('./jobs/scheduler');   
-require('./jobs/catalogCategoryScheduler');
+const { connectProducer } = require('./utils/kafkaProducer'); 
+require('./sheduler/scheduler_OITM_ITM1');   
 
 const pruebaRoutes = require('./routes/prueba.Routes');
 
@@ -15,6 +15,8 @@ app.use(express.json());
 app.use('/api/catalog', pruebaRoutes); 
 
 const PORT = process.env.PORT || 5006;
+
 app.listen(PORT, async () => {
+  await connectProducer(); 
   console.log(`🚀 Catalog Service running on port ${PORT}`);
 });

@@ -1,0 +1,17 @@
+version: "3.8"
+
+networks:
+  orders-service_kafka_network:
+    external: true
+
+services:
+  api-gateway:
+    build: .
+    container_name: api-gateway
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+    networks:
+      - orders-service_kafka_network

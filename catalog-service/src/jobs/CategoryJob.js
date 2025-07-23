@@ -1,4 +1,4 @@
-const { syncAuxCatalogs } = require('../services/catalogCategorySyncService');
+const { syncAuxCatalogs } = require('../services/CategorySync');
 
 async function runAuxSyncJob() {
   try {
