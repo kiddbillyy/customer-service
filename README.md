@@ -1,10 +1,10 @@
-1) 📄 PEDIDO RECIBIDO
+# 1) 📄 PEDIDO RECIBIDO
     - Origen del pedido:
         - Retail Pro (bajo demanda, con número de folio).
         - SAP (carga automática cada 10 minutos).
     - Estado inicial: Pedido Recibido (estado = 1).
 
-2) 🙋 ASIGNACIÓN A PICKERS
+# 2) 🙋 ASIGNACIÓN A PICKERS
     - Un usuario con rol ASIGNER revisa qué pedidos necesitan ser surtidos y asigna productos a los pickers.
     - Condiciones para asignar:
         1. El pedido existe y está en Pedido Recibido.
@@ -117,3 +117,163 @@
       |
       v
 7. ✅ CIERRE DE PEDIDO
+
+
+
+Claro, aquí tienes tu flujo en **Markdown mejorado**, con una visual más clara, mejor jerarquía y espaciado para facilitar la lectura:
+
+---
+
+# 📦 **Flujo de Pedido - Paso a Paso**
+
+---
+
+## 1️⃣ 📄 PEDIDO RECIBIDO
+
+* **Origen del pedido**:
+
+  * `Retail Pro`: bajo demanda, con número de folio.
+  * `SAP`: carga automática cada 10 minutos.
+
+* **Estado inicial**: `Pedido Recibido` (estado = 1)
+
+---
+
+## 2️⃣ 🙋 ASIGNACIÓN A PICKERS
+
+* Un usuario con rol **ASIGNER** revisa qué pedidos necesitan surtido y asigna productos a pickers.
+
+### ✅ Condiciones para asignar:
+
+1. El pedido existe y está en **Pedido Recibido**.
+2. El pedido tiene productos disponibles sin asignar.
+3. Existen pickers en estado **activo**.
+4. El producto aún no está asignado a otro picker.
+
+### 🔄 Resultado:
+
+* Estado cambia a: **Asignación de Picking**
+* Listo para que el picker inicie la búsqueda.
+
+---
+
+## 3️⃣ 🏷️ PROCESO DE PICKING
+
+El picker ve sus productos asignados y comienza a localizarlos:
+
+### 🔍 1. Ver productos y buscar stock
+
+* Localiza físicamente los productos requeridos.
+
+### 📦 2. Asignar a bultos
+
+* Agrupa productos en bultos o contenedores.
+* Registra las cantidades efectivamente encontradas.
+
+### 🚨 3. Reportar faltantes
+
+* Si encuentra todo → marca **Picking Completo**.
+* Si hay faltantes → marca **Picking Incompleto**.
+* El picker *no* decide sobre backorder o cancelación.
+
+#### 🔚 Estados resultantes:
+
+* `✅ Picking Completo`
+* `⚠️ Picking Incompleto`
+
+---
+
+## 4️⃣ 🔎 AUDITORÍA
+
+Rol: **Auditor** — revisa los pedidos con Picking Completo o Incompleto.
+
+### ✔ Revisión:
+
+* Verifica productos, cantidades, bultos y documentación.
+
+### ❓¿Hay faltantes?
+
+* **No faltan productos** → pasa a Empaque.
+* **Sí faltan productos** → el auditor decide:
+
+#### Opciones:
+
+1. 📆 **Reabastecer / Backorder**
+
+   * Línea pasa a estado `Pendiente de Reabastecer`.
+2. 📦 **Envío Parcial**
+
+   * Se despacha lo disponible, lo faltante puede ir a backorder o cancelarse.
+3. ❌ **Cancelación Parcial o Total**
+
+   * Si el cliente no espera o no habrá stock, se cancela total o parcialmente.
+
+#### 🔚 Estados resultantes:
+
+* `📦 Pedido Aprobado para Empaque`
+* `📆 Pedido Pendiente de Reabastecer`
+* `❌ Pedido Cancelado Parcial/Total`
+
+---
+
+## 5️⃣ 📦 EMPAQUE
+
+* Se embalan los productos aprobados por el auditor.
+* Si hay envío parcial, solo se empaca lo disponible.
+
+### 🎯 Resultado:
+
+* Pedido **listo para despacho**.
+
+---
+
+## 6️⃣ 🚚 DESPACHO / ENVÍO
+
+* Se genera la guía de transporte o documento de salida.
+* Se realiza el embarque físico de la mercancía.
+
+---
+
+## 7️⃣ ✅ CIERRE DE PEDIDO
+
+* Una vez enviado o cancelado, el pedido se marca como **Cerrado**.
+* Se registran cantidades enviadas y/o canceladas.
+
+### 🔔 El sistema puede:
+
+* Notificar al cliente.
+* Actualizar estado en SAP o Retail Pro.
+
+### 🔚 Estado final: `Pedido Cerrado / Completado`
+
+---
+
+## 🔁 FLUJO RESUMIDO
+
+```
+1. 📄 PEDIDO RECIBIDO
+      ↓
+2. 🙋 ASIGNACIÓN A PICKERS
+      ↓
+3. 🏷️ PROCESO DE PICKING
+      ├─ a) Picker busca productos
+      ├─ b) Todo encontrado → "Picking Completo"
+      └─ c) Faltantes → "Picking Incompleto"
+      ↓
+4. 🔎 AUDITORÍA
+      ├─ a) Verificación
+      └─ b) Si hay faltantes → Decisión del auditor:
+            1) ♻ Backorder
+            2) 📦 Envío Parcial
+            3) ❌ Cancelación
+      ↓
+5. 📦 EMPAQUE
+      ↓
+6. 🚚 DESPACHO / ENVÍO
+      ↓
+7. ✅ CIERRE DE PEDIDO
+```
+
+---
+
+¿Te gustaría que convierta esto en un archivo descargable (PDF o Markdown)?
