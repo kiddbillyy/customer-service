@@ -48,8 +48,8 @@ services:
     environment:
       PORT: 5000
       DB_HOST: host.docker.internal
-      DB_USER: windburst
-      DB_PASSWORD: admin123
+      DB_USER: Marcelo
+      DB_PASSWORD: Mimbral_!234
       DB_NAME: orders_service_db
       DB_PORT: 1433
       VTEX_APP_KEY: ${VTEX_APP_KEY}

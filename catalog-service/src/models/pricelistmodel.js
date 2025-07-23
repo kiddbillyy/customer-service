@@ -1,104 +1,115 @@
-const GetPool = require('../config/db'); 
-const sql = require('mssql');
 
-async function getListPrices(options) {
-    const {
-        page = 1,
-        pageSize = 100,
-        itemCode = null,
-        priceList = null,
-        minPrice = null,
-        maxPrice = null,
-        sortBy = 'ItemCode',
-        sortOrder = 'ASC'
-    } = options;
+const { catalogPool, catalogPoolConnect, sql } = require('../config/dbnew');
 
-    try {
-        const pool = await GetPool;
-        const request = pool.request();
+const VALID_SORT = ['ItemCode','PriceList','Price','PriceIVA','CreatedAt','UpdatedAt'];
 
-        let conditions = [];
-        let query = `
-            SELECT ItemCode, PriceList, Price, CreatedAt, UpdatedAt
-            FROM dbo.ITM1_ListPrice
-        `;
+async function getListPrices(opts){
+  await catalogPoolConnect;
 
-        if (itemCode) {
-            conditions.push(`ItemCode LIKE @itemCode`); 
-            request.input('itemCode', sql.NVarChar(50), `%${itemCode}%`); 
-        }
-        if (priceList !== null && priceList !== undefined) {
-            conditions.push(`PriceList = @priceList`);
-            request.input('priceList', sql.SmallInt, priceList);
-        }
-        if (minPrice !== null && minPrice !== undefined) {
-            conditions.push(`Price >= @minPrice`);
-            request.input('minPrice', sql.Numeric(19,6), minPrice);
-        }
-        if (maxPrice !== null && maxPrice !== undefined) {
-            conditions.push(`Price <= @maxPrice`);
-            request.input('maxPrice', sql.Numeric(19,6), maxPrice);
-        }
+  const where = [];
+  const req = catalogPool.request();
+  const priceIvaExpr = `CAST(CASE WHEN P.TaxCodeAR = 'IVA_EXE' THEN L.Price ELSE L.Price * 1.19 END AS NUMERIC(19,6))`;
 
-        if (conditions.length > 0) {
-            query += ` WHERE ` + conditions.join(' AND ');
-        }
+  if (opts.itemCode){
+    where.push('L.ItemCode LIKE @itemCode');
+    req.input('itemCode', sql.NVarChar(50), `%${opts.itemCode}%`);
+  }
+  if (opts.price != null) {
+    where.push('L.Price = @price');
+    req.input('price', sql.Numeric(19,6), opts.price);
+  }
+  if (opts.priceIVA != null) {
+    where.push(`${priceIvaExpr} = @priceIVA`);
+    req.input('priceIVA', sql.Numeric(19,6), opts.priceIVA);
+  }
+  if (opts.priceList != null){
+    where.push('L.PriceList = @priceList');
+    req.input('priceList', sql.SmallInt, opts.priceList);
+  }
+  if (opts.minPrice != null){
+    where.push('L.Price >= @minPrice');
+    req.input('minPrice', sql.Numeric(19,6), opts.minPrice);
+  }
+  if (opts.maxPrice != null){
+    where.push('L.Price <= @maxPrice');
+    req.input('maxPrice', sql.Numeric(19,6), opts.maxPrice);
+  }
 
-        const validSortColumns = ['ItemCode', 'PriceList', 'Price', 'CreatedAt', 'UpdatedAt'];
-        const validatedSortBy = validSortColumns.includes(sortBy) ? sortBy : 'ItemCode';
-        const validatedSortOrder = (sortOrder.toUpperCase() === 'DESC') ? 'DESC' : 'ASC';
 
-        query += ` ORDER BY ${validatedSortBy} ${validatedSortOrder}`;
+  const whereSQL   = where.length ? 'WHERE ' + where.join(' AND ') : '';
+  const sortBy     = VALID_SORT.includes(opts.sortBy) ? opts.sortBy : 'ItemCode';
+  const sortOrder  = opts.sortOrder.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
-        const offset = (page - 1) * pageSize;
-        query += ` OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;`;
-        
-        request.input('offset', sql.Int, offset);
-        request.input('pageSize', sql.Int, pageSize);
+  const sqlText = `
+   WITH Q AS (
+    SELECT  L.ItemCode,
+            L.PriceList,
+            L.Price,
+            ${priceIvaExpr} AS PriceIVA,
+            L.CreatedAt,
+            L.UpdatedAt,
+            P.ItemName,
+            P.MinLevel  AS MinQuantity,
+            P.ValidFrom AS DateFrom,
+            P.ValidTo   AS DateTo,
+            COUNT(*) OVER() AS totalRecords
+    FROM dbo.ITM1_ListPrice  AS L
+    JOIN dbo.OITM_Products   AS P ON P.ItemCode = L.ItemCode
+    ${whereSQL}
+  )
+  SELECT ItemCode, PriceList, Price, PriceIVA,
+         CreatedAt, UpdatedAt,
+         ItemName, MinQuantity, DateFrom, DateTo,
+         totalRecords
+  FROM Q
+  ORDER BY ${sortBy} ${sortOrder}
+  OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+`;
 
-        let countQuery = `SELECT COUNT(*) AS totalRecords FROM dbo.ITM1_ListPrice`;
-        if (conditions.length > 0) {
-            countQuery += ` WHERE ` + conditions.join(' AND ');
-        }
-        const countResult = await request.query(countQuery);
-        const totalRecords = countResult.recordset[0].totalRecords;
 
-        const result = await request.query(query);
+  req.input('offset', sql.Int, (opts.page - 1) * opts.pageSize);
+  req.input('pageSize', sql.Int, opts.pageSize);
 
-        return {
-            page,
-            pageSize,
-            totalRecords,
-            totalPages: Math.ceil(totalRecords / pageSize),
-            data: result.recordset
-        };
+  const r = await req.query(sqlText);
+  console.log("consulta: ",sqlText)
+  const totalRecords = r.recordset[0]?.totalRecords ?? 0;
 
-    } catch (error) {
-        console.error(`Error en getListPrices: ${error.message}`);
-        throw new Error(`No se pudo obtener la lista de precios: ${error.message}`);
-    }
+  const data = r.recordset.map(({ totalRecords, ...row }) => row);
+
+  return {
+  page: opts.page,
+  pageSize: opts.pageSize,
+  totalRecords,
+  totalPages: Math.ceil(totalRecords / opts.pageSize),
+  data
+};
 }
 
 async function getListPriceById(itemCode, priceList) {
-    try {
-        const pool = await GetPool;
-        const result = await pool.request()
-            .input('itemCode', sql.NVarChar(50), itemCode)
-            .input('priceList', sql.SmallInt, priceList)
-            .query(`
-                SELECT ItemCode, PriceList, Price, CreatedAt, UpdatedAt
-                FROM dbo.ITM1_ListPrice
-                WHERE ItemCode = @itemCode AND PriceList = @priceList;
-            `);
-            
-        return result.recordset.length > 0 ? result.recordset[0] : null;
-    } catch (error) {
-        console.error(`Error en getListPriceById: ${error.message}`);
-        throw new Error(`No se pudo obtener el precio por ID: ${error.message}`);
-    }
+  await catalogPoolConnect;
+  const result = await catalogPool.request()
+    .input('itemCode', sql.NVarChar(50), itemCode)
+    .input('priceList', sql.SmallInt, priceList)
+    .query(`
+      SELECT  L.ItemCode,
+            L.PriceList,
+            L.Price,
+            CAST(CASE WHEN P.TaxCodeAR = 'IVA_EXE' THEN L.Price ELSE L.Price * 1.19 END AS NUMERIC(19,6)) AS PriceIVA,
+            L.CreatedAt,
+            L.UpdatedAt,
+            P.ItemName,
+            P.MinLevel  AS MinQuantity,
+            P.ValidFrom AS DateFrom,
+            P.ValidTo   AS DateTo
+    FROM dbo.ITM1_ListPrice  AS L
+    JOIN dbo.OITM_Products   AS P ON P.ItemCode = L.ItemCode
+    WHERE L.ItemCode = @itemCode
+      AND L.PriceList = @priceList;
+    `);
+  return result.recordset[0] ?? null;
 }
 
 module.exports = {
-    getListPrices,
-    getListPriceById
+  getListPrices,
+  getListPriceById
 };

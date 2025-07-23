@@ -3,8 +3,8 @@ const catalogPool = require('../config/db');
 const pLimit = require('p-limit');
 
 async function syncAuxCatalogs() {
-  console.log(' Iniciando sincronización de tablas auxiliares...');
-  console.time('⏱ Tiempo total aux');
+  //console.log(' Iniciando sincronización de tablas auxiliares...');
+  //console.time('⏱ Tiempo total aux');
 
   const limit = pLimit(100);
 
@@ -84,15 +84,15 @@ async function syncAuxCatalogs() {
       limit(async () => {
         const valores = Object.values(r);
         await catalogPool.query(t.merge, [...valores, ...valores]);
-        if (idx % 100 === 0) console.log(`  ↳ ${t.nombre}: ${idx} procesados...`);
+        //if (idx % 100 === 0) console.log(`  ↳ ${t.nombre}: ${idx} procesados...`);
       })
     );
 
     await Promise.all(tareas);
-    console.log(`✅ ${t.nombre} sincronizado (${registros.length})`);
+    //console.log(`✅ ${t.nombre} sincronizado (${registros.length})`);
   }
 
-  console.timeEnd('⏱️ Tiempo total aux');
+  //console.timeEnd('⏱️ Tiempo total aux');
   return true;
 }
 

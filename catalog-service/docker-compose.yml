@@ -2,15 +2,15 @@ version: '3.8'
 
 networks:
   orders-service_kafka_network:
-    external: true  # 📌 Usa la misma red de `orders-service`
+    external: true
 
 services:
-  inventory-service:
+  catalog-service:
     build: .
-    container_name: inventory-service
+    container_name: catalog-service
     restart: always
     ports:
-      - "5005:5005"
+      - "5006:5006"
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "win-hp03dio6fsk:192.168.0.165"
@@ -19,14 +19,14 @@ services:
       - 8.8.8.8         
       - 1.1.1.1  
     environment:
-      PORT: 5005
+      PORT: 5006
       DB_HOST: host.docker.internal
-      DB_USER: windburst
-      DB_PASSWORD: admin123
-      DB_NAME: inventory_service_db
+      DB_USER: Marcelo
+      DB_PASSWORD: Mimbral_!234
+      DB_NAME: CATALOG_SERVICE_DB
       DB_PORT: 1433
       KAFKA_BROKER: kafka:9092
-      KAFKA_CLIENT_ID: inventory-service
+      KAFKA_CLIENT_ID: catalog-service
       VTEX_APP_KEY: ${VTEX_APP_KEY}
       VTEX_APP_TOKEN: ${VTEX_APP_TOKEN}
       VTEX_ACCOUNT: ${VTEX_ACCOUNT}

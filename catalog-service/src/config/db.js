@@ -39,11 +39,11 @@ pool.query = async (query, params) => {
   const result = await request.query(query);
 
   // Si es SELECT, retorna el recordset
-  if (result.recordset !== undefined) {
+ /*  if (result.recordset !== undefined) {
     return [result.recordset];
-  }
+  } */
 
   // Si es UPDATE / INSERT / DELETE, retorna el objeto completo
-  return [result];
+  //return [result];
 };
 module.exports = pool;

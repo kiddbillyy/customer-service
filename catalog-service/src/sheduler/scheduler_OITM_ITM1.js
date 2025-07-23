@@ -19,10 +19,9 @@ cron.schedule('*/3 * * * *', async () => {
 
     // Paso 2: Precios
     console.log('🔹 Iniciando sincronización de precios...');
-    const priceMetrics = await runSyncPriceJob();
-    const totalPrices = priceMetrics.inserted + priceMetrics.updated;
-    console.log(`✅ Precios sincronizados: ${totalPrices} (Insertados: ${priceMetrics.inserted}, Actualizados: ${priceMetrics.updated})`);
-
+    await runSyncPriceJob();
+    console.log('✅ Precios sincronizados correctamente.');
+    
     // Paso 3: Categorías
     console.log('🔹 Iniciando sincronización de categorías...');
     await runAuxSyncJob();
