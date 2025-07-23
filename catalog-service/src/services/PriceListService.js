@@ -76,17 +76,8 @@ async function syncPriceList() {
       metrics.inserted = inserted;
       metrics.updated = updated;
 
-      // Watermark
       const tWMU0 = performance.now();
       const upReq = new sql.Request(tx);
-      //upReq.input('dt', sql.DateTime, new Date());
-      /* await upReq.query(`
-        MERGE dbo.SyncMeta AS T
-        USING (SELECT 'PriceSync_OITM' AS JobName, @dt AS LastSyncDT) AS S
-          ON T.JobName = S.JobName
-        WHEN MATCHED THEN UPDATE SET LastSyncDT = S.LastSyncDT
-        WHEN NOT MATCHED THEN INSERT (JobName, LastSyncDT) VALUES (S.JobName, S.LastSyncDT);
-      `); */
       await upReq.query(`
         MERGE dbo.SyncMeta AS T
         USING (SELECT 'PriceSync_OITM' AS JobName, GETUTCDATE() AS LastSyncDT) AS S
@@ -105,13 +96,8 @@ async function syncPriceList() {
       return metrics;
     }
 
-    // Incremental
-    //const now = new Date();
-    //const from = new Date(lastSync.getTime() - SAFETY_LAG_MS);
     const fromUTC = new Date(lastSync.getTime() - SAFETY_LAG_MS);
 
-    /* metrics.watermarkFrom = from.toISOString();
-    metrics.watermarkTo = now.toISOString(); */
     metrics.watermarkFrom = fromUTC.toISOString();
     metrics.watermarkTo = nowUTC.toISOString();
 
@@ -124,9 +110,6 @@ async function syncPriceList() {
     changedReq.input('from', sql.DateTime, fromSAPLocal);
     changedReq.input('to', sql.DateTime, nowSAPLocal);
 
-    /* changedReq.input('from', sql.DateTime, from);
-    changedReq.input('now', sql.DateTime, now);
- */
     const changedRes = await changedReq.query(`
             WITH ItemEvents AS (
                 -- Eventos de ACTUALIZACIÓN de ítems existentes
@@ -160,6 +143,49 @@ async function syncPriceList() {
                     AND DATEADD(SECOND,
                         ((i.CreateTS / 10000) * 3600) + (((i.CreateTS % 10000) / 100) * 60) + (i.CreateTS % 100),
                         CAST(i.CreateDate AS DATETIME)) <= @to
+
+              UNION ALL
+
+            -- Eventos de ACTUALIZACIÓN de precios en [@CAMBIOT3] para la lista T3
+            SELECT
+                ItemCode = c.Code COLLATE ${DEST_COLLATION},
+                EventDT = CASE
+                            WHEN c.U_Hora IS NOT NULL THEN
+                                DATEADD(SECOND,
+                                    (CAST(SUBSTRING(c.U_Hora, 1, 2) AS INT) * 3600) +
+                                    (CAST(SUBSTRING(c.U_Hora, 4, 2) AS INT) * 60) +
+                                    CAST(SUBSTRING(c.U_Hora, 7, 2) AS INT),
+                                    CAST(c.U_Fecha AS DATETIME)
+                                )
+                            ELSE
+                                CAST(c.U_Fecha AS DATETIME) -- Si U_Hora es NULL, solo toma la fecha (hora 00:00:00)
+                          END
+            FROM [@CAMBIOT3] c
+            WHERE
+                c.U_Fecha IS NOT NULL -- La fecha SI O SI no debe ser NULL
+                AND CASE
+                        WHEN c.U_Hora IS NOT NULL THEN
+                            DATEADD(SECOND,
+                                (CAST(SUBSTRING(c.U_Hora, 1, 2) AS INT) * 3600) +
+                                (CAST(SUBSTRING(c.U_Hora, 4, 2) AS INT) * 60) +
+                                CAST(SUBSTRING(c.U_Hora, 7, 2) AS INT),
+                                CAST(c.U_Fecha AS DATETIME)
+                            )
+                        ELSE
+                            CAST(c.U_Fecha AS DATETIME)
+                      END > @from
+                AND CASE
+                        WHEN c.U_Hora IS NOT NULL THEN
+                            DATEADD(SECOND,
+                                (CAST(SUBSTRING(c.U_Hora, 1, 2) AS INT) * 3600) +
+                                (CAST(SUBSTRING(c.U_Hora, 4, 2) AS INT) * 60) +
+                                CAST(SUBSTRING(c.U_Hora, 7, 2) AS INT),
+                                CAST(c.U_Fecha AS DATETIME)
+                            )
+                        ELSE
+                            CAST(c.U_Fecha AS DATETIME)
+                      END <= @to
+                AND c.U_Lista = 'T3'
             )
             SELECT DISTINCT ItemCode FROM ItemEvents;
         `);
@@ -190,7 +216,6 @@ async function syncPriceList() {
       return metrics;
     }
 
-    // Batches
     const batches = [];
     for (let i = 0; i < changedItems.length; i += BATCH_SIZE) {
       batches.push(changedItems.slice(i, i + BATCH_SIZE));
@@ -237,10 +262,8 @@ async function syncPriceList() {
       });
     }
 
-    // Watermark update
     const tWMU0 = performance.now();
     const wmUpReq = new sql.Request(tx);
-    //wmUpReq.input('dt', sql.DateTime, now);
     await wmUpReq.query(`
       MERGE dbo.SyncMeta AS T
       USING (SELECT 'PriceSync_OITM' AS JobName, GETUTCDATE() AS LastSyncDT) AS S
