@@ -3,6 +3,7 @@ const { performance } = require('perf_hooks');
 const { sql, sapPool } = require('../config/dbnewsap');
 const { catalogPool } = require('../config/dbnew');
 const { toZonedTime } = require('date-fns-tz');
+const { sendNewProductEvents } = require('../utils/kafkaProducer');
 
 // Configuración de sincronización
 const SAFETY_LAG_MS = 60 * 1000;
@@ -11,7 +12,7 @@ const CHUNK_INSERT = 1000;
 const JOB_NAME = 'OITM_ProductSync';
 const DEST_COLLATION = 'SQL_Latin1_General_CP850_CI_AS';
 const SAP_SERVER_TIMEZONE = 'America/Santiago';
-const REFERENCE_TIMEZONE = 'UTC';
+//const REFERENCE_TIMEZONE = 'UTC';
 
 async function syncProducts() {
   const t0 = performance.now();
@@ -480,14 +481,26 @@ async function bulkMergeProductsTx(tx, rows) {
         S.CreateDate, S.CreateTS, S.UpdateDate, S.UpdateTS,
         S.UserSign, S.AvgPrice, S.ValidFrom, S.ValidTo, S.PrchseItem, S.MinLevel -- Nuevas columnas
       )
-    OUTPUT $action AS MergeAction;
+    OUTPUT $action AS MergeAction, INSERTED.ItemCode;
   `);
 
-  let inserted = 0, updated = 0;
-  mergeRes.recordset.forEach(r => {
-    if (r.MergeAction === 'INSERT') inserted++;
-    else if (r.MergeAction === 'UPDATE') updated++;
-  });
+    let inserted = 0;
+    let updated = 0;
+    const insertedItemCodes = []; // Array para almacenar los ItemCodes insertados
+
+    // Recorremos los resultados del MERGE
+    for (const r of mergeRes.recordset) {
+      if (r.MergeAction === 'INSERT') {
+        inserted++;
+        insertedItemCodes.push(r.ItemCode); // Almacenamos el ItemCode
+      } else if (r.MergeAction === 'UPDATE') {
+        updated++;
+      }
+    }
+    // Enviamos un solo evento a Kafka con todos los ItemCodes insertados
+    if (insertedItemCodes.length > 0) {
+        await sendNewProductEvents(insertedItemCodes);
+    }
 
   return { inserted, updated };
 }

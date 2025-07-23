@@ -22,7 +22,7 @@ services:
       - "9092:9092"
     environment:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092  # Asegura que Kafka usa el hostname correcto
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092  
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_OPTS: "-Djava.net.preferIPv4Stack=true"
     depends_on:
@@ -48,8 +48,8 @@ services:
     environment:
       PORT: 5000
       DB_HOST: host.docker.internal
-      DB_USER: windburst
-      DB_PASSWORD: admin123
+      DB_USER: DEV
+      DB_PASSWORD: 1234
       DB_NAME: orders_service_db
       DB_PORT: 1433
       VTEX_APP_KEY: ${VTEX_APP_KEY}

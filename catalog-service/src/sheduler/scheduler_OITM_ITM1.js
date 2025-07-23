@@ -4,9 +4,9 @@ const runSyncPriceJob = require('../jobs/catalogPriceListSynscJob');
 const runAuxSyncJob = require('../jobs/CategoryJob');
 const runItmsJobs = require('../jobs/ItmsGrpJob');
 
-console.log('🔁 Job unificado de sincronización programado para ejecutarse cada 3 minutos...');
+console.log('🔁 Job unificado de sincronización programado para ejecutarse cada 5 minutos...');
 
-cron.schedule('*/3 * * * *', async () => {
+cron.schedule('*/5 * * * *', async () => {
   const now = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
   console.log(`🕒 Iniciando sincronización completa [${now}]`);
 
@@ -19,9 +19,8 @@ cron.schedule('*/3 * * * *', async () => {
 
     // Paso 2: Precios
     console.log('🔹 Iniciando sincronización de precios...');
-    const priceMetrics = await runSyncPriceJob();
-    const totalPrices = priceMetrics.inserted + priceMetrics.updated;
-    console.log(`✅ Precios sincronizados: ${totalPrices} (Insertados: ${priceMetrics.inserted}, Actualizados: ${priceMetrics.updated})`);
+    await runSyncPriceJob();
+    console.log('✅ Precios sincronizados correctamente.');
 
     // Paso 3: Categorías
     console.log('🔹 Iniciando sincronización de categorías...');
@@ -32,6 +31,9 @@ cron.schedule('*/3 * * * *', async () => {
     console.log('🔹 Iniciando sincronización de grupos de ítems...');
     await runItmsJobs();
     console.log('✅ Grupos de ítems sincronizados correctamente.');
+
+    //Paso 5: Codigo de barras
+    console.log('🔹 Iniciando sincronización de códigos de barras...');
 
   } catch (err) {
     console.error('❌ Error general durante la sincronización:', err.message);
