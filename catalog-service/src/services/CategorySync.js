@@ -1,10 +1,12 @@
-const sapPool = require('../config/dbSap');
-const catalogPool = require('../config/db');
+const { catalogPool, catalogPoolConnect } = require('../config/dbnew');
+const { sapPool, sapPoolConnect } = require('../config/dbnewsap');
 const pLimit = require('p-limit');
 
 async function syncAuxCatalogs() {
-  console.log(' Iniciando sincronización de tablas auxiliares...');
   console.time('⏱ Tiempo total aux');
+
+ 
+  await Promise.all([catalogPoolConnect, sapPoolConnect]);
 
   const limit = pLimit(100);
 
@@ -14,12 +16,12 @@ async function syncAuxCatalogs() {
       sql: `SELECT Code, Name, U_PRIMER_NIVEL FROM [@CATEGORIA]`,
       merge: `
         MERGE INTO Categoria AS target
-        USING (SELECT ? AS Code) AS source
+        USING (SELECT @Code AS Code) AS source
         ON target.Code = source.Code
         WHEN MATCHED THEN
-          UPDATE SET Name = ?, U_PRIMER_NIVEL = ?
+          UPDATE SET Name = @Name, U_PRIMER_NIVEL = @U_PRIMER_NIVEL
         WHEN NOT MATCHED THEN
-          INSERT (Code, Name, U_PRIMER_NIVEL) VALUES (?, ?, ?);
+          INSERT (Code, Name, U_PRIMER_NIVEL) VALUES (@Code, @Name, @U_PRIMER_NIVEL);
       `
     },
     {
@@ -27,12 +29,12 @@ async function syncAuxCatalogs() {
       sql: `SELECT Code, Name FROM [@PRIMERNIVEL]`,
       merge: `
         MERGE INTO PrimerNivel AS target
-        USING (SELECT ? AS Code) AS source
+        USING (SELECT @Code AS Code) AS source
         ON target.Code = source.Code
         WHEN MATCHED THEN
-          UPDATE SET Name = ?
+          UPDATE SET Name = @Name
         WHEN NOT MATCHED THEN
-          INSERT (Code, Name) VALUES (?, ?);
+          INSERT (Code, Name) VALUES (@Code, @Name);
       `
     },
     {
@@ -40,12 +42,12 @@ async function syncAuxCatalogs() {
       sql: `SELECT Code, Name, U_CATEGORIA FROM [@SUBCATEGORIA]`,
       merge: `
         MERGE INTO Subcategoria AS target
-        USING (SELECT ? AS Code) AS source
+        USING (SELECT @Code AS Code) AS source
         ON target.Code = source.Code
         WHEN MATCHED THEN
-          UPDATE SET Name = ?, U_CATEGORIA = ?
+          UPDATE SET Name = @Name, U_CATEGORIA = @U_CATEGORIA
         WHEN NOT MATCHED THEN
-          INSERT (Code, Name, U_CATEGORIA) VALUES (?, ?, ?);
+          INSERT (Code, Name, U_CATEGORIA) VALUES (@Code, @Name, @U_CATEGORIA);
       `
     },
     {
@@ -53,12 +55,12 @@ async function syncAuxCatalogs() {
       sql: `SELECT Code, Name FROM [@FAMILIA]`,
       merge: `
         MERGE INTO Familia AS target
-        USING (SELECT ? AS Code) AS source
+        USING (SELECT @Code AS Code) AS source
         ON target.Code = source.Code
         WHEN MATCHED THEN
-          UPDATE SET Name = ?
+          UPDATE SET Name = @Name
         WHEN NOT MATCHED THEN
-          INSERT (Code, Name) VALUES (?, ?);
+          INSERT (Code, Name) VALUES (@Code, @Name);
       `
     },
     {
@@ -66,33 +68,44 @@ async function syncAuxCatalogs() {
       sql: `SELECT Code, Name FROM [@SUBFAMILIA]`,
       merge: `
         MERGE INTO Subfamilia AS target
-        USING (SELECT ? AS Code) AS source
+        USING (SELECT @Code AS Code) AS source
         ON target.Code = source.Code
         WHEN MATCHED THEN
-          UPDATE SET Name = ?
+          UPDATE SET Name = @Name
         WHEN NOT MATCHED THEN
-          INSERT (Code, Name) VALUES (?, ?);
+          INSERT (Code, Name) VALUES (@Code, @Name);
       `
     }
   ];
 
-  for (const t of tablas) {
-    const [registros] = await sapPool.query(t.sql);
-    console.log(`🔹 Sincronizando ${t.nombre}: ${registros.length} registros...`);
+  try {
+    for (const t of tablas) {
+      const sapResult = await sapPool.request().query(t.sql);
+      const registros = sapResult.recordset;
 
-    const tareas = registros.map((r, idx) =>
-      limit(async () => {
-        const valores = Object.values(r);
-        await catalogPool.query(t.merge, [...valores, ...valores]);
-        if (idx % 100 === 0) console.log(`  ↳ ${t.nombre}: ${idx} procesados...`);
-      })
-    );
+      const tareas = registros.map((r, idx) =>
+        limit(async () => {
+          const catalogRequest = catalogPool.request();
+          const valores = Object.entries(r);
 
-    await Promise.all(tareas);
-    console.log(`✅ ${t.nombre} sincronizado (${registros.length})`);
+          for (const [key, value] of valores) {
+            catalogRequest.input(key, value);
+          }
+
+          await catalogRequest.query(t.merge);
+          //if (idx % 100 === 0) console.log(` ↳ ${t.nombre}: ${idx} procesados...`);
+        })
+      );
+
+      await Promise.all(tareas);
+    }
+  } catch (err) {
+    console.error('❌ Error durante la sincronización:', err);
+    return false;
+  } finally {
+    console.timeEnd('⏱ Tiempo total aux');
   }
 
-  console.timeEnd('⏱️ Tiempo total aux');
   return true;
 }
 
