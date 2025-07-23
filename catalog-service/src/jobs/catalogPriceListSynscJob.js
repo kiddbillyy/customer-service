@@ -1,4 +1,4 @@
-const { syncPriceList } = require('../services/PriceListSyncService');
+const { syncPriceList } = require('../services/PriceListService');
 
 async function runSyncPriceJob() {
   try {
