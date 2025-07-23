@@ -1,4 +1,4 @@
-# 1) 📄 PEDIDO RECIBIDO
+ 1) 📄 PEDIDO RECIBIDO
     - Origen del pedido:
         - Retail Pro (bajo demanda, con número de folio).
         - SAP (carga automática cada 10 minutos).
@@ -117,10 +117,6 @@
       |
       v
 7. ✅ CIERRE DE PEDIDO
-
-
-
-Claro, aquí tienes tu flujo en **Markdown mejorado**, con una visual más clara, mejor jerarquía y espaciado para facilitar la lectura:
 
 ---
 
