@@ -17,12 +17,12 @@ services:
     dns:
       - 127.0.0.11
       - 8.8.8.8         
-      - 1.1.1.1  
+      - 1.1.1.1 
     environment:
       PORT: 5006
       DB_HOST: host.docker.internal
-      DB_USER: Marcelo
-      DB_PASSWORD: Mimbral_!234
+      DB_USER: DEV
+      DB_PASSWORD: 1234
       DB_NAME: CATALOG_SERVICE_DB
       DB_PORT: 1433
       KAFKA_BROKER: kafka:9092

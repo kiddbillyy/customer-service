@@ -3,8 +3,9 @@ const runSyncJob = require('../jobs/CatalogJob');
 const runSyncPriceJob = require('../jobs/catalogPriceListSynscJob');
 const runAuxSyncJob = require('../jobs/CategoryJob');
 const runItmsJobs = require('../jobs/ItmsGrpJob');
+const runBarcodeJob =require('../jobs/BarcodeJob');
 
-console.log('🔁 Job unificado de sincronización programado para ejecutarse cada 3 minutos...');
+console.log('🔁 Job unificado de sincronización programado para ejecutarse cada 5 minutos...');
 
 cron.schedule('*/3 * * * *', async () => {
   const now = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
@@ -21,7 +22,7 @@ cron.schedule('*/3 * * * *', async () => {
     console.log('🔹 Iniciando sincronización de precios...');
     await runSyncPriceJob();
     console.log('✅ Precios sincronizados correctamente.');
-    
+
     // Paso 3: Categorías
     console.log('🔹 Iniciando sincronización de categorías...');
     await runAuxSyncJob();
@@ -31,6 +32,11 @@ cron.schedule('*/3 * * * *', async () => {
     console.log('🔹 Iniciando sincronización de grupos de ítems...');
     await runItmsJobs();
     console.log('✅ Grupos de ítems sincronizados correctamente.');
+
+    //Paso 5: Codigo de barras
+    console.log('🔹 Iniciando sincronización de códigos de barras...');
+    await runBarcodeJob();
+    console.log('✅ Códigos barra sincronizados correctamente.');
 
   } catch (err) {
     console.error('❌ Error general durante la sincronización:', err.message);

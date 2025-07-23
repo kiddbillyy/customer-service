@@ -1,8 +1,5 @@
 FROM node:18
 
-
-ENV TZ=UTC
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Crear directorio de trabajo
 WORKDIR /app
 
@@ -17,5 +14,5 @@ RUN npm install
 COPY . .
 
 # Exponer puerto y comando para iniciar
-EXPOSE 5006
+EXPOSE 5005
 CMD ["npm", "start"]
