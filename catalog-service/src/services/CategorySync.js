@@ -3,9 +3,9 @@ const { sapPool, sapPoolConnect } = require('../config/dbnewsap');
 const pLimit = require('p-limit');
 
 async function syncAuxCatalogs() {
+
   console.time('⏱ Tiempo total aux');
 
- 
   await Promise.all([catalogPoolConnect, sapPoolConnect]);
 
   const limit = pLimit(100);

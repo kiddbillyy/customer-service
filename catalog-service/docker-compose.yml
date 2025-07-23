@@ -2,10 +2,10 @@ version: '3.8'
 
 networks:
   orders-service_kafka_network:
-    external: true  # 📌 Usa la misma red de `orders-service`
+    external: true
 
 services:
-  inventory-service:
+  catalog-service:
     build: .
     container_name: catalog-service
     restart: always

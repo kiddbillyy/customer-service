@@ -48,6 +48,7 @@ services:
     environment:
       PORT: 5000
       DB_HOST: host.docker.internal
+
       DB_USER: DEV
       DB_PASSWORD: 1234
       DB_NAME: orders_service_db
