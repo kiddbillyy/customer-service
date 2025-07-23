@@ -309,5 +309,3 @@ Aunque este es un ejemplo, se han considerado algunas prácticas de seguridad im
   * **Recomendación HTTPS**: Para entornos de producción, es **crucial** implementar HTTPS para cifrar la comunicación entre el cliente y el servidor, protegiendo las credenciales y los tokens.
 
 -----
-
-¿Hay alguna sección específica que te gustaría expandir o alguna otra funcionalidad que te interese documentar?
