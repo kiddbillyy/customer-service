@@ -361,12 +361,12 @@ async function bulkMergeProductsTx(tx, rows) {
     tvp.columns.add('CreateTS', sql.Int, { nullable: true });
     tvp.columns.add('UpdateDate', sql.DateTime, { nullable: true });
     tvp.columns.add('UpdateTS', sql.Int, { nullable: true });
-    tvp.columns.add('UserSign', sql.Int, { nullable: true });        // Nueva columna
-    tvp.columns.add('AvgPrice', sql.Numeric(19, 6), { nullable: true }); // Nueva columna
-    tvp.columns.add('ValidFrom', sql.DateTime, { nullable: true });   // Nueva columna
-    tvp.columns.add('ValidTo', sql.DateTime, { nullable: true });     // Nueva columna
-    tvp.columns.add('PrchseItem', sql.Char(1), { nullable: true });   // Nueva columna
-    tvp.columns.add('MinLevel', sql.Numeric(19, 6), { nullable: true }); // Nueva columna
+    tvp.columns.add('UserSign', sql.Int, { nullable: true });        
+    tvp.columns.add('AvgPrice', sql.Numeric(19, 6), { nullable: true }); 
+    tvp.columns.add('ValidFrom', sql.DateTime, { nullable: true });   
+    tvp.columns.add('ValidTo', sql.DateTime, { nullable: true });     
+    tvp.columns.add('PrchseItem', sql.Char(1), { nullable: true });   
+    tvp.columns.add('MinLevel', sql.Numeric(19, 6), { nullable: true }); 
 
     chunk.forEach(r => {
       tvp.rows.add(
