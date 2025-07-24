@@ -9,16 +9,16 @@ Microservicio encargado de gestionar el **catalogo completo de los productos de 
 
 Este microservicio ha sido desarrollado utilizando el siguiente stack tecnológico:
 
-**Node.js v22.15.0**: Entorno de ejecución para JavaScript del lado del servidor.
-**Express**: Framework minimalista y flexible para construir APIs REST.
-**Microsoft SQL Server (MSSQL)**: Motor de base de datos utilizado tanto para el catálogo (`CATALOG_SERVICE_DB`) como para la integración con SAP (`SBO_COM_MIM`).
-**Apache Kafka**: Sistema de mensajería distribuido utilizado para crear *topics* y enviar eventos del sistema (por ejemplo, inicio de sesión).
-**API Gateway**: Punto de entrada centralizado para el ruteo de solicitudes hacia los distintos microservicios.
-**Docker**: Contenerización de servicios para facilitar la portabilidad y despliegue en distintos entornos.
-**`dotenv`**: Gestión segura de variables de entorno mediante archivos `.env`.
-**`node-cron`**: Programación de tareas automáticas (como la limpieza de tokens expirados).
-**`p-limit`**: Control de concurrencia para limitar el número de promesas ejecutadas simultáneamente.
-**`date-fns`**: Utilidades modernas y eficientes para el manejo de fechas.
+- **Node.js v22.15.0**: Entorno de ejecución para JavaScript del lado del servidor.
+- **Express**: Framework minimalista y flexible para construir APIs REST.
+- **Microsoft SQL Server (MSSQL)**: Motor de base de datos utilizado tanto para el catálogo (`CATALOG_SERVICE_DB`) como para la integración con SAP (`SBO_COM_MIM`).
+- **Apache Kafka**: Sistema de mensajería distribuido utilizado para crear *topics* y enviar eventos del sistema (por ejemplo, inicio de sesión).
+- **API Gateway**: Punto de entrada centralizado para el ruteo de solicitudes hacia los distintos microservicios.
+- **Docker**: Contenerización de servicios para facilitar la portabilidad y despliegue en distintos entornos.
+- **`dotenv`**: Gestión segura de variables de entorno mediante archivos `.env`.
+- **`node-cron`**: Programación de tareas automáticas (como la limpieza de tokens expirados).
+- **`p-limit`**: Control de concurrencia para limitar el número de promesas ejecutadas simultáneamente.
+- **`date-fns`**: Utilidades modernas y eficientes para el manejo de fechas.
 
 -----
 
