@@ -1,10 +1,10 @@
 # Ejemplo Documentación
 
-# 📄 README.md — Servicio de Autenticación (Login Service)
+# 📄 README.md — Microservicio de Catalogo 
 
-## 🧪 Servicio de Autenticación (Login Service)
+## 🧪 Catalogo de productos y precios (Catalog service)
 
-Microservicio encargado de gestionar el **ciclo completo de autenticación de usuarios**, incluyendo la validación de credenciales, la emisión de tokens de sesión, el registro de eventos de inicio de sesión en Kafka y la limpieza automática de tokens expirados. Este servicio funciona de manera autónoma y se integra con otros componentes a través de Apache Kafka y una base de datos MSSQL.
+Microservicio encargado de gestionar el **catalogo completo de los productos de Mimbral**, obtiene los productos desde la base de datos de SAP Businnes One y los almacena cada 5 minutos en la base de datos del microservicio. Este servicio funciona de manera autónoma y no necesita consumir información desde kafka para complementar el proceso.
 
 -----
 
