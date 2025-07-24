@@ -144,21 +144,48 @@ module.exports = { sql, sapPool, sapPoolConnect };
 
 Sigue estos pasos para configurar y ejecutar el servicio en tu máquina local:
 
-1.  **Clona el repositorio:**
+1.  **Clona el repositorio principal de microservicios de Mimbral:**
     ```bash
-    git clone https://github.com/tuusuario/login-service.git
-    cd login-service
+    git clone https://github.com/mimbral1/Microservicios.git
+    cd Microservicios
     ```
-2.  **Instala las dependencias:**
+2.  **Configurar las variables de entorno:**
+
+    Dentro de cada microservicio (order-service, catalog-service, api-gateway), crea un archivo .env con sus respectivas variables de entorno. Revisa la sección configuración para ver el detalle de cómo configurar el `.env`.
+    
+3.  **Instalar `Docker Desktop`**
+
+    Se debe instalar Docker Desktop: `https://www.docker.com/products/docker-desktop/`
+    Debe estar activo y ejcutado antes de continuar. Esto es importante para poder construir y levantar los contenedores para los microservicios.
+   
+4.  **Levantar los microservicios con Docker:**
+    Cda microservico debe levantarse de forma independiente. Para esto, se debe abrir una terminal para cada uno y seguir los siguientes pasos:
+
+    1. Levantar Microservicio de order-service
     ```bash
-    npm install
+    cd -- y despues la ruta de donde esta el microservicio
+    docker-compose up --build -d
     ```
-3.  **Crea el archivo `.env`** con las variables de entorno necesarias (ver sección anterior).
-4.  **Ejecuta el servicio en modo desarrollo:**
+    <img width="930" height="140" alt="image" src="https://github.com/user-attachments/assets/fe972c97-51a9-4180-b381-bba6fe3e8176" />
+
+    2. Levantar catalog-service
     ```bash
-    npm run dev
+    cd -- y despues la ruta de donde esta el microservicio
+    docker-compose up --build -d
     ```
-    (Asume que tu `package.json` tiene un script `dev` configurado para `nodemon` o similar).
+    <img width="933" height="121" alt="image" src="https://github.com/user-attachments/assets/0d69781e-18b6-4266-a311-9604fa7435c0" />
+
+    3. Levantar api-gateway
+    ```bash
+    cd -- y despues la ruta de donde esta el microservicio
+    docker-compose up --build -d
+    ```
+    <img width="960" height="221" alt="image" src="https://github.com/user-attachments/assets/4310a5ae-d309-4419-b2a8-d122696d2336" />
+
+    
+    Puedes veriicar que los microservicios esten corriendo en la opción de contenedores en docker 
+
+6. 
 
 ### 4\. Ejecutar con Docker
 
