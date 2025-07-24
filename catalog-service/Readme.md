@@ -139,8 +139,83 @@ module.exports = { sql, sapPool, sapPoolConnect };
 
 ```
 
+### 3\.  Configurar archivos para instalar en Docker 
 
-### 3\. Instalación y Ejecución Docker (Modo Desarrollo)
+Se proporciona un `Dockerfile` y un `docker-compose.yml` para una fácil implementación y orquestación del servicio junto con sus dependencias (Kafka y MSSQL).
+
+#### **`Dockerfile`**
+
+```dockerfile
+FROM node:18
+
+# Crear directorio de trabajo
+WORKDIR /app
+
+# Copiar package.json (y lock) antes de copiar todo el código,
+# así se aprovecha la cache si no cambian las dependencias
+COPY package*.json ./
+
+# Instalar dependencias
+RUN npm install
+
+# Copiar el resto del código
+COPY . .
+
+# Exponer puerto y comando para iniciar
+EXPOSE 5005
+CMD ["npm", "start"]
+
+```
+
+#### **`docker-compose.yml` (Configuración)**
+
+
+```yaml
+version: '3.8'
+
+networks:
+  orders-service_kafka_network:
+    external: true
+
+services:
+  catalog-service:
+    build: .
+    container_name: catalog-service
+    restart: always
+    ports:
+      - "5006:5006"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "win-hp03dio6fsk:192.168.0.165"
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8         
+      - 1.1.1.1 
+    environment:
+      PORT: 5006
+      DB_HOST: host.docker.internal
+      DB_USER: DEV
+      DB_PASSWORD: 1234
+      DB_NAME: CATALOG_SERVICE_DB
+      DB_PORT: 1433
+      KAFKA_BROKER: kafka:9092
+      KAFKA_CLIENT_ID: catalog-service
+      VTEX_APP_KEY: ${VTEX_APP_KEY}
+      VTEX_APP_TOKEN: ${VTEX_APP_TOKEN}
+      VTEX_ACCOUNT: ${VTEX_ACCOUNT}
+      VTEX_ENVIRONMENT: ${VTEX_ENVIRONMENT}
+      SAP_BASE_URL: ${SAP_BASE_URL}
+      SAP_COMPANY_DB: ${SAP_COMPANY_DB}
+      SAP_USERNAME: ${SAP_USERNAME}
+      SAP_PASSWORD: ${SAP_PASSWORD}
+    networks:
+      - orders-service_kafka_network
+
+
+```
+
+
+### 4\. Instalación y Ejecución Docker (Modo Desarrollo)
 
 Sigue estos pasos para configurar y ejecutar el servicio en tu máquina local:
 
@@ -159,127 +234,41 @@ Sigue estos pasos para configurar y ejecutar el servicio en tu máquina local:
     Debe estar activo y ejcutado antes de continuar. Esto es importante para poder construir y levantar los contenedores para los microservicios.
    
 4.  **Levantar los microservicios con Docker:**
-    Cda microservico debe levantarse de forma independiente. Para esto, se debe abrir una terminal para cada uno y seguir los siguientes pasos:
+   
+    Cada microservico debe levantarse de forma independiente. Para esto, se debe abrir una terminal para cada uno y seguir los siguientes pasos:
 
     1. Levantar Microservicio de order-service
     ```bash
+    
     cd -- y despues la ruta de donde esta el microservicio
     docker-compose up --build -d
     ```
+    
     <img width="930" height="140" alt="image" src="https://github.com/user-attachments/assets/fe972c97-51a9-4180-b381-bba6fe3e8176" />
 
     2. Levantar catalog-service
+       
     ```bash
     cd -- y despues la ruta de donde esta el microservicio
     docker-compose up --build -d
     ```
+    
     <img width="933" height="121" alt="image" src="https://github.com/user-attachments/assets/0d69781e-18b6-4266-a311-9604fa7435c0" />
 
     3. Levantar api-gateway
+       
     ```bash
     cd -- y despues la ruta de donde esta el microservicio
     docker-compose up --build -d
     ```
+    
     <img width="960" height="221" alt="image" src="https://github.com/user-attachments/assets/4310a5ae-d309-4419-b2a8-d122696d2336" />
 
-    
-    Puedes veriicar que los microservicios esten corriendo en la opción de contenedores en docker 
+    Puedes veriicar que los microservicios esten corriendo en la opción de contenedores en docker
 
-6. 
+    <img width="1370" height="159" alt="image" src="https://github.com/user-attachments/assets/716e3dea-0b4a-422e-b892-ab871a54eea6" />
 
-### 4\. Ejecutar con Docker
 
-Se proporciona un `Dockerfile` y un `docker-compose.yml` para una fácil implementación y orquestación del servicio junto con sus dependencias (Kafka y MSSQL).
-
-#### **`Dockerfile`**
-
-```dockerfile
-# Usa una imagen oficial de Node.js en su versión 18
-FROM node:18-alpine
-
-# Establece el directorio de trabajo dentro del contenedor
-WORKDIR /app
-
-# Copia los archivos de definición de dependencias
-COPY package*.json ./
-
-# Instala las dependencias de producción
-RUN npm install --production
-
-# Copia el resto del código de la aplicación
-COPY . .
-
-# Expone el puerto en el que la aplicación escuchará
-EXPOSE 3000
-
-# Comando para iniciar la aplicación cuando el contenedor se ejecute
-CMD ["node", "index.js"]
-```
-
-#### **`docker-compose.yml` (Configuración de Ejemplo)**
-
-Este archivo define el servicio de login, Kafka y MSSQL para un entorno de desarrollo o pruebas.
-
-```yaml
-version: '3.8'
-
-services:
-  # Servicio de Autenticación (Login Service)
-  login-service:
-    build: . # Construye la imagen desde el Dockerfile en el directorio actual
-    ports:
-      - "3000:3000" # Mapea el puerto 3000 del host al puerto 3000 del contenedor
-    env_file:
-      - .env # Carga las variables de entorno desde el archivo .env
-    depends_on:
-      - kafka # Asegura que Kafka se inicie antes que este servicio
-      - mssql # Asegura que MSSQL se inicie antes que este servicio
-    networks:
-      - app-network # Conecta este servicio a la red compartida
-
-  # Servicio de Kafka
-  kafka:
-    image: bitnami/kafka:latest # Utiliza la imagen oficial de Bitnami Kafka
-    # Configuración de entorno para Kafka (ejemplo, ajustar según necesidad)
-    environment:
-      KAFKA_CFG_NODE_ID: 0
-      KAFKA_CFG_PROCESS_ROLES: controller,broker
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-    ports:
-      - "9092:9092"
-    networks:
-      - app-network
-
-  # Servicio de MSSQL Server
-  mssql:
-    image: mcr.microsoft.com/mssql/server:2022-latest # Utiliza la imagen oficial de MSSQL
-    environment:
-      SA_PASSWORD: "tu_password_segura" # ¡Cambia esto por una contraseña fuerte!
-      ACCEPT_EULA: "Y" # Acepta el acuerdo de licencia de usuario final
-    ports:
-      - "1433:1433" # Mapea el puerto 1433 del host al puerto 1433 del contenedor
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge # Define una red de puente para la comunicación entre servicios
-```
-
-**Para iniciar el stack completo con Docker Compose:**
-
-1.  Asegúrate de tener Docker y Docker Compose instalados.
-2.  Crea el archivo `.env` en la raíz del proyecto.
-3.  Desde el directorio raíz del proyecto, ejecuta:
-    ```bash
-    docker-compose up -d
-    ```
-    Esto construirá las imágenes (si no existen) e iniciará todos los servicios en segundo plano.
-
------
 
 ## 📚 Arquitectura y Flujo
 
