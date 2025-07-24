@@ -5,7 +5,7 @@
 Microservicio encargado de gestionar el **catalogo completo de los productos de Mimbral**, obtiene los productos desde la base de datos de SAP Businnes One y los almacena cada 5 minutos en la base de datos del microservicio. Este servicio funciona de manera autónoma y no necesita consumir información desde kafka para complementar el proceso.
 
 -----
-## 📦 Tecnologías Utilizadas
+## Tecnologías Utilizadas
 
 Este microservicio ha sido desarrollado utilizando el siguiente stack tecnológico:
 
@@ -22,7 +22,7 @@ Este microservicio ha sido desarrollado utilizando el siguiente stack tecnológi
 
 -----
 
-## 🚀 Endpoints
+## Endpoints
 
 ### `POST /login`
 
@@ -63,7 +63,7 @@ Autentica a un usuario utilizando sus credenciales (`username` y `password`). Si
 
 -----
 
-## 🛠️ Configuración
+## Configuración
 
 ### 1\. Variables de Entorno (`.env`)
 
@@ -79,15 +79,43 @@ Para ejecutar el servicio, se requieren las siguientes variables de entorno. Cre
 | `DB_PORT`           | Puerto del servidor MSSQL Generalmente es 1433.                             | `1433`                          |
 | `SAP_DB_HOST`       | Dirección del servidor MSSQL con los datos de SAP.                          | `192.168.0.24`                  |
 | `SAP_DB_USER`       | Usuario para conectarse a la base de datos de SAP.                          | `Tu_Usuario`                    |
-| `SAP_DB_PASSWORD`   | Contraseña del usuario de SAP.                                              | `*****`                        |
-| `SAP_DB_NAME`       | Nombre de la base de datos de SAP.                                          | `COMERCIAL_ENERO`              |
+| `SAP_DB_PASSWORD`   | Contraseña del usuario de SAP.                                              | `*****`                         |
+| `SAP_DB_NAME`       | Nombre de la base de datos de SAP.                                          | `COMERCIAL_ENERO`               |
 | `KAFKA_BROKER`      | Dirección del broker de Kafka.                                              | `kafka:9092`                    |
 | `KAFKA_CLIENT_ID`   | Identificador del cliente Kafka para este microservicio.                    | `catalog-service`               |
 | `JWT_SECRET`        | Secreto para la firma de tokens JWT. **Debe ser una cadena robusta.**       | `*****************`             |
 | `JWT_EXPIRES_IN`    | Tiempo de expiración del token JWT.                                         | `1h`                            |
 
+### 2\. Configuración conexiones DB
 
-### 2\. Instalación y Ejecución Local (Modo Desarrollo)
+El microservicio utiliza dos conexiones MSSQL: una para la base de datos interna del catálogo (`CATALOG_SERVICE_DB`) y otra para consultar los datos de productos desde SAP (`COMERCIAL_ENERO`).
+
+####  Archivo: `dbnew.js` (Conexión a la base de datos del microservicio)
+
+```js
+const sql = require('mssql');
+require('dotenv').config();
+
+const omsConfig = {
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  server: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  port: parseInt(process.env.DB_PORT, 10),
+  options: { encrypt: false, trustServerCertificate: true },
+  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+};
+
+const catalogPool = new sql.ConnectionPool(omsConfig);
+const catalogPoolConnect = catalogPool.connect()
+  .then(() => console.log('✅ Conectado a Catalog (OMS) DB'))
+  .catch(err => console.error('❌ Error conectando a OMS DB:', err));
+
+module.exports = { sql, catalogPool, catalogPoolConnect };
+```
+
+
+### 3\. Instalación y Ejecución Local (Modo Desarrollo)
 
 Sigue estos pasos para configurar y ejecutar el servicio en tu máquina local:
 
@@ -107,7 +135,7 @@ Sigue estos pasos para configurar y ejecutar el servicio en tu máquina local:
     ```
     (Asume que tu `package.json` tiene un script `dev` configurado para `nodemon` o similar).
 
-### 3\. Ejecutar con Docker
+### 4\. Ejecutar con Docker
 
 Se proporciona un `Dockerfile` y un `docker-compose.yml` para una fácil implementación y orquestación del servicio junto con sus dependencias (Kafka y MSSQL).
 
