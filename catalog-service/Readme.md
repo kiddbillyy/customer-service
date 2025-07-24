@@ -7,16 +7,18 @@ Microservicio encargado de gestionar el **catalogo completo de los productos de 
 -----
 ## 📦 Tecnologías Utilizadas
 
-Este MicroServicio está construido con las siguientes tecnologías:
+Este microservicio ha sido desarrollado utilizando el siguiente stack tecnológico:
 
-  * **Node.js 22.15.0**: Entorno de ejecución JavaScript.
-  * **Express**: Framework web para la construcción de APIs REST.
-  * **Microsoft SQL Server (MSSQL)**: Alojamiento de la base de datos de SAP (SBO_COM_MIM) y del MicroServicio(CATALOG_SERVICE_DB).
-  * **Kafka**: Utilizada para crear topic y enviar mensajes .
-  * **`dotenv`**: Módulo para la gestión de variables de entorno.
-  * **`node-cron`**: Biblioteca para la programación de tareas periódicas.
-  * **Docker**: Herramienta para almacenar los Microservicios en distintos contenedores.
-  * **API GATEWAY**: Herramienta para centralizar las APIS de los Microservicios. 
+**Node.js v22.15.0**: Entorno de ejecución para JavaScript del lado del servidor.
+**Express**: Framework minimalista y flexible para construir APIs REST.
+**Microsoft SQL Server (MSSQL)**: Motor de base de datos utilizado tanto para el catálogo (`CATALOG_SERVICE_DB`) como para la integración con SAP (`SBO_COM_MIM`).
+**Apache Kafka**: Sistema de mensajería distribuido utilizado para crear *topics* y enviar eventos del sistema (por ejemplo, inicio de sesión).
+**API Gateway**: Punto de entrada centralizado para el ruteo de solicitudes hacia los distintos microservicios.
+**Docker**: Contenerización de servicios para facilitar la portabilidad y despliegue en distintos entornos.
+**`dotenv`**: Gestión segura de variables de entorno mediante archivos `.env`.
+**`node-cron`**: Programación de tareas automáticas (como la limpieza de tokens expirados).
+**`p-limit`**: Control de concurrencia para limitar el número de promesas ejecutadas simultáneamente.
+**`date-fns`**: Utilidades modernas y eficientes para el manejo de fechas.
 
 -----
 
@@ -67,18 +69,23 @@ Autentica a un usuario utilizando sus credenciales (`username` y `password`). Si
 
 Para ejecutar el servicio, se requieren las siguientes variables de entorno. Crea un archivo `.env` en la raíz del proyecto y configúralo según tu entorno.
 
-| Variable           | Descripción                                              | Ejemplo                     |
-| :----------------- | :------------------------------------------------------- | :-------------------------- |
-| `PORT`             | Puerto en el que el servidor Express escuchará.          | `3000`                      |
-| `DB_USER`          | Usuario para la conexión a la base de datos MSSQL.       | `sa`                        |
-| `DB_PASSWORD`      | Contraseña para la conexión a la base de datos MSSQL.    | `tu_password_segura`        |
-| `DB_SERVER`        | Host o IP del servidor MSSQL.                            | `mssql` (dentro de Docker)  |
-| `DB_DATABASE`      | Nombre de la base de datos MSSQL a la que conectarse.    | `login_db`                  |
-| `KAFKA_BROKER`     | Dirección del broker de Kafka.                           | `kafka:9092` (dentro de Docker) |
-| `KAFKA_TOPIC`      | Nombre del tópico de Kafka para eventos de login.        | `login-events`              |
-| `JWT_SECRET`       | Secreto para la firma y verificación de tokens JWT. **Debe ser una cadena robusta y única.** | `mi_secreto_super_seguro_y_largo` |
+| Variable            | Descripción                                                                 | Ejemplo                         |
+| :------------------ | :-------------------------------------------------------------------------- | :------------------------------ |
+| `PORT`              | Puerto en el que el servidor Express escuchará.                             | `5006`                          |
+| `DB_HOST`           | Host para la conexión a la base de datos del catálogo.                      | `host.docker.internal`          |
+| `DB_USER`           | Usuario para la conexión a la base de datos del catálogo.                   | `Tu_Usuario de donde esta la BD`|
+| `DB_PASSWORD`       | Contraseña para la conexión a la base de datos del catálogo.                | `*****`                         |
+| `DB_NAME`           | Nombre de la base de datos del microservicio de catálogo.                   | `CATALOG_SERVICE_DB`            |
+| `DB_PORT`           | Puerto del servidor MSSQL Generalmente es 1433.                             | `1433`                          |
+| `SAP_DB_HOST`       | Dirección del servidor MSSQL con los datos de SAP.                          | `192.168.0.24`                  |
+| `SAP_DB_USER`       | Usuario para conectarse a la base de datos de SAP.                          | `Tu_Usuario`                    |
+| `SAP_DB_PASSWORD`   | Contraseña del usuario de SAP.                                              | `*****`                        |
+| `SAP_DB_NAME`       | Nombre de la base de datos de SAP.                                          | `COMERCIAL_ENERO`              |
+| `KAFKA_BROKER`      | Dirección del broker de Kafka.                                              | `kafka:9092`                    |
+| `KAFKA_CLIENT_ID`   | Identificador del cliente Kafka para este microservicio.                    | `catalog-service`               |
+| `JWT_SECRET`        | Secreto para la firma de tokens JWT. **Debe ser una cadena robusta.**       | `*****************`             |
+| `JWT_EXPIRES_IN`    | Tiempo de expiración del token JWT.                                         | `1h`                            |
 
-> ⚠️ **Importante**: El archivo `.env` contiene información sensible. **Nunca lo subas a tu repositorio de control de versiones (Git).** Asegúrate de añadir `.env` a tu archivo `.gitignore`.
 
 ### 2\. Instalación y Ejecución Local (Modo Desarrollo)
 
