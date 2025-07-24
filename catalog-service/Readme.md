@@ -24,30 +24,41 @@ Este microservicio ha sido desarrollado utilizando el siguiente stack tecnológi
 
 ## Endpoints
 
-### `POST /login`
+## 📘 API - Categorías
 
-Autentica a un usuario utilizando sus credenciales (`username` y `password`). Si las credenciales son válidas, el servicio retorna un token JWT para futuras solicitudes y emite un evento a Kafka.
+### `GET /getcategory`
 
-#### **Request (JSON)**
+Permite obtener todas las categorías o realizar búsquedas filtradas. El servicio retorna un arreglo JSON con los campos `Code` y `Name` correspondientes a cada categoría registrada.
+
+**URL:**
 
 ```json
-{
-  "username": "usuario1",
-  "password": "secreto123"
-}
+http://localhost:8080/api/catalog/getcategory
 ```
 
-#### **Responses**
+**Descripción:**
 
-  * **`200 OK` - Login Exitoso**
+Obtiene la lista completa de categorías disponibles.
 
-    ```json
-    {
-      "message": "Login exitoso",
-      "token": "jwt_token_aqui",
-      "userId": 5
-    }
-    ```
+**Respuesta exitosa: `200 OK`**
+
+```json
+[
+  {
+    "Code": "2000016",
+    "Name": "Piscinas y Playa"
+  },
+  {
+    "Code": "464",
+    "Name": "Climatización"
+  },
+  {
+    "Code": "753",
+    "Name": "Herramientas Eléctricas e Inalámbricas"
+  }
+]
+```
+
 
     *Descripción*: El usuario ha iniciado sesión correctamente. Se incluye un token JWT para la autenticación de futuras solicitudes y el `userId` asociado.
 
