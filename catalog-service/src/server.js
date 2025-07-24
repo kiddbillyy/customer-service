@@ -4,7 +4,9 @@ const cors = require('cors');
 const { connectProducer } = require('./utils/kafkaProducer'); 
 require('./sheduler/scheduler_OITM_ITM1');   
 
+
 const pruebaRoutes = require('./routes/prueba.Routes');
+const categoryRoutes = require('./routes/Category.Routes');
 
 dotenv.config();
 
@@ -13,6 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/catalog', pruebaRoutes); 
+app.use('/api/catalog', categoryRoutes);
 
 const PORT = process.env.PORT || 5006;
 
