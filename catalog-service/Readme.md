@@ -58,19 +58,42 @@ Obtiene la lista completa de categorías disponibles.
   }
 ]
 ```
+    *Descripción*: El usuario ha obtenido todas las categorias.
+### `GET /getcategory?buscar=`
 
+**URL:**
 
-    *Descripción*: El usuario ha iniciado sesión correctamente. Se incluye un token JWT para la autenticación de futuras solicitudes y el `userId` asociado.
+```json
+http://localhost:8080/api/catalog/getcategory?buscar=herramientas
+```
 
-  * **`401 Unauthorized` - Credenciales Inválidas**
+**Descripción:**
 
-    ```json
-    {
-      "message": "Credenciales inválidas"
-    }
-    ```
+Obtiene la lista de categorias filtrada por busqueda.
 
-    *Descripción*: Las credenciales proporcionadas (usuario o contraseña) son incorrectas.
+**Respuesta exitosa: `200 OK`**
+
+```json
+[
+  {
+    "Code": "3019",
+    "Name": "Herramientas Automóvil"
+  },
+  {
+    "Code": "3060",
+    "Name": "Herramientas Manuales"
+  },
+  {
+    "Code": "3061",
+    "Name": "Maquinaria y Herramientas Estacionarias"
+  },
+  {
+    "Code": "3062",
+    "Name": "Herramientas de Construcción"
+  }
+]
+```
+    *Descripción*: El usuario ha obtenido las categorias filtradas por la busqueda.
 
 -----
 
