@@ -1,24 +1,22 @@
-# Ejemplo Documentación
+# — Microservicio de Catalogo 
 
-# 📄 README.md — Microservicio de Catalogo 
-
-## 🧪 Catalogo de productos y precios (Catalog service)
+## Catalogo de productos y precios (Catalog service)
 
 Microservicio encargado de gestionar el **catalogo completo de los productos de Mimbral**, obtiene los productos desde la base de datos de SAP Businnes One y los almacena cada 5 minutos en la base de datos del microservicio. Este servicio funciona de manera autónoma y no necesita consumir información desde kafka para complementar el proceso.
 
 -----
-
 ## 📦 Tecnologías Utilizadas
 
-Este servicio está construido con las siguientes tecnologías:
+Este MicroServicio está construido con las siguientes tecnologías:
 
-  * **Node.js 18+**: Entorno de ejecución JavaScript.
+  * **Node.js 22.15.0**: Entorno de ejecución JavaScript.
   * **Express**: Framework web para la construcción de APIs REST.
-  * **Microsoft SQL Server (MSSQL)**: Base de datos principal para el almacenamiento de usuarios y credenciales.
-  * **Apache Kafka**: Plataforma de streaming distribuida utilizada para emitir eventos de inicio de sesión.
+  * **Microsoft SQL Server (MSSQL)**: Alojamiento de la base de datos de SAP (SBO_COM_MIM) y del MicroServicio(CATALOG_SERVICE_DB).
+  * **Kafka**: Utilizada para crear topic y enviar mensajes .
   * **`dotenv`**: Módulo para la gestión de variables de entorno.
   * **`node-cron`**: Biblioteca para la programación de tareas periódicas.
-  * **Docker** y **Docker Compose**: Herramientas para la **contenedorización** y orquestación del servicio y sus dependencias.
+  * **Docker**: Herramienta para almacenar los Microservicios en distintos contenedores.
+  * **API GATEWAY**: Herramienta para centralizar las APIS de los Microservicios. 
 
 -----
 
