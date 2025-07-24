@@ -90,7 +90,7 @@ Para ejecutar el servicio, se requieren las siguientes variables de entorno. Cre
 
 El microservicio utiliza dos conexiones MSSQL: una para la base de datos interna del catálogo (`CATALOG_SERVICE_DB`) y otra para consultar los datos de productos desde SAP (`COMERCIAL_ENERO`).
 
-####  Archivo: `dbnew.js` (Conexión a la base de datos del microservicio)
+####  2.1 Archivo: `dbnew.js` (Conexión a la base de datos del microservicio)
 
 ```js
 const sql = require('mssql');
@@ -113,9 +113,34 @@ const catalogPoolConnect = catalogPool.connect()
 
 module.exports = { sql, catalogPool, catalogPoolConnect };
 ```
+####  2.2 Archivo: `dbnewsap.js` (Conexión a la base de datos de SAP)
+
+```js
+// dbnewsap.js
+const sql = require('mssql');
+require('dotenv').config();
+
+const sapConfig = {
+  user: process.env.SAP_DB_USER,
+  password: process.env.SAP_DB_PASSWORD,
+  server: process.env.SAP_DB_HOST,
+  database: process.env.SAP_DB_NAME,
+  port: parseInt(process.env.SAP_DB_PORT, 10),
+  options: { encrypt: false, trustServerCertificate: true },
+  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+};
+
+const sapPool = new sql.ConnectionPool(sapConfig);
+const sapPoolConnect = sapPool.connect()
+  .then(() => console.log(' Conectado a SAP DB'))
+  .catch(err => console.error(' Error conectando a SAP DB:', err));
+
+module.exports = { sql, sapPool, sapPoolConnect };
+
+```
 
 
-### 3\. Instalación y Ejecución Local (Modo Desarrollo)
+### 3\. Instalación y Ejecución Docker (Modo Desarrollo)
 
 Sigue estos pasos para configurar y ejecutar el servicio en tu máquina local:
 
