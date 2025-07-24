@@ -1,4 +1,4 @@
-# — Microservicio de Catalogo 
+# Microservicio de Catalogo 
 
 ## Catalogo de productos y precios (Catalog service)
 
