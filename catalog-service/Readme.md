@@ -58,6 +58,7 @@ Obtiene la lista completa de categoría padre disponibles.
 
 ```json
 http://localhost:8080/api/catalog/getfirstlevel?buscar=aire
+http://localhost:8080/api/catalog/getfirstlevel?buscar=399
 ```
 
 **Descripción:**
