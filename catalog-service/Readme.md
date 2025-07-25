@@ -26,7 +26,7 @@ Este microservicio ha sido desarrollado utilizando el siguiente stack tecnológi
 
 ## 📘 API - Categorías
 
-### `GET /getcategory`
+### `GET api/catalog/getcategory`
 
 Permite obtener todas las categorías o realizar búsquedas filtradas. El servicio retorna un arreglo JSON con los campos `Code` y `Name` correspondientes a cada categoría registrada.
 
@@ -59,7 +59,7 @@ Obtiene la lista completa de categorías disponibles.
 ]
 ```
     *Descripción*: El usuario ha obtenido todas las categorias.
-### `GET /getcategory?buscar=`
+### `GET api/catalog/getcategory?buscar=`
 
 **URL:**
 
@@ -94,7 +94,89 @@ Obtiene la lista de categorias filtrada por busqueda.
 ]
 ```
     *Descripción*: El usuario ha obtenido las categorias filtradas por la busqueda.
+    
+### `GET api/catalog/getcategorytree`
 
+**URL:**
+```json
+http://localhost:8080/api/catalog/getcategorytree
+```
+
+**Descripción:**
+
+Obtiene el cátalogo de las categorías con la siguiente estructura:
+
+- **NAME**: Nombre del hijo del Tree.
+- **REFERENCE**: Código de la categoria o subcategoria del hijo (NAME).
+- **NAME TREE**: Árbol de categorías.
+- **DATE MODIFIED**: Fecha de modificación.
+- **STATUS**: Estado de la categoría.
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+{
+  "page": 1,
+  "pageSize": 40,
+  "total": 910,
+  "totalPages": 23,
+  "data": [
+    {
+      "name": "Bicicletas",
+      "reference": "3015",
+      "nameTree": "Aire Libre y Mascotas \u003E Bicicletas",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    },
+    {
+      "name": "Accesorios para Bicicleta",
+      "reference": "3224",
+      "nameTree": "Aire Libre y Mascotas \u003E Bicicletas \u003E Accesorios para Bicicleta",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    }
+  ]
+}
+```
+    *Descripción*: El usuario ha obtenido las categorias con filtros de paginación por defecto, con un size de 40.
+
+### `GET /api/catalog/getcategorytree?buscarname=&buscarreference=&buscarnametree=herramientas&page=&pageSize=`
+
+**URL:**
+```json
+http://localhost:8080/api/catalog/getcategorytree?buscarname=medidores%20de%20presion&buscarreference=&buscarnametree=herramientas&page=&pageSize=
+```
+
+**Descripción:**
+
+Obtiene el cátalogo de las categorías paginadas, para eso se debe especificar en &page= la hoja que se elegirá, en pageSize= la cantidad que traerá por cada página, además, se puede realizar una busqueda:
+buscarname=
+buscarreference=
+buscarnametree=
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+{
+  "page": 1,
+  "pageSize": 40,
+  "total": 1,
+  "totalPages": 1,
+  "data": [
+    {
+      "name": "Medidores de presión",
+      "reference": "3237",
+      "nameTree": "Automóvil \u003E Herramientas Automóvil \u003E Medidores de presión",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    }
+  ]
+}
+```
+    *Descripción*: El usuario ha obtenido las categorias con la busqueda del name por "medidores de presión"
 -----
 
 ## Configuración
