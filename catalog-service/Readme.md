@@ -515,11 +515,11 @@ El servicio utiliza `node-cron` para ejecutar tareas de sincronización de catal
 
 ### `Scheduler`
 
-  * **Descripción**: Esta tarea es responsable de buscar y eliminar los tokens de sesión que han expirado de la base de datos.
-  * **Frecuencia**: Se ejecuta cada hora.
-  * **Implementación (ejemplo conceptual)**:
+  * **Descripción**: Esta tarea es responsable de insertar o actualizar el catalogo con respecto a su fecha de creación, actualización y hora.
+  * **Frecuencia**: Se ejecuta cada 5 minutos.
+  * **Implementación**:
 ```javascript
-    const cron = require('node-cron');
+const cron = require('node-cron');
 const runSyncJob = require('../jobs/CatalogJob');
 const runSyncPriceJob = require('../jobs/catalogPriceListSynscJob');
 const runAuxSyncJob = require('../jobs/CategoryJob');
@@ -542,25 +542,25 @@ cron.schedule('*/2 * * * *', async () => {
     // Paso 2: Precios
     console.log('🔹 Iniciando sincronización de precios...');
     await runSyncPriceJob();
-    console.log('✅ Precios sincronizados correctamente.');
+    console.log('Precios sincronizados correctamente.');
 
     // Paso 3: Categorías
     console.log('🔹 Iniciando sincronización de categorías...');
     await runAuxSyncJob();
-    console.log('✅ Categorías sincronizadas correctamente.');
+    console.log('Categorías sincronizadas correctamente.');
 
     // Paso 4: Grupos de ítems
     console.log('🔹 Iniciando sincronización de grupos de ítems...');
     await runItmsJobs();
-    console.log('✅ Grupos de ítems sincronizados correctamente.');
+    console.log(' Grupos de ítems sincronizados correctamente.');
 
     //Paso 5: Codigo de barras
     console.log('🔹 Iniciando sincronización de códigos de barras...');
     await runBarcodeJob();
-    console.log('✅ Códigos barra sincronizados correctamente.');
+    console.log(' Códigos barra sincronizados correctamente.');
 
   } catch (err) {
-    console.error('❌ Error general durante la sincronización:', err.message);
+    console.error(' Error general durante la sincronización:', err.message);
   } finally {
     const end = Date.now();
     const duration = ((end - start) / 1000).toFixed(2);
