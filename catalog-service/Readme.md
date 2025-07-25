@@ -243,6 +243,65 @@ buscarnametree=
     *Descripción*: El usuario ha obtenido las categorias con la busqueda del name por "medidores de presión" y busqueda por nametree=herramientas.
 -----
 
+## 📘 API - Detalle Catalago Hijo
+
+### `GET /api/catalog/getsubcategory/:id`
+
+**URL:**
+```json
+http://localhost:8080/api/catalog/getsubcategory/3019
+```
+
+**Descripción:**
+
+Obtiene el detalle de la categoria seleccionada en el catalogo de las categorias, mostrando la tercera rama del arbol padre.
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+{
+  "primernivel": "Automóvil",
+  "categoria": "Herramientas Automóvil",
+  "subcategorias": [
+    {
+      "reference": "3235",
+      "name": "Compresores Portatiles ",
+      "nameTree": "Automóvil \u003E Herramientas Automóvil \u003E Compresores Portatiles ",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    },
+    {
+      "reference": "3236",
+      "name": "Pulidoras",
+      "nameTree": "Automóvil \u003E Herramientas Automóvil \u003E Pulidoras",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    },
+    {
+      "reference": "3237",
+      "name": "Medidores de presión",
+      "nameTree": "Automóvil \u003E Herramientas Automóvil \u003E Medidores de presión",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    },
+    {
+      "reference": "3238",
+      "name": "Banquillos, Cabaelletes y Camillas",
+      "nameTree": "Automóvil \u003E Herramientas Automóvil \u003E Banquillos, Cabaelletes y Camillas",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    }
+  ]
+}
+```
+    *Descripción*: El usuario ha obtenido el detalle del hijo de la categoria.
+
+-----
+
 ## Configuración
 
 ### 1\. Variables de Entorno (`.env`)
