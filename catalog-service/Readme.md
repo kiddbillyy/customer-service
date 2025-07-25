@@ -118,6 +118,7 @@ Obtiene la lista completa de categorías disponibles.
 
 ```json
 http://localhost:8080/api/catalog/getcategory?buscar=herramientas
+http://localhost:8080/api/catalog/getcategory?buscar=3019
 ```
 
 **Descripción:**
@@ -146,6 +147,15 @@ Obtiene la lista de categorias filtrada por busqueda.
   }
 ]
 ```
+```json
+[
+  {
+    "Code": "3019",
+    "Name": "Herramientas Automóvil"
+  }
+]
+```
+
     *Descripción*: El usuario ha obtenido las categorias filtradas por la busqueda.
 ## 📘 API - Catalogo Categorías
 
