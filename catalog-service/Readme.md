@@ -177,7 +177,7 @@ buscarnametree=
   ]
 }
 ```
-    *Descripción*: El usuario ha obtenido las categorias con la busqueda del name por "medidores de presión"
+    *Descripción*: El usuario ha obtenido las categorias con la busqueda del name por "medidores de presión" y busqueda por nametree=herramientas.
 -----
 
 ## Configuración
@@ -387,43 +387,68 @@ Sigue estos pasos para configurar y ejecutar el servicio en tu máquina local:
 
 
 
-## 📚 Arquitectura y Flujo
-
-El "Login Service" sigue una arquitectura basada en microservicios con énfasis en la **separación de responsabilidades** y la **comunicación asíncrona** a través de Kafka.
-
-Cuando un usuario intenta iniciar sesión:
-
-1.  **Validación de Credenciales**: El servicio recibe la solicitud `POST /login` y procede a validar las credenciales (`username` y `password`) contra la base de datos **MSSQL**.
-2.  **Generación de JWT**: Si las credenciales son correctas, se genera un **JSON Web Token (JWT)**. Este token contiene información de la sesión y se firma con un secreto (`JWT_SECRET`) para garantizar su integridad y autenticidad.
-3.  **Emisión de Evento a Kafka**: Se publica un evento de "login exitoso" en el tópico de Kafka **`login-events`**. Este evento puede ser consumido por otros microservicios (ej. servicio de auditoría, servicio de notificaciones) para reaccionar a la acción de inicio de sesión de forma asíncrona.
-4.  **Respuesta al Cliente**: El servicio responde al cliente con el token JWT y un mensaje de éxito.
-
-Adicionalmente, el servicio gestiona el ciclo de vida de los tokens de sesión mediante una **tarea programada**:
-
-  * **Limpieza de Tokens Expirados**: Una tarea `node-cron` se ejecuta periódicamente (por ejemplo, cada hora) para identificar y eliminar tokens JWT que hayan caducado, ayudando a mantener la base de datos limpia y la seguridad del sistema.
-
------
-
 ## ⏰ Tareas Programadas (`node-cron`)
 
-El servicio utiliza `node-cron` para ejecutar tareas de mantenimiento de forma periódica.
+El servicio utiliza `node-cron` para ejecutar tareas de sincronización de catalogo cada 5 minutos con la fuente SAP Businees One.
 
-### `Token Cleanup Job`
+### `Scheduler`
 
   * **Descripción**: Esta tarea es responsable de buscar y eliminar los tokens de sesión que han expirado de la base de datos.
   * **Frecuencia**: Se ejecuta cada hora.
   * **Implementación (ejemplo conceptual)**:
-    ```javascript
-    cron.schedule('0 * * * *', async () => {
-      console.log('[CRON] Iniciando la limpieza de tokens expirados...');
-      try {
-        await borrarTokensExpirados(); // Función que contiene la lógica para eliminar tokens
-        console.log('[CRON] Limpieza de tokens expirados completada.');
-      } catch (error) {
-        console.error('[CRON] Error durante la limpieza de tokens:', error.message);
-      }
-    });
-    ```
+```javascript
+    const cron = require('node-cron');
+const runSyncJob = require('../jobs/CatalogJob');
+const runSyncPriceJob = require('../jobs/catalogPriceListSynscJob');
+const runAuxSyncJob = require('../jobs/CategoryJob');
+const runItmsJobs = require('../jobs/ItmsGrpJob');
+const runBarcodeJob =require('../jobs/BarcodeJob');
+
+console.log('🔁 Job unificado de sincronización programado para ejecutarse cada 5 minutos...');
+
+cron.schedule('*/2 * * * *', async () => {
+  const now = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+  console.log(`🕒 Iniciando sincronización completa [${now}]`);
+
+  const start = Date.now();
+
+  try {
+    // Paso 1: Catálogo
+    console.log('🔹 Iniciando sincronización de catálogo...');
+    await runSyncJob();
+
+    // Paso 2: Precios
+    console.log('🔹 Iniciando sincronización de precios...');
+    await runSyncPriceJob();
+    console.log('✅ Precios sincronizados correctamente.');
+
+    // Paso 3: Categorías
+    console.log('🔹 Iniciando sincronización de categorías...');
+    await runAuxSyncJob();
+    console.log('✅ Categorías sincronizadas correctamente.');
+
+    // Paso 4: Grupos de ítems
+    console.log('🔹 Iniciando sincronización de grupos de ítems...');
+    await runItmsJobs();
+    console.log('✅ Grupos de ítems sincronizados correctamente.');
+
+    //Paso 5: Codigo de barras
+    console.log('🔹 Iniciando sincronización de códigos de barras...');
+    await runBarcodeJob();
+    console.log('✅ Códigos barra sincronizados correctamente.');
+
+  } catch (err) {
+    console.error('❌ Error general durante la sincronización:', err.message);
+  } finally {
+    const end = Date.now();
+    const duration = ((end - start) / 1000).toFixed(2);
+    console.log(`⏱ Sincronización total finalizada en ${duration} segundos.\n---`);
+  }
+}, {
+  timezone: 'America/Santiago'
+});
+
+```
 
 -----
 
@@ -432,7 +457,7 @@ El servicio utiliza `node-cron` para ejecutar tareas de mantenimiento de forma p
 La organización del código del microservicio sigue una estructura modular para facilitar la lectura y el mantenimiento:
 
 ```
-login-service/
+catalog-service/
 │
 ├── index.js                # Punto de entrada principal de la aplicación.
 ├── kafka/                  # Módulo para la integración con Kafka.
@@ -450,53 +475,3 @@ login-service/
 
 -----
 
-## 🧪 Pruebas Manuales
-
-Puedes probar el endpoint `/login` utilizando herramientas como [Postman](https://www.postman.com/) o `curl`.
-
-### Ejemplo con `curl`
-
-```bash
-curl -X POST http://localhost:3000/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"usuario1", "password":"secreto123"}'
-```
-
------
-
-## 🧯 Logs
-
-El servicio emite logs informativos a la consola (o a un sistema de logging configurado) para monitorización y depuración.
-
-Ejemplos de logs:
-
-  * `[INFO] Login exitoso para usuario1`
-  * `[CRON] Iniciando la limpieza de tokens expirados...`
-  * `[INFO] Evento enviado a Kafka: login-events`
-  * `[ERROR] Credenciales inválidas para usuario: usuario_intento`
-
------
-
-## 🧩 Integraciones Clave
-
-Este microservicio se integra con los siguientes sistemas y tecnologías:
-
-| Servicio / Tecnología | Descripción                                                              |
-| :-------------------- | :----------------------------------------------------------------------- |
-| **Apache Kafka** | Emite eventos cuando un usuario inicia sesión correctamente, permitiendo a otros servicios reaccionar asíncronamente. |
-| **MSSQL Server** | Actúa como la fuente de verdad para la validación de credenciales de usuario. |
-| **JWT (JSON Web Tokens)** | Utilizado para la generación de tokens de sesión seguros, permitiendo la autenticación sin estado en futuras solicitudes. |
-| **`node-cron`** | Facilita la programación y ejecución automática de tareas de mantenimiento, como la limpieza de tokens vencidos. |
-
------
-
-## 🔐 Consideraciones de Seguridad
-
-Aunque este es un ejemplo, se han considerado algunas prácticas de seguridad importantes:
-
-  * **Contraseñas Hasheadas**: Se espera que las contraseñas de los usuarios estén almacenadas en la base de datos utilizando un algoritmo de hashing robusto como **bcrypt** (la lógica de hashing de contraseñas debería implementarse antes de almacenar usuarios).
-  * **JWT con Firma Secreta (`JWT_SECRET`)**: Los tokens JWT son firmados con un secreto fuerte y único para prevenir manipulaciones.
-  * **Uso de `.env`**: Las variables de entorno sensibles se gestionan fuera del código fuente con `.env` para evitar que se filtren.
-  * **Recomendación HTTPS**: Para entornos de producción, es **crucial** implementar HTTPS para cifrar la comunicación entre el cliente y el servidor, protegiendo las credenciales y los tokens.
-
------
