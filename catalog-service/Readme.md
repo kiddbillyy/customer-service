@@ -23,6 +23,58 @@ Este microservicio ha sido desarrollado utilizando el siguiente stack tecnológi
 -----
 
 ## Endpoints
+## 📘 API - Categoría Padre
+
+### `GET /api/catalog/getfirstlevel`
+
+Permite obtener el Name y Code de la categoría padre para utilizar en filtros
+**URL:**
+
+```json
+http://localhost:8080/api/catalog/getfirstlevel
+```
+**Descripción:**
+
+Obtiene la lista completa de categorías disponibles.
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+[
+  {
+    "Code": "426",
+    "Name": "Baño"
+  },
+  {
+    "Code": "3003",
+    "Name": "Ferreteria y Seguridad"
+  }
+]
+```
+    *Descripción*: El usuario ha obtenido todo el primer nivel de las categorías.
+### `GET /api/catalog/getfirstlevel?buscar=`
+
+**URL:**
+
+```json
+http://localhost:8080/api/catalog/getfirstlevel?buscar=aire
+```
+
+**Descripción:**
+
+Obtiene la lista del primer nivel filtrada por busqueda.
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+[
+  {
+    "Code": "399",
+    "Name": "Aire Libre y Mascotas"
+  }
+]
+```
+    *Descripción*: El usuario ha obtenido el primer nivel filtrado por la busqueda.
 
 ## 📘 API - Buscar Categorías
 
