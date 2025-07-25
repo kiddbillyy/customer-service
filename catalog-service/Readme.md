@@ -35,7 +35,7 @@ http://localhost:8080/api/catalog/getfirstlevel
 ```
 **Descripción:**
 
-Obtiene la lista completa de categorías disponibles.
+Obtiene la lista completa de categoría padre disponibles.
 
 **Respuesta exitosa: `200 OK`**
 
@@ -51,7 +51,7 @@ Obtiene la lista completa de categorías disponibles.
   }
 ]
 ```
-    *Descripción*: El usuario ha obtenido todo el primer nivel de las categorías.
+    *Descripción*: El usuario ha obtenido todas las categoría padre disponibles.
 ### `GET /api/catalog/getfirstlevel?buscar=`
 
 **URL:**
@@ -62,7 +62,7 @@ http://localhost:8080/api/catalog/getfirstlevel?buscar=aire
 
 **Descripción:**
 
-Obtiene la lista del primer nivel filtrada por busqueda.
+Obtiene la lista de la categoría padre filtrada por busqueda.
 
 **Respuesta exitosa: `200 OK`**
 
@@ -74,7 +74,7 @@ Obtiene la lista del primer nivel filtrada por busqueda.
   }
 ]
 ```
-    *Descripción*: El usuario ha obtenido el primer nivel filtrado por la busqueda.
+    *Descripción*: El usuario ha obtenido la categoría padre filtrado por la busqueda.
 
 ## 📘 API - Buscar Categorías
 
