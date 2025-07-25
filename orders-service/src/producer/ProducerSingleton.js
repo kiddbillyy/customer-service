@@ -38,12 +38,11 @@ class ProducerSingleton {
 
       console.log(`📤 Mensaje enviado a Kafka [${topic}]:`, message);
     } catch (error) {
-      console.error('❌ Error enviando mensaje a Kafka:', error);
+      console.error(' Error enviando mensaje a Kafka:', error);
     }
   }
 }
 
 const instance = new ProducerSingleton();
-//Object.freeze(instance); // Prevenir modificaciones
 
 module.exports = instance;
