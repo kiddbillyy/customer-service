@@ -589,7 +589,6 @@ catalog-service/
 │
 ├── src/
 │   ├── config/                  # Configuración de conexiones y servicios externos
-│   │   ├── db.js
 │   │   ├── dbnew.js
 │   │   ├── dbnewSap.js          # Conexión con SAP
 │   │   └── kafka.js             # Configuración de Kafka
@@ -597,7 +596,7 @@ catalog-service/
 │   ├── controllers/             # Controladores de las rutas
 │   │   ├── Category.controller.js
 │   │   ├── price-list.js
-│   │   └── prueba.js
+│   │   └── 
 │   │
 │   ├── jobs/                    # Cron jobs de sincronización
 │   │   ├── BarcodeJob.js
@@ -609,7 +608,7 @@ catalog-service/
 │   ├── models/                  # Consultas a base de datos (lógica de datos)
 │   │   ├── CategoryModels.js
 │   │   ├── pricelistmodel.js
-│   │   └── prueba.js
+│   │   └── 
 │   │
 │   ├── routes/                  # Rutas de la API
 │   │   ├── Category.Routes.js
@@ -624,9 +623,10 @@ catalog-service/
 │   │
 │   ├── scheduler/               # Tareas automáticas ejecutadas con node-cron
 │   │   ├── Scheduler_OITM_ITM1.js
-│   │   └── kafkaProducer.js
+│   │ 
 │   │
-│   └── utils/                   # Funciones auxiliares, helpers, validadores, etc.
+│   └── utils/
+    └── kafkaProducer.js            # Funciones auxiliares, helpers, validadores, etc.
 │
 ├── .gitignore
 ├── README.md
