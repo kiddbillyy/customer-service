@@ -94,7 +94,8 @@ Obtiene la lista de categorias filtrada por busqueda.
 ]
 ```
     *Descripción*: El usuario ha obtenido las categorias filtradas por la busqueda.
-    
+## 📘 API - Catalogo Categorías
+
 ### `GET api/catalog/getcategorytree`
 
 **URL:**
