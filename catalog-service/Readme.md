@@ -581,18 +581,56 @@ La organización del código del microservicio sigue una estructura modular para
 ```
 catalog-service/
 │
-├── index.js                # Punto de entrada principal de la aplicación.
-├── kafka/                  # Módulo para la integración con Kafka.
-│   └── producer.js         # Lógica para producir (enviar) eventos a Kafka.
-├── db/                     # Módulo para la gestión de la base de datos.
-│   └── sql.js              # Configuración de la conexión y operaciones con MSSQL.
-├── routes/                 # Definición de las rutas de la API REST.
-│   └── login.js            # Lógica y manejo de la ruta POST /login.
-├── jobs/                   # Tareas programadas o cronjobs.
-│   └── cleanTokens.js      # Lógica para la tarea de limpieza de tokens expirados.
-├── .env                    # Variables de entorno (NO subido a Git).
-├── Dockerfile              # Definición para la construcción de la imagen Docker del servicio.
-└── docker-compose.yml      # Archivo para la orquestación de servicios Docker (si es parte de un monorepo o stack).
+├── .env                         # Variables de entorno (NO debe subirse al repo)
+├── Dockerfile                   # Imagen Docker del servicio
+├── docker-compose.yml           # Orquestación con otros servicios
+├── package.json                 # Dependencias y scripts del proyecto
+├── server.js                    # Punto de entrada principal de la aplicación
+│
+├── src/
+│   ├── config/                  # Configuración de conexiones y servicios externos
+│   │   ├── db.js
+│   │   ├── dbnew.js
+│   │   ├── dbnewSap.js          # Conexión con SAP
+│   │   └── kafka.js             # Configuración de Kafka
+│   │
+│   ├── controllers/             # Controladores de las rutas
+│   │   ├── Category.controller.js
+│   │   ├── price-list.js
+│   │   └── prueba.js
+│   │
+│   ├── jobs/                    # Cron jobs de sincronización
+│   │   ├── BarcodeJob.js
+│   │   ├── catalogJob.js
+│   │   ├── catalogPriceListSyncJob.js
+│   │   ├── CategoryJob.js
+│   │   └── ItmsGrpJob.js
+│   │
+│   ├── models/                  # Consultas a base de datos (lógica de datos)
+│   │   ├── CategoryModels.js
+│   │   ├── pricelistmodel.js
+│   │   └── prueba.js
+│   │
+│   ├── routes/                  # Rutas de la API
+│   │   ├── Category.Routes.js
+│   │   └── prueba.Routes.js
+│   │
+│   ├── services/                # Servicios reutilizables (uso dentro de jobs o controllers)
+│   │   ├── BarcodeSync.js
+│   │   ├── CatalogSync.js
+│   │   ├── CategorySync.js
+│   │   ├── ItmsGrpSync.js
+│   │   └── PriceListService.js
+│   │
+│   ├── scheduler/               # Tareas automáticas ejecutadas con node-cron
+│   │   ├── Scheduler_OITM_ITM1.js
+│   │   └── kafkaProducer.js
+│   │
+│   └── utils/                   # Funciones auxiliares, helpers, validadores, etc.
+│
+├── .gitignore
+├── README.md
+
 ```
 
 -----
