@@ -24,7 +24,7 @@ Este microservicio ha sido desarrollado utilizando el siguiente stack tecnológi
 
 ## Endpoints
 
-## 📘 API - Categorías
+## 📘 API - Buscar Categorías
 
 ### `GET api/catalog/getcategory`
 
