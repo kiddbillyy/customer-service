@@ -16,6 +16,7 @@ async function syncAuxCatalogs () {
   await tx.begin();
 
   /** Definición homogénea de cada catálogo */
+
   const tablas = [
     {
       nombre: 'Categoria',
@@ -99,6 +100,7 @@ async function syncAuxCatalogs () {
       const sapRows = (await sapPool.request().query(t.sapSql)).recordset;
       if (!sapRows.length) continue;
 
+
       const ddlCols = t.cols
         .map(c => `${c.n} NVARCHAR(${c.len}) COLLATE ${DEST_COLLATION}`)
         .join(', ');
@@ -122,6 +124,7 @@ async function syncAuxCatalogs () {
     await tx.commit();
     console.log(`✔️  syncAuxCatalogs completado en ${(performance.now() - t0).toFixed(0)} ms`);
     return true;
+
 
   } catch (err) {
     try { await tx.rollback(); } catch {}

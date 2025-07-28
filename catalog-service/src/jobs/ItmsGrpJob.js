@@ -7,6 +7,7 @@ async function runItmsJobs() {
     //console.log(' Job de sincronización completado.');
   } catch (err) {
     console.error(' Error en job de tablas auxiliares:', err);
+    throw err;
   }
 }
 

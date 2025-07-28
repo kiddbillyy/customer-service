@@ -52,6 +52,7 @@ async function getListPrices(opts){
             P.MinLevel  AS MinQuantity,
             P.ValidFrom AS DateFrom,
             P.ValidTo   AS DateTo,
+            P.UpdatedAt AS DateModified,
             COUNT(*) OVER() AS totalRecords
     FROM dbo.ITM1_ListPrice  AS L
     JOIN dbo.OITM_Products   AS P ON P.ItemCode = L.ItemCode
@@ -59,7 +60,7 @@ async function getListPrices(opts){
   )
   SELECT ItemCode, PriceList, Price, PriceIVA,
          CreatedAt, UpdatedAt,
-         ItemName, MinQuantity, DateFrom, DateTo,
+         ItemName, MinQuantity, DateFrom, DateTo, DateModified,
          totalRecords
   FROM Q
   ORDER BY ${sortBy} ${sortOrder}
@@ -100,7 +101,8 @@ async function getListPriceById(itemCode, priceList) {
             P.ItemName,
             P.MinLevel  AS MinQuantity,
             P.ValidFrom AS DateFrom,
-            P.ValidTo   AS DateTo
+            P.ValidTo   AS DateTo,
+            P.UpdatedAt AS DateModified
     FROM dbo.ITM1_ListPrice  AS L
     JOIN dbo.OITM_Products   AS P ON P.ItemCode = L.ItemCode
     WHERE L.ItemCode = @itemCode

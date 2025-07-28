@@ -1,38 +1,52 @@
 // services/kafkaUtils.js
+const { CompressionTypes } = require('kafkajs');
 const kafka = require('../config/kafka');
 
 const producer = kafka.producer();
+const BATCH_SIZE = 500;               // ← tamaño de lote
 
 const connectProducer = async () => {
   await producer.connect();
   console.log('🟢 Kafka Producer conectado');
 };
 
-// Modificamos la función para que acepte un array de ItemCodes
+/**
+ * Envía uno o más ItemCodes como eventos de producto nuevo.
+ * Se parte en lotes de 500 y se comprime con GZIP para evitar
+ * el error MESSAGE_TOO_LARGE (1 MB por ProduceRequest en el broker).
+ */
 const sendNewProductEvents = async (itemCodes) => {
   if (!producer) {
-    return console.error('Producer no inicializado');
+    console.error('Producer no inicializado');
+    return;
   }
-
-  // Creamos un array de mensajes
-  const messages = itemCodes.map(itemCode => ({
-    value: JSON.stringify({ itemCode }),
-  }));
-
-  if (messages.length === 0) {
+  if (!Array.isArray(itemCodes) || itemCodes.length === 0) {
     console.log('No hay nuevos productos para enviar a Kafka.');
     return;
   }
 
-  try {
-    await producer.send({
-      topic: 'new-product-created',
-      messages, // Enviamos el array completo de mensajes
-    });
-    console.log(`📤 ${messages.length} eventos enviados a Kafka.`);
-    console.log(`Último ItemCode enviado: ${itemCodes[itemCodes.length - 1]}`);
-  } catch (error) {
-    console.error('Error al enviar mensajes a Kafka:', error);
+  for (let i = 0; i < itemCodes.length; i += BATCH_SIZE) {
+    const slice = itemCodes.slice(i, i + BATCH_SIZE);
+
+    const messages = slice.map(itemCode => ({
+      value: JSON.stringify({ itemCode }),
+    }));
+
+    try {
+      await producer.send({
+        topic: 'new-product-created',
+        messages,
+        compression: CompressionTypes.GZIP,
+      });
+      console.log(
+        `📤 Mensaje enviado a Kafka ${(i / BATCH_SIZE) + 1}: ` +
+        `${messages.length} eventos enviados (último ItemCode: ${slice[slice.length - 1]})`
+      );
+    } catch (error) {
+      console.error('Error al enviar batch a Kafka:', error);
+      // Decide si quieres lanzar o continuar con el siguiente batch
+      throw error;
+    }
   }
 };
 

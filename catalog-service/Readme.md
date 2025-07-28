@@ -1,238 +1,576 @@
-# Ejemplo Documentación
+# Microservicio de Catalogo 
 
-# 📄 README.md — Servicio de Autenticación (Login Service)
+## Catalogo de productos y precios (Catalog service)
 
-## 🧪 Servicio de Autenticación (Login Service)
+Microservicio encargado de gestionar el **catalogo completo de los productos de Mimbral**, obtiene los productos desde la base de datos de SAP Businnes One y los almacena cada 5 minutos en la base de datos del microservicio. Este servicio funciona de manera autónoma y no necesita consumir información desde kafka para complementar el proceso.
 
-Microservicio encargado de gestionar el **ciclo completo de autenticación de usuarios**, incluyendo la validación de credenciales, la emisión de tokens de sesión, el registro de eventos de inicio de sesión en Kafka y la limpieza automática de tokens expirados. Este servicio funciona de manera autónoma y se integra con otros componentes a través de Apache Kafka y una base de datos MSSQL.
+-----
+## Tecnologías Utilizadas
+
+Este microservicio ha sido desarrollado utilizando el siguiente stack tecnológico:
+
+- **Node.js v22.15.0**: Entorno de ejecución para JavaScript del lado del servidor.
+- **Express**: Framework minimalista y flexible para construir APIs REST.
+- **Microsoft SQL Server (MSSQL)**: Motor de base de datos utilizado tanto para el catálogo (`CATALOG_SERVICE_DB`) como para la integración con SAP (`SBO_COM_MIM`).
+- **Apache Kafka**: Sistema de mensajería distribuido utilizado para crear *topics* y enviar eventos del sistema (por ejemplo, inicio de sesión).
+- **API Gateway**: Punto de entrada centralizado para el ruteo de solicitudes hacia los distintos microservicios.
+- **Docker**: Contenerización de servicios para facilitar la portabilidad y despliegue en distintos entornos.
+- **`dotenv`**: Gestión segura de variables de entorno mediante archivos `.env`.
+- **`node-cron`**: Programación de tareas automáticas (como la limpieza de tokens expirados).
+- **`p-limit`**: Control de concurrencia para limitar el número de promesas ejecutadas simultáneamente.
+- **`date-fns`**: Utilidades modernas y eficientes para el manejo de fechas.
 
 -----
 
-## 📦 Tecnologías Utilizadas
+## Endpoints
+## 📘 API - Categoría Padre
 
-Este servicio está construido con las siguientes tecnologías:
+### `GET /api/catalog/getfirstlevel`
 
-  * **Node.js 18+**: Entorno de ejecución JavaScript.
-  * **Express**: Framework web para la construcción de APIs REST.
-  * **Microsoft SQL Server (MSSQL)**: Base de datos principal para el almacenamiento de usuarios y credenciales.
-  * **Apache Kafka**: Plataforma de streaming distribuida utilizada para emitir eventos de inicio de sesión.
-  * **`dotenv`**: Módulo para la gestión de variables de entorno.
-  * **`node-cron`**: Biblioteca para la programación de tareas periódicas.
-  * **Docker** y **Docker Compose**: Herramientas para la **contenedorización** y orquestación del servicio y sus dependencias.
+Permite obtener el Name y Code de la categoría padre para utilizar en filtros
+**URL:**
 
------
+```json
+http://localhost:8080/api/catalog/getfirstlevel
+```
+**Descripción:**
 
-## 🚀 Endpoints
+Obtiene la lista completa de categoría padre disponibles.
 
-### `POST /login`
+**Respuesta exitosa: `200 OK`**
 
-Autentica a un usuario utilizando sus credenciales (`username` y `password`). Si las credenciales son válidas, el servicio retorna un token JWT para futuras solicitudes y emite un evento a Kafka.
+```json
+[
+  {
+    "Code": "426",
+    "Name": "Baño"
+  },
+  {
+    "Code": "3003",
+    "Name": "Ferreteria y Seguridad"
+  }
+]
+```
+    *Descripción*: El usuario ha obtenido todas las categoría padre disponibles.
+### `GET /api/catalog/getfirstlevel?buscar=`
 
-#### **Request (JSON)**
+**URL:**
+
+```json
+http://localhost:8080/api/catalog/getfirstlevel?buscar=aire
+http://localhost:8080/api/catalog/getfirstlevel?buscar=399
+```
+
+**Descripción:**
+
+Obtiene la lista de la categoría padre filtrada por busqueda.
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+[
+  {
+    "Code": "399",
+    "Name": "Aire Libre y Mascotas"
+  }
+]
+```
+    *Descripción*: El usuario ha obtenido la categoría padre filtrado por la busqueda.
+
+## 📘 API - Buscar Categorías
+
+### `GET api/catalog/getcategory`
+
+Permite obtener todas las categorías o realizar búsquedas filtradas. El servicio retorna un arreglo JSON con los campos `Code` y `Name` correspondientes a cada categoría registrada.
+
+**URL:**
+
+```json
+http://localhost:8080/api/catalog/getcategory
+```
+
+**Descripción:**
+
+Obtiene la lista completa de categorías disponibles.
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+[
+  {
+    "Code": "2000016",
+    "Name": "Piscinas y Playa"
+  },
+  {
+    "Code": "464",
+    "Name": "Climatización"
+  },
+  {
+    "Code": "753",
+    "Name": "Herramientas Eléctricas e Inalámbricas"
+  }
+]
+```
+    *Descripción*: El usuario ha obtenido todas las categorias.
+### `GET api/catalog/getcategory?buscar=`
+
+**URL:**
+
+```json
+http://localhost:8080/api/catalog/getcategory?buscar=herramientas
+http://localhost:8080/api/catalog/getcategory?buscar=3019
+```
+
+**Descripción:**
+
+Obtiene la lista de categorias filtrada por busqueda.
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+[
+  {
+    "Code": "3019",
+    "Name": "Herramientas Automóvil"
+  },
+  {
+    "Code": "3060",
+    "Name": "Herramientas Manuales"
+  },
+  {
+    "Code": "3061",
+    "Name": "Maquinaria y Herramientas Estacionarias"
+  },
+  {
+    "Code": "3062",
+    "Name": "Herramientas de Construcción"
+  }
+]
+```
+```json
+[
+  {
+    "Code": "3019",
+    "Name": "Herramientas Automóvil"
+  }
+]
+```
+
+    *Descripción*: El usuario ha obtenido las categorias filtradas por la busqueda.
+## 📘 API - Catalogo Categorías
+
+### `GET api/catalog/getcategorytree`
+
+**URL:**
+```json
+http://localhost:8080/api/catalog/getcategorytree
+```
+
+**Descripción:**
+
+Obtiene el cátalogo de las categorías con la siguiente estructura:
+
+- **NAME**: Nombre del hijo del Tree.
+- **REFERENCE**: Código de la categoria o subcategoria del hijo (NAME).
+- **NAME TREE**: Árbol de categorías.
+- **DATE MODIFIED**: Fecha de modificación.
+- **STATUS**: Estado de la categoría.
+
+**Respuesta exitosa: `200 OK`**
 
 ```json
 {
-  "username": "usuario1",
-  "password": "secreto123"
+  "page": 1,
+  "pageSize": 40,
+  "total": 910,
+  "totalPages": 23,
+  "data": [
+    {
+      "name": "Bicicletas",
+      "reference": "3015",
+      "nameTree": "Aire Libre y Mascotas \u003E Bicicletas",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    },
+    {
+      "name": "Accesorios para Bicicleta",
+      "reference": "3224",
+      "nameTree": "Aire Libre y Mascotas \u003E Bicicletas \u003E Accesorios para Bicicleta",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    }
+  ]
 }
 ```
+    *Descripción*: El usuario ha obtenido las categorias con filtros de paginación por defecto, con un size de 40.
 
-#### **Responses**
+### `GET /api/catalog/getcategorytree?buscarname=&buscarreference=&buscarnametree=herramientas&page=&pageSize=`
 
-  * **`200 OK` - Login Exitoso**
+**URL:**
+```json
+http://localhost:8080/api/catalog/getcategorytree?buscarname=medidores%20de%20presion&buscarreference=&buscarnametree=herramientas&page=&pageSize=
+```
 
-    ```json
+**Descripción:**
+
+Obtiene el cátalogo de las categorías paginadas, para eso se debe especificar en &page= la hoja que se elegirá, en pageSize= la cantidad que traerá por cada página, además, se puede realizar una busqueda:
+buscarname=
+buscarreference=
+buscarnametree=
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+{
+  "page": 1,
+  "pageSize": 40,
+  "total": 1,
+  "totalPages": 1,
+  "data": [
     {
-      "message": "Login exitoso",
-      "token": "jwt_token_aqui",
-      "userId": 5
+      "name": "Medidores de presión",
+      "reference": "3237",
+      "nameTree": "Automóvil \u003E Herramientas Automóvil \u003E Medidores de presión",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
     }
-    ```
+  ]
+}
+```
+    *Descripción*: El usuario ha obtenido las categorias con la busqueda del name por "medidores de presión" y busqueda por nametree=herramientas.
+-----
 
-    *Descripción*: El usuario ha iniciado sesión correctamente. Se incluye un token JWT para la autenticación de futuras solicitudes y el `userId` asociado.
+## 📘 API - Detalle Catalago Hijo
 
-  * **`401 Unauthorized` - Credenciales Inválidas**
+### `GET /api/catalog/getsubcategory/:id`
 
-    ```json
+**URL:**
+```json
+http://localhost:8080/api/catalog/getsubcategory/3019
+```
+
+**Descripción:**
+
+Obtiene el detalle de la categoria seleccionada en el catalogo de las categorias, mostrando la tercera rama del arbol padre.
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+{
+  "primernivel": "Automóvil",
+  "categoria": "Herramientas Automóvil",
+  "subcategorias": [
     {
-      "message": "Credenciales inválidas"
+      "reference": "3235",
+      "name": "Compresores Portatiles ",
+      "nameTree": "Automóvil \u003E Herramientas Automóvil \u003E Compresores Portatiles ",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    },
+    {
+      "reference": "3236",
+      "name": "Pulidoras",
+      "nameTree": "Automóvil \u003E Herramientas Automóvil \u003E Pulidoras",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    },
+    {
+      "reference": "3237",
+      "name": "Medidores de presión",
+      "nameTree": "Automóvil \u003E Herramientas Automóvil \u003E Medidores de presión",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
+    },
+    {
+      "reference": "3238",
+      "name": "Banquillos, Cabaelletes y Camillas",
+      "nameTree": "Automóvil \u003E Herramientas Automóvil \u003E Banquillos, Cabaelletes y Camillas",
+      "date_modified": null,
+      "user_modified": null,
+      "status": "Active"
     }
-    ```
-
-    *Descripción*: Las credenciales proporcionadas (usuario o contraseña) son incorrectas.
+  ]
+}
+```
+    *Descripción*: El usuario ha obtenido el detalle del hijo de la categoria.
 
 -----
 
-## 🛠️ Configuración
+## Configuración
 
 ### 1\. Variables de Entorno (`.env`)
 
 Para ejecutar el servicio, se requieren las siguientes variables de entorno. Crea un archivo `.env` en la raíz del proyecto y configúralo según tu entorno.
 
-| Variable           | Descripción                                              | Ejemplo                     |
-| :----------------- | :------------------------------------------------------- | :-------------------------- |
-| `PORT`             | Puerto en el que el servidor Express escuchará.          | `3000`                      |
-| `DB_USER`          | Usuario para la conexión a la base de datos MSSQL.       | `sa`                        |
-| `DB_PASSWORD`      | Contraseña para la conexión a la base de datos MSSQL.    | `tu_password_segura`        |
-| `DB_SERVER`        | Host o IP del servidor MSSQL.                            | `mssql` (dentro de Docker)  |
-| `DB_DATABASE`      | Nombre de la base de datos MSSQL a la que conectarse.    | `login_db`                  |
-| `KAFKA_BROKER`     | Dirección del broker de Kafka.                           | `kafka:9092` (dentro de Docker) |
-| `KAFKA_TOPIC`      | Nombre del tópico de Kafka para eventos de login.        | `login-events`              |
-| `JWT_SECRET`       | Secreto para la firma y verificación de tokens JWT. **Debe ser una cadena robusta y única.** | `mi_secreto_super_seguro_y_largo` |
+| Variable            | Descripción                                                                 | Ejemplo                         |
+| :------------------ | :-------------------------------------------------------------------------- | :------------------------------ |
+| `PORT`              | Puerto en el que el servidor Express escuchará.                             | `5006`                          |
+| `DB_HOST`           | Host para la conexión a la base de datos del catálogo.                      | `host.docker.internal`          |
+| `DB_USER`           | Usuario para la conexión a la base de datos del catálogo.                   | `Tu_Usuario de donde esta la BD`|
+| `DB_PASSWORD`       | Contraseña para la conexión a la base de datos del catálogo.                | `*****`                         |
+| `DB_NAME`           | Nombre de la base de datos del microservicio de catálogo.                   | `CATALOG_SERVICE_DB`            |
+| `DB_PORT`           | Puerto del servidor MSSQL Generalmente es 1433.                             | `1433`                          |
+| `SAP_DB_HOST`       | Dirección del servidor MSSQL con los datos de SAP.                          | `192.168.0.24`                  |
+| `SAP_DB_USER`       | Usuario para conectarse a la base de datos de SAP.                          | `Tu_Usuario`                    |
+| `SAP_DB_PASSWORD`   | Contraseña del usuario de SAP.                                              | `*****`                         |
+| `SAP_DB_NAME`       | Nombre de la base de datos de SAP.                                          | `COMERCIAL_ENERO`               |
+| `KAFKA_BROKER`      | Dirección del broker de Kafka.                                              | `kafka:9092`                    |
+| `KAFKA_CLIENT_ID`   | Identificador del cliente Kafka para este microservicio.                    | `catalog-service`               |
+| `JWT_SECRET`        | Secreto para la firma de tokens JWT. **Debe ser una cadena robusta.**       | `*****************`             |
+| `JWT_EXPIRES_IN`    | Tiempo de expiración del token JWT.                                         | `1h`                            |
 
-> ⚠️ **Importante**: El archivo `.env` contiene información sensible. **Nunca lo subas a tu repositorio de control de versiones (Git).** Asegúrate de añadir `.env` a tu archivo `.gitignore`.
+### 2\. Configuración conexiones DB
 
-### 2\. Instalación y Ejecución Local (Modo Desarrollo)
+El microservicio utiliza dos conexiones MSSQL: una para la base de datos interna del catálogo (`CATALOG_SERVICE_DB`) y otra para consultar los datos de productos desde SAP (`COMERCIAL_ENERO`).
 
-Sigue estos pasos para configurar y ejecutar el servicio en tu máquina local:
+####  2.1 Archivo: `dbnew.js` (Conexión a la base de datos del microservicio)
 
-1.  **Clona el repositorio:**
-    ```bash
-    git clone https://github.com/tuusuario/login-service.git
-    cd login-service
-    ```
-2.  **Instala las dependencias:**
-    ```bash
-    npm install
-    ```
-3.  **Crea el archivo `.env`** con las variables de entorno necesarias (ver sección anterior).
-4.  **Ejecuta el servicio en modo desarrollo:**
-    ```bash
-    npm run dev
-    ```
-    (Asume que tu `package.json` tiene un script `dev` configurado para `nodemon` o similar).
+```js
+const sql = require('mssql');
+require('dotenv').config();
 
-### 3\. Ejecutar con Docker
+const omsConfig = {
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  server: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  port: parseInt(process.env.DB_PORT, 10),
+  options: { encrypt: false, trustServerCertificate: true },
+  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+};
+
+const catalogPool = new sql.ConnectionPool(omsConfig);
+const catalogPoolConnect = catalogPool.connect()
+  .then(() => console.log('✅ Conectado a Catalog (OMS) DB'))
+  .catch(err => console.error('❌ Error conectando a OMS DB:', err));
+
+module.exports = { sql, catalogPool, catalogPoolConnect };
+```
+####  2.2 Archivo: `dbnewsap.js` (Conexión a la base de datos de SAP)
+
+```js
+// dbnewsap.js
+const sql = require('mssql');
+require('dotenv').config();
+
+const sapConfig = {
+  user: process.env.SAP_DB_USER,
+  password: process.env.SAP_DB_PASSWORD,
+  server: process.env.SAP_DB_HOST,
+  database: process.env.SAP_DB_NAME,
+  port: parseInt(process.env.SAP_DB_PORT, 10),
+  options: { encrypt: false, trustServerCertificate: true },
+  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+};
+
+const sapPool = new sql.ConnectionPool(sapConfig);
+const sapPoolConnect = sapPool.connect()
+  .then(() => console.log(' Conectado a SAP DB'))
+  .catch(err => console.error(' Error conectando a SAP DB:', err));
+
+module.exports = { sql, sapPool, sapPoolConnect };
+
+```
+
+### 3\.  Configurar archivos para instalar en Docker 
 
 Se proporciona un `Dockerfile` y un `docker-compose.yml` para una fácil implementación y orquestación del servicio junto con sus dependencias (Kafka y MSSQL).
 
 #### **`Dockerfile`**
 
 ```dockerfile
-# Usa una imagen oficial de Node.js en su versión 18
-FROM node:18-alpine
+FROM node:18
 
-# Establece el directorio de trabajo dentro del contenedor
+# Crear directorio de trabajo
 WORKDIR /app
 
-# Copia los archivos de definición de dependencias
+# Copiar package.json (y lock) antes de copiar todo el código,
+# así se aprovecha la cache si no cambian las dependencias
 COPY package*.json ./
 
-# Instala las dependencias de producción
-RUN npm install --production
+# Instalar dependencias
+RUN npm install
 
-# Copia el resto del código de la aplicación
+# Copiar el resto del código
 COPY . .
 
-# Expone el puerto en el que la aplicación escuchará
-EXPOSE 3000
+# Exponer puerto y comando para iniciar
+EXPOSE 5005
+CMD ["npm", "start"]
 
-# Comando para iniciar la aplicación cuando el contenedor se ejecute
-CMD ["node", "index.js"]
 ```
 
-#### **`docker-compose.yml` (Configuración de Ejemplo)**
+#### **`docker-compose.yml` (Configuración)**
 
-Este archivo define el servicio de login, Kafka y MSSQL para un entorno de desarrollo o pruebas.
 
 ```yaml
 version: '3.8'
 
-services:
-  # Servicio de Autenticación (Login Service)
-  login-service:
-    build: . # Construye la imagen desde el Dockerfile en el directorio actual
-    ports:
-      - "3000:3000" # Mapea el puerto 3000 del host al puerto 3000 del contenedor
-    env_file:
-      - .env # Carga las variables de entorno desde el archivo .env
-    depends_on:
-      - kafka # Asegura que Kafka se inicie antes que este servicio
-      - mssql # Asegura que MSSQL se inicie antes que este servicio
-    networks:
-      - app-network # Conecta este servicio a la red compartida
-
-  # Servicio de Kafka
-  kafka:
-    image: bitnami/kafka:latest # Utiliza la imagen oficial de Bitnami Kafka
-    # Configuración de entorno para Kafka (ejemplo, ajustar según necesidad)
-    environment:
-      KAFKA_CFG_NODE_ID: 0
-      KAFKA_CFG_PROCESS_ROLES: controller,broker
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-    ports:
-      - "9092:9092"
-    networks:
-      - app-network
-
-  # Servicio de MSSQL Server
-  mssql:
-    image: mcr.microsoft.com/mssql/server:2022-latest # Utiliza la imagen oficial de MSSQL
-    environment:
-      SA_PASSWORD: "tu_password_segura" # ¡Cambia esto por una contraseña fuerte!
-      ACCEPT_EULA: "Y" # Acepta el acuerdo de licencia de usuario final
-    ports:
-      - "1433:1433" # Mapea el puerto 1433 del host al puerto 1433 del contenedor
-    networks:
-      - app-network
-
 networks:
-  app-network:
-    driver: bridge # Define una red de puente para la comunicación entre servicios
+  orders-service_kafka_network:
+    external: true
+
+services:
+  catalog-service:
+    build: .
+    container_name: catalog-service
+    restart: always
+    ports:
+      - "5006:5006"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "win-hp03dio6fsk:192.168.0.165"
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8         
+      - 1.1.1.1 
+    environment:
+      PORT: 5006
+      DB_HOST: host.docker.internal
+      DB_USER: DEV
+      DB_PASSWORD: 1234
+      DB_NAME: CATALOG_SERVICE_DB
+      DB_PORT: 1433
+      KAFKA_BROKER: kafka:9092
+      KAFKA_CLIENT_ID: catalog-service
+      VTEX_APP_KEY: ${VTEX_APP_KEY}
+      VTEX_APP_TOKEN: ${VTEX_APP_TOKEN}
+      VTEX_ACCOUNT: ${VTEX_ACCOUNT}
+      VTEX_ENVIRONMENT: ${VTEX_ENVIRONMENT}
+      SAP_BASE_URL: ${SAP_BASE_URL}
+      SAP_COMPANY_DB: ${SAP_COMPANY_DB}
+      SAP_USERNAME: ${SAP_USERNAME}
+      SAP_PASSWORD: ${SAP_PASSWORD}
+    networks:
+      - orders-service_kafka_network
+
+
 ```
 
-**Para iniciar el stack completo con Docker Compose:**
 
-1.  Asegúrate de tener Docker y Docker Compose instalados.
-2.  Crea el archivo `.env` en la raíz del proyecto.
-3.  Desde el directorio raíz del proyecto, ejecuta:
+### 4\. Instalación y Ejecución Docker (Modo Desarrollo)
+
+Sigue estos pasos para configurar y ejecutar el servicio en tu máquina local:
+
+1.  **Clona el repositorio principal de microservicios de Mimbral:**
     ```bash
-    docker-compose up -d
+    git clone https://github.com/mimbral1/Microservicios.git
+    cd Microservicios
     ```
-    Esto construirá las imágenes (si no existen) e iniciará todos los servicios en segundo plano.
+2.  **Configurar las variables de entorno:**
 
------
+    Dentro de cada microservicio (order-service, catalog-service, api-gateway), crea un archivo .env con sus respectivas variables de entorno. Revisa la sección configuración para ver el detalle de cómo configurar el `.env`.
+    
+3.  **Instalar `Docker Desktop`**
 
-## 📚 Arquitectura y Flujo
+    Se debe instalar Docker Desktop: `https://www.docker.com/products/docker-desktop/`
+    Debe estar activo y ejcutado antes de continuar. Esto es importante para poder construir y levantar los contenedores para los microservicios.
+   
+4.  **Levantar los microservicios con Docker:**
+   
+    Cada microservico debe levantarse de forma independiente. Para esto, se debe abrir una terminal para cada uno y seguir los siguientes pasos:
 
-El "Login Service" sigue una arquitectura basada en microservicios con énfasis en la **separación de responsabilidades** y la **comunicación asíncrona** a través de Kafka.
+    1. Levantar Microservicio de order-service
+    ```bash
+    
+    cd -- y despues la ruta de donde esta el microservicio
+    docker-compose up --build -d
+    ```
+    
+    <img width="930" height="140" alt="image" src="https://github.com/user-attachments/assets/fe972c97-51a9-4180-b381-bba6fe3e8176" />
 
-Cuando un usuario intenta iniciar sesión:
+    2. Levantar catalog-service
+       
+    ```bash
+    cd -- y despues la ruta de donde esta el microservicio
+    docker-compose up --build -d
+    ```
+    
+    <img width="933" height="121" alt="image" src="https://github.com/user-attachments/assets/0d69781e-18b6-4266-a311-9604fa7435c0" />
 
-1.  **Validación de Credenciales**: El servicio recibe la solicitud `POST /login` y procede a validar las credenciales (`username` y `password`) contra la base de datos **MSSQL**.
-2.  **Generación de JWT**: Si las credenciales son correctas, se genera un **JSON Web Token (JWT)**. Este token contiene información de la sesión y se firma con un secreto (`JWT_SECRET`) para garantizar su integridad y autenticidad.
-3.  **Emisión de Evento a Kafka**: Se publica un evento de "login exitoso" en el tópico de Kafka **`login-events`**. Este evento puede ser consumido por otros microservicios (ej. servicio de auditoría, servicio de notificaciones) para reaccionar a la acción de inicio de sesión de forma asíncrona.
-4.  **Respuesta al Cliente**: El servicio responde al cliente con el token JWT y un mensaje de éxito.
+    3. Levantar api-gateway
+       
+    ```bash
+    cd -- y despues la ruta de donde esta el microservicio
+    docker-compose up --build -d
+    ```
+    
+    <img width="960" height="221" alt="image" src="https://github.com/user-attachments/assets/4310a5ae-d309-4419-b2a8-d122696d2336" />
 
-Adicionalmente, el servicio gestiona el ciclo de vida de los tokens de sesión mediante una **tarea programada**:
+    Puedes veriicar que los microservicios esten corriendo en la opción de contenedores en docker
 
-  * **Limpieza de Tokens Expirados**: Una tarea `node-cron` se ejecuta periódicamente (por ejemplo, cada hora) para identificar y eliminar tokens JWT que hayan caducado, ayudando a mantener la base de datos limpia y la seguridad del sistema.
+    <img width="1370" height="159" alt="image" src="https://github.com/user-attachments/assets/716e3dea-0b4a-422e-b892-ab871a54eea6" />
 
------
+
 
 ## ⏰ Tareas Programadas (`node-cron`)
 
-El servicio utiliza `node-cron` para ejecutar tareas de mantenimiento de forma periódica.
+El servicio utiliza `node-cron` para ejecutar tareas de sincronización de catalogo cada 5 minutos con la fuente SAP Businees One.
 
-### `Token Cleanup Job`
+### `Scheduler`
 
-  * **Descripción**: Esta tarea es responsable de buscar y eliminar los tokens de sesión que han expirado de la base de datos.
-  * **Frecuencia**: Se ejecuta cada hora.
-  * **Implementación (ejemplo conceptual)**:
-    ```javascript
-    cron.schedule('0 * * * *', async () => {
-      console.log('[CRON] Iniciando la limpieza de tokens expirados...');
-      try {
-        await borrarTokensExpirados(); // Función que contiene la lógica para eliminar tokens
-        console.log('[CRON] Limpieza de tokens expirados completada.');
-      } catch (error) {
-        console.error('[CRON] Error durante la limpieza de tokens:', error.message);
-      }
-    });
-    ```
+  * **Descripción**: Esta tarea es responsable de insertar o actualizar el catalogo con respecto a su fecha de creación, actualización y hora.
+  * **Frecuencia**: Se ejecuta cada 5 minutos.
+  * **Implementación**:
+```javascript
+const cron = require('node-cron');
+const runSyncJob = require('../jobs/CatalogJob');
+const runSyncPriceJob = require('../jobs/catalogPriceListSynscJob');
+const runAuxSyncJob = require('../jobs/CategoryJob');
+const runItmsJobs = require('../jobs/ItmsGrpJob');
+const runBarcodeJob =require('../jobs/BarcodeJob');
+
+console.log('🔁 Job unificado de sincronización programado para ejecutarse cada 5 minutos...');
+
+cron.schedule('*/2 * * * *', async () => {
+  const now = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+  console.log(`🕒 Iniciando sincronización completa [${now}]`);
+
+  const start = Date.now();
+
+  try {
+    // Paso 1: Catálogo
+    console.log('🔹 Iniciando sincronización de catálogo...');
+    await runSyncJob();
+
+    // Paso 2: Precios
+    console.log('🔹 Iniciando sincronización de precios...');
+    await runSyncPriceJob();
+    console.log('Precios sincronizados correctamente.');
+
+    // Paso 3: Categorías
+    console.log('🔹 Iniciando sincronización de categorías...');
+    await runAuxSyncJob();
+    console.log('Categorías sincronizadas correctamente.');
+
+    // Paso 4: Grupos de ítems
+    console.log('🔹 Iniciando sincronización de grupos de ítems...');
+    await runItmsJobs();
+    console.log(' Grupos de ítems sincronizados correctamente.');
+
+    //Paso 5: Codigo de barras
+    console.log('🔹 Iniciando sincronización de códigos de barras...');
+    await runBarcodeJob();
+    console.log(' Códigos barra sincronizados correctamente.');
+
+  } catch (err) {
+    console.error(' Error general durante la sincronización:', err.message);
+  } finally {
+    const end = Date.now();
+    const duration = ((end - start) / 1000).toFixed(2);
+    console.log(`⏱ Sincronización total finalizada en ${duration} segundos.\n---`);
+  }
+}, {
+  timezone: 'America/Santiago'
+});
+
+```
 
 -----
 
@@ -241,71 +579,59 @@ El servicio utiliza `node-cron` para ejecutar tareas de mantenimiento de forma p
 La organización del código del microservicio sigue una estructura modular para facilitar la lectura y el mantenimiento:
 
 ```
-login-service/
+catalog-service/
 │
-├── index.js                # Punto de entrada principal de la aplicación.
-├── kafka/                  # Módulo para la integración con Kafka.
-│   └── producer.js         # Lógica para producir (enviar) eventos a Kafka.
-├── db/                     # Módulo para la gestión de la base de datos.
-│   └── sql.js              # Configuración de la conexión y operaciones con MSSQL.
-├── routes/                 # Definición de las rutas de la API REST.
-│   └── login.js            # Lógica y manejo de la ruta POST /login.
-├── jobs/                   # Tareas programadas o cronjobs.
-│   └── cleanTokens.js      # Lógica para la tarea de limpieza de tokens expirados.
-├── .env                    # Variables de entorno (NO subido a Git).
-├── Dockerfile              # Definición para la construcción de la imagen Docker del servicio.
-└── docker-compose.yml      # Archivo para la orquestación de servicios Docker (si es parte de un monorepo o stack).
+├── .env                         # Variables de entorno (NO debe subirse al repo)
+├── Dockerfile                   # Imagen Docker del servicio
+├── docker-compose.yml           # Orquestación con otros servicios
+├── package.json                 # Dependencias y scripts del proyecto
+├── server.js                    # Punto de entrada principal de la aplicación
+│
+├── src/
+│   ├── config/                  # Configuración de conexiones y servicios externos
+│   │   ├── dbnew.js
+│   │   ├── dbnewSap.js          # Conexión con SAP
+│   │   └── kafka.js             # Configuración de Kafka
+│   │
+│   ├── controllers/             # Controladores de las rutas
+│   │   ├── Category.controller.js
+│   │   ├── price-list.js
+│   │   └── 
+│   │
+│   ├── jobs/                    # Cron jobs de sincronización
+│   │   ├── BarcodeJob.js
+│   │   ├── catalogJob.js
+│   │   ├── catalogPriceListSyncJob.js
+│   │   ├── CategoryJob.js
+│   │   └── ItmsGrpJob.js
+│   │
+│   ├── models/                  # Consultas a base de datos (lógica de datos)
+│   │   ├── CategoryModels.js
+│   │   ├── pricelistmodel.js
+│   │   └── 
+│   │
+│   ├── routes/                  # Rutas de la API
+│   │   ├── Category.Routes.js
+│   │   └── prueba.Routes.js
+│   │
+│   ├── services/                # Servicios reutilizables (uso dentro de jobs o controllers)
+│   │   ├── BarcodeSync.js
+│   │   ├── CatalogSync.js
+│   │   ├── CategorySync.js
+│   │   ├── ItmsGrpSync.js
+│   │   └── PriceListService.js
+│   │
+│   ├── scheduler/               # Tareas automáticas ejecutadas con node-cron
+│   │   ├── Scheduler_OITM_ITM1.js
+│   │ 
+│   │
+│   └── utils/
+    └── kafkaProducer.js            # Funciones auxiliares, helpers, validadores, etc.
+│
+├── .gitignore
+├── README.md
+
 ```
 
 -----
 
-## 🧪 Pruebas Manuales
-
-Puedes probar el endpoint `/login` utilizando herramientas como [Postman](https://www.postman.com/) o `curl`.
-
-### Ejemplo con `curl`
-
-```bash
-curl -X POST http://localhost:3000/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"usuario1", "password":"secreto123"}'
-```
-
------
-
-## 🧯 Logs
-
-El servicio emite logs informativos a la consola (o a un sistema de logging configurado) para monitorización y depuración.
-
-Ejemplos de logs:
-
-  * `[INFO] Login exitoso para usuario1`
-  * `[CRON] Iniciando la limpieza de tokens expirados...`
-  * `[INFO] Evento enviado a Kafka: login-events`
-  * `[ERROR] Credenciales inválidas para usuario: usuario_intento`
-
------
-
-## 🧩 Integraciones Clave
-
-Este microservicio se integra con los siguientes sistemas y tecnologías:
-
-| Servicio / Tecnología | Descripción                                                              |
-| :-------------------- | :----------------------------------------------------------------------- |
-| **Apache Kafka** | Emite eventos cuando un usuario inicia sesión correctamente, permitiendo a otros servicios reaccionar asíncronamente. |
-| **MSSQL Server** | Actúa como la fuente de verdad para la validación de credenciales de usuario. |
-| **JWT (JSON Web Tokens)** | Utilizado para la generación de tokens de sesión seguros, permitiendo la autenticación sin estado en futuras solicitudes. |
-| **`node-cron`** | Facilita la programación y ejecución automática de tareas de mantenimiento, como la limpieza de tokens vencidos. |
-
------
-
-## 🔐 Consideraciones de Seguridad
-
-Aunque este es un ejemplo, se han considerado algunas prácticas de seguridad importantes:
-
-  * **Contraseñas Hasheadas**: Se espera que las contraseñas de los usuarios estén almacenadas en la base de datos utilizando un algoritmo de hashing robusto como **bcrypt** (la lógica de hashing de contraseñas debería implementarse antes de almacenar usuarios).
-  * **JWT con Firma Secreta (`JWT_SECRET`)**: Los tokens JWT son firmados con un secreto fuerte y único para prevenir manipulaciones.
-  * **Uso de `.env`**: Las variables de entorno sensibles se gestionan fuera del código fuente con `.env` para evitar que se filtren.
-  * **Recomendación HTTPS**: Para entornos de producción, es **crucial** implementar HTTPS para cifrar la comunicación entre el cliente y el servidor, protegiendo las credenciales y los tokens.
-
------
