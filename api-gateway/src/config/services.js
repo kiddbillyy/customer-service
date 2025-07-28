@@ -6,11 +6,12 @@ export default {
   auth:        { path: '/api/auth',     target: 'http://user-service:5002'   },
   bundles:     { path: '/api/bundles',  target: 'http://packaging-service:5003' },
   audit:       { path: '/api/audit',    target: 'http://packaging-service:5003' },
-  sap:         { path: '/api/sap',      target: 'http://orders-service:5000' }, // reuse
+  sap:         { path: '/api/sap',      target: 'http://orders-service:5000' }, 
   scheduler:   { path: '/api/scheduler',target: 'http://sap-integration-service:5004' },
   vtex:        { path: '/api/vtex',     target: 'http://sap-integration-service:5004' },
   inventory:   { path: '/api/inventory',target: 'http://inventory-service:5005' },
   store:       { path: '/api/store',    target: 'http://inventory-service:5005' },
   pricing:     { path: '/api/pricing',  target: 'http://inventory-service:5005' },
   catalog:     { path: '/api/catalog',  target: 'http://catalog-service:5006' },
+  login:       { path: '/api/login',    target: 'http://id-service:5007' },
 };
