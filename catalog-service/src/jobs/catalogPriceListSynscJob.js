@@ -8,6 +8,7 @@ async function runSyncPriceJob() {
     console.log(`✅ Job de Precios completado. ${total} precios sincronizados (${metrics.inserted} insertados, ${metrics.updated} actualizados`);
   } catch (err) {
     console.error('❌ Error en job de sincronización:', err.message);
+    throw err;
   }
 }
 
