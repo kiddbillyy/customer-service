@@ -9,7 +9,7 @@ console.log('Tipo de runPriceListJob:', typeof runPriceListJob);
 
 console.log('🔁 Job unificado de sincronización programado para ejecutarse cada 5 minutos...');
 
-cron.schedule('*/3 * * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   const now = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
   console.log(`🕒 Iniciando sincronización completa [${now}]`);
 
