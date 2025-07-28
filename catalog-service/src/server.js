@@ -12,7 +12,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/catalog', pruebaRoutes); 
 app.use('/api/catalog', categoryRoutes);
 
 const PORT = process.env.PORT || 5006;
