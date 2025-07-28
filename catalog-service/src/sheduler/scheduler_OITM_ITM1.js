@@ -4,6 +4,8 @@ const runSyncPriceJob = require('../jobs/catalogPriceListSynscJob');
 const runAuxSyncJob = require('../jobs/CategoryJob');
 const runItmsJobs = require('../jobs/ItmsGrpJob');
 const runBarcodeJob =require('../jobs/BarcodeJob');
+const runPriceListJob = require('../jobs/PriceListJob')
+console.log('Tipo de runPriceListJob:', typeof runPriceListJob);
 
 console.log('🔁 Job unificado de sincronización programado para ejecutarse cada 5 minutos...');
 
@@ -22,7 +24,10 @@ cron.schedule('*/2 * * * *', async () => {
     console.log('🔹 Iniciando sincronización de precios...');
     await runSyncPriceJob();
     console.log('✅ Precios sincronizados correctamente.');
-
+    // paso 2.5:Lista de precios
+    console.log(' Iniciando sincronizacion de lista de precios.')
+    await runPriceListJob()
+    console.log(' Lista de precios sincronizada correctamente.')
     // Paso 3: Categorías
     console.log('🔹 Iniciando sincronización de categorías...');
     await runAuxSyncJob();
