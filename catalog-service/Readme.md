@@ -300,6 +300,264 @@ Obtiene el detalle de la categoria seleccionada en el catalogo de las categorias
 ```
     *Descripción*: El usuario ha obtenido el detalle del hijo de la categoria.
 
+
+## 📘 API - Productos y Precios
+
+### `GET /api/catalog/products`
+
+Obtiene un listado paginado de productos disponibles en el catálogo. Se pueden aplicar filtros por `itemCode`, `name`, `category`, y `barcode`, así como ordenamiento y paginación.
+
+**URL de ejemplo:**
+
+https://catalogomimbral.loclx.io/api/catalog/products
+
+**Parámetros de consulta opcionales:**
+
+- `page` (número): Página solicitada (por defecto: 1)
+- `pageSize` (número): Tamaño de página (por defecto: 100, máximo: 500)
+- `itemCode` (string): Código del producto
+- `name` (string): Nombre del producto
+- `category` (string): Categoría del producto
+- `barcode` (string): Código de barras
+- `sortBy` (string): Campo por el cual ordenar (por defecto: `ItemCode`)
+- `sortOrder` (`ASC` | `DESC`): Orden de resultados (por defecto: `ASC`)
+
+**Respuesta:**
+```json
+{
+  "page": 1,
+  "pageSize": 100,
+  "totalRecords": 47777,
+  "totalPages": 478,
+  "data": [
+    {
+      "Image": null,
+      "Name": "XXXCEMENTO PREMEZCLADO HN15 CON GRAVILLA",
+      "ItemCode": "001001002",
+      "Category": null,
+      "Brand": null,
+      "TotalSalesChannel": null,
+      "DateModified": null,
+      "Status": "Inactivo",
+      "Eans": null,
+      "CreatedName": "manager",
+      "CreatedEmail": ""
+    },
+    {
+      "Image": null,
+      "Name": "CEMENTO PREMEZCLADO HN30 (10) 40/8",
+      "ItemCode": "001001003",
+      "Category": null,
+      "Brand": null,
+      "TotalSalesChannel": null,
+      "DateModified": null,
+      "Status": "Activo",
+      "Eans": null,
+      "CreatedName": "Cristian Montero",
+      "CreatedEmail": null
+    }
+  ]
+}
+```
+### `GET /api/catalog/products/:itemCode`
+
+Obtiene los detalles de un producto específico según su código.
+
+**URL de ejemplo:**
+
+https://catalogomimbral.loclx.io/api/catalog/products/001001002
+
+**Respuesta:**
+```json
+{
+  "Image": null,
+  "Name": "XXXCEMENTO PREMEZCLADO HN15 CON GRAVILLA",
+  "SKU": "001001002",
+  "Category": null,
+  "Brand": null,
+  "TotalSalesChannel": null,
+  "DateModified": null,
+  "UserId": 1,
+  "Status": "N",
+  "Eans": null,
+  "UpdatedByName": "manager",
+  "UpdatedByEmail": ""
+}
+```
+
+### `GET /api/catalog/price-lists`
+
+Lista las listas de precios con soporte de paginación y filtros.
+
+**URL de ejemplo:**
+
+https://catalogomimbral.loclx.io/api/catalog/price-lists
+
+**Parámetros de consulta opcionales:**
+
+- `page` (número): Página solicitada (por defecto: 1)
+- `pageSize` (número): Tamaño de página (por defecto: 100, máximo: 500)
+- `listNum` (string): Número de la lista de precios
+- `listName` (string): Nombre de la lista de precios
+- `groupCode` (string): Código del grupo de clientes asociado a la lista
+- `validFor` (string): Indica si la lista está activa (Y) o no (N)
+- `validFrom` (string): Fecha de inicio de validez
+- `validTo` (string): Fecha de fin de validez
+- `sortBy` (string): Campo por el cual ordenar los resultados (por defecto: ListNum)
+- `sortOrder` (`ASC` | `DESC`): Orden de resultados (por defecto: `ASC`)
+
+**Respuesta:**
+```json
+{
+  "page": 1,
+  "pageSize": 100,
+  "totalRecords": 4,
+  "totalPages": 1,
+  "data": [
+    {
+      "ListNum": 1,
+      "ListName": "T1",
+      "GroupCode": 1,
+      "UpdateDate": null,
+      "CreateDate": "2020-11-24T00:00:00.000Z",
+      "ValidFor": "Y",
+      "ValidFrom": null,
+      "ValidTo": null,
+      "CreatedByName": "manager",
+      "CreatedByEmail": "",
+      "UpdatedByName": null,
+      "UpdatedByEmail": null,
+      "CreatedById": 1,
+      "UpdatedById": null
+    },
+    {
+      "ListNum": 2,
+      "ListName": "T2",
+      "GroupCode": 1,
+      "UpdateDate": null,
+      "CreateDate": "2020-11-24T00:00:00.000Z",
+      "ValidFor": "Y",
+      "ValidFrom": null,
+      "ValidTo": null,
+      "CreatedByName": "manager",
+      "CreatedByEmail": "",
+      "UpdatedByName": null,
+      "UpdatedByEmail": null,
+      "CreatedById": 1,
+      "UpdatedById": null
+    }
+  ]
+}
+```
+
+## GET /api/catalog/price-lists/:listNum
+
+Obtiene el detalle de una lista de precios específica.
+
+**URL de ejemplo:**
+
+https://catalogomimbral.loclx.io/api/catalog/price-lists/1
+
+```json
+{
+  "ListNum": 1,
+  "ListName": "T1",
+  "GroupCode": 1,
+  "UserSign": 1,
+  "UserSign2": null,
+  "UpdateDate": null,
+  "CreateDate": "2020-11-24T00:00:00.000Z",
+  "ValidFor": "Y",
+  "ValidFrom": null,
+  "ValidTo": null,
+  "CreatedByName": "manager",
+  "CreatedByEmail": ""
+}
+```
+
+## GET /api/catalog/listprices
+
+Obtiene los precios de productos por lista, con filtros como rango de precio o código de producto.
+
+**URL de ejemplo:**
+
+https://catalogomimbral.loclx.io/api/catalog/listprices
+
+**Parámetros de consulta opcionales:**
+
+- `itemCode ` (string): Código del producto
+- `price ` (decimal): Precio exacto del producto
+- `priceIVA ` (decimal): Precio con IVA incluido
+- `priceList ` (número): ID de la lista de precios
+- `minPrice ` (decimal): Precio mínimo para filtrar
+- `maxPrice ` (decimal):Precio máximo para filtrar
+- `page` (número): Página solicitada (por defecto: 1)
+- `pageSize` (número): Tamaño de página (por defecto: 100, máximo: 500)
+- `sortBy` (string): Campo por el cual ordenar los resultados (por defecto: ListNum)
+- `sortOrder` (`ASC` | `DESC`): Orden de resultados (por defecto: `ASC`)
+
+```json
+{
+  "page": 1,
+  "pageSize": 100,
+  "totalRecords": 191108,
+  "totalPages": 1912,
+  "data": [
+    {
+      "ItemCode": "001001002",
+      "PriceList": 1,
+      "Price": 999989,
+      "PriceIVA": 1189986.91,
+      "CreatedAt": "2025-07-28T14:00:13.910Z",
+      "UpdatedAt": null,
+      "ItemName": "XXXCEMENTO PREMEZCLADO HN15 CON GRAVILLA",
+      "MinQuantity": 0,
+      "DateFrom": null,
+      "DateTo": null,
+      "DateModified": null
+    },
+    {
+      "ItemCode": "001001002",
+      "PriceList": 2,
+      "Price": 919989.88,
+      "PriceIVA": 1094787.9572,
+      "CreatedAt": "2025-07-28T14:00:13.910Z",
+      "UpdatedAt": null,
+      "ItemName": "XXXCEMENTO PREMEZCLADO HN15 CON GRAVILLA",
+      "MinQuantity": 0,
+      "DateFrom": null,
+      "DateTo": null,
+      "DateModified": null
+    }
+  ]
+}
+
+```
+
+## GET /api/catalog/listprices/:itemCode/:priceList
+
+Obtiene el precio de un producto específico en una lista de precios.
+
+**URL de ejemplo:**
+
+https://catalogomimbral.loclx.io/api/catalog/listprices/:itemCode/:priceList
+
+```json
+{
+  "ItemCode": "001001002",
+  "PriceList": 1,
+  "Price": 999989,
+  "PriceIVA": 1189986.91,
+  "CreatedAt": "2025-07-28T14:00:13.910Z",
+  "UpdatedAt": null,
+  "ItemName": "XXXCEMENTO PREMEZCLADO HN15 CON GRAVILLA",
+  "MinQuantity": 0,
+  "DateFrom": null,
+  "DateTo": null,
+  "DateModified": null
+}
+```
+
 -----
 
 ## Configuración
