@@ -25,13 +25,13 @@ Este microservicio ha sido desarrollado utilizando el siguiente stack tecnológi
 ## Endpoints
 ## 📘 API - Categoría Padre
 
-### `GET /api/catalog/getfirstlevel`
+### `GET catalogomimbral.loclx.io/api/catalog/getfirstlevel`
 
 Permite obtener el Name y Code de la categoría padre para utilizar en filtros
 **URL:**
 
 ```json
-http://localhost:8080/api/catalog/getfirstlevel
+http://catalogomimbral.loclx.io/api/catalog/getfirstlevel
 ```
 **Descripción:**
 
@@ -52,13 +52,13 @@ Obtiene la lista completa de categoría padre disponibles.
 ]
 ```
     *Descripción*: El usuario ha obtenido todas las categoría padre disponibles.
-### `GET /api/catalog/getfirstlevel?buscar=`
+### `GET catalogomimbral.loclx.io/api/catalog/getfirstlevel?buscar=`
 
 **URL:**
 
 ```json
-http://localhost:8080/api/catalog/getfirstlevel?buscar=aire
-http://localhost:8080/api/catalog/getfirstlevel?buscar=399
+http://catalogomimbral.loclx.io/api/catalog/getfirstlevel?buscar=aire
+http://catalogomimbral.loclx.io/api/catalog/getfirstlevel?buscar=399
 ```
 
 **Descripción:**
@@ -79,14 +79,14 @@ Obtiene la lista de la categoría padre filtrada por busqueda.
 
 ## 📘 API - Buscar Categorías
 
-### `GET api/catalog/getcategory`
+### `GET catalogomimbral.loclx.io/api/catalog/getcategory`
 
 Permite obtener todas las categorías o realizar búsquedas filtradas. El servicio retorna un arreglo JSON con los campos `Code` y `Name` correspondientes a cada categoría registrada.
 
 **URL:**
 
 ```json
-http://localhost:8080/api/catalog/getcategory
+http://catalogomimbral.loclx.io/api/catalog/getcategory
 ```
 
 **Descripción:**
@@ -112,13 +112,13 @@ Obtiene la lista completa de categorías disponibles.
 ]
 ```
     *Descripción*: El usuario ha obtenido todas las categorias.
-### `GET api/catalog/getcategory?buscar=`
+### `GET catalogomimbral.loclx.io/api/catalog/getcategory?buscar=`
 
 **URL:**
 
 ```json
-http://localhost:8080/api/catalog/getcategory?buscar=herramientas
-http://localhost:8080/api/catalog/getcategory?buscar=3019
+http://catalogomimbral.loclx.io/api/catalog/getcategory?buscar=herramientas
+http://catalogomimbral.loclx.io/api/catalog/getcategory?buscar=3019
 ```
 
 **Descripción:**
@@ -159,11 +159,11 @@ Obtiene la lista de categorias filtrada por busqueda.
     *Descripción*: El usuario ha obtenido las categorias filtradas por la busqueda.
 ## 📘 API - Catalogo Categorías
 
-### `GET api/catalog/getcategorytree`
+### `GET catalogomimbral.loclx.io/api/catalog/getcategorytree`
 
 **URL:**
 ```json
-http://localhost:8080/api/catalog/getcategorytree
+http://catalogomimbral.loclx.io/api/catalog/getcategorytree
 ```
 
 **Descripción:**
@@ -206,11 +206,11 @@ Obtiene el cátalogo de las categorías con la siguiente estructura:
 ```
     *Descripción*: El usuario ha obtenido las categorias con filtros de paginación por defecto, con un size de 40.
 
-### `GET /api/catalog/getcategorytree?buscarname=&buscarreference=&buscarnametree=herramientas&page=&pageSize=`
+### `GET catalogomimbral.loclx.io/api/catalog/getcategorytree?buscarname=&buscarreference=&buscarnametree=herramientas&page=&pageSize=`
 
 **URL:**
 ```json
-http://localhost:8080/api/catalog/getcategorytree?buscarname=medidores%20de%20presion&buscarreference=&buscarnametree=herramientas&page=&pageSize=
+http://catalogomimbral.loclx.io/api/catalog/getcategorytree?buscarname=medidores%20de%20presion&buscarreference=&buscarnametree=herramientas&page=&pageSize=
 ```
 
 **Descripción:**
@@ -245,11 +245,11 @@ buscarnametree=
 
 ## 📘 API - Detalle Catalago Hijo
 
-### `GET /api/catalog/getsubcategory/:id`
+### `GET catalogomimbral.loclx.io/api/catalog/getsubcategory/:id`
 
 **URL:**
 ```json
-http://localhost:8080/api/catalog/getsubcategory/3019
+http://catalogomimbral.loclx.io/api/catalog/getsubcategory/3019
 ```
 
 **Descripción:**
