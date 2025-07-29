@@ -1,38 +1,51 @@
 // src/proxy/routeFactory.js
+import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { Buffer } from 'buffer';
 import createBreaker from '../utils/createBreaker.js';
+import auth from '../middlewares/auth.js';
 
-export function makeRoute({ path, target }) {
+export function makeRoute({ path, target, requireAuth = false, publicPaths = [], prependBasePath = true }) {
   const breaker = createBreaker(target);
+  const router = express.Router();
 
-  return {
-    mountPoint: path,
-    handler: createProxyMiddleware({
+  if (requireAuth) {
+    router.use((req, res, next) => {
+      const rel = (req.originalUrl || req.url || '').replace(path, '') || '/';
+      const isPublic = publicPaths.some(p => rel.startsWith(p));
+      if (isPublic) return next();
+      return auth(req, res, next);
+    });
+  }
+
+  router.use(
+    createProxyMiddleware({
       target,
       changeOrigin: true,
-
-      // ✅ Reescribe para mantener solo UNA instancia del path
-      pathRewrite: (url) => `${path}${url}`, 
+      // ⬇️ Si tu micro usa prefijo, prependemos el mountPoint:
+      pathRewrite: prependBasePath
+        ? (incomingPath) => `${path}${incomingPath}`  // '/api/catalog' + '/getcategory'
+        : undefined,
 
       onProxyReq: (proxyReq, req) => {
-        if (breaker.closed) {
-          // ✅ Reinyectar body si fue parseado por express.json()
-          if (req.body && typeof req.body === 'object') {
-            const bodyData = JSON.stringify(req.body);
-            proxyReq.setHeader('Content-Type', 'application/json');
-            proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-            proxyReq.write(bodyData);
-          }
-        } else {
-          throw new Error(`Circuit open for ${target}`);
+        if (!breaker.closed) throw new Error(`Circuit open for ${target}`);
+        const method = req.method.toUpperCase();
+        const hasBody = method === 'POST' || method === 'PUT' || method === 'PATCH';
+        const isJSON = (req.headers['content-type'] || '').includes('application/json');
+        if (hasBody && isJSON && req.body && typeof req.body === 'object') {
+          const bodyData = JSON.stringify(req.body);
+          proxyReq.setHeader('Content-Type', 'application/json');
+          proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+          proxyReq.write(bodyData);
         }
       },
 
-      onError: (_err, _req, res) => {
+      onError: (err, _req, res) => {
+        console.error(`[ProxyError] ${target}:`, err.message);
         res.status(502).json({ message: 'Microservicio no disponible' });
       }
-    }),
-    breaker
-  };
+    })
+  );
+
+  return { mountPoint: path, handler: router, breaker };
 }

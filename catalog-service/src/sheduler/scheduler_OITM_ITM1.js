@@ -9,7 +9,7 @@ console.log('Tipo de runPriceListJob:', typeof runPriceListJob);
 
 console.log('🔁 Job unificado de sincronización programado para ejecutarse cada 5 minutos...');
 
-cron.schedule('*/2 * * * *', async () => {
+cron.schedule('*/5 * * * *', async () => {
   const now = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
   console.log(`🕒 Iniciando sincronización completa [${now}]`);
 
@@ -24,21 +24,21 @@ cron.schedule('*/2 * * * *', async () => {
     console.log('🔹 Iniciando sincronización de precios...');
     await runSyncPriceJob();
     console.log('✅ Precios sincronizados correctamente.');
-    // paso 2.5:Lista de precios
+    // paso 3:Lista de precios
     console.log(' Iniciando sincronizacion de lista de precios.')
     await runPriceListJob()
     console.log(' Lista de precios sincronizada correctamente.')
-    // Paso 3: Categorías
+    // Paso 4: Categorías
     console.log('🔹 Iniciando sincronización de categorías...');
     await runAuxSyncJob();
     console.log('✅ Categorías sincronizadas correctamente.');
 
-    // Paso 4: Grupos de ítems
+    // Paso 5: Grupos de ítems
     console.log('🔹 Iniciando sincronización de grupos de ítems...');
     await runItmsJobs();
     console.log('✅ Grupos de ítems sincronizados correctamente.');
 
-    //Paso 5: Codigo de barras
+    //Paso 6: Codigo de barras
     console.log('🔹 Iniciando sincronización de códigos de barras...');
     await runBarcodeJob();
     console.log('✅ Códigos barra sincronizados correctamente.');

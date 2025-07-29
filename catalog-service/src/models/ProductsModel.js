@@ -2,6 +2,7 @@ const { catalogPool, catalogPoolConnect, sql } = require('../config/dbnew');
 
 
 const {sapPool,sapPoolConnect} = require('../config/dbnewsap')
+
 const VALID_SORT = [
   'ItemCode',
   'ItemName',
@@ -14,28 +15,36 @@ async function getProducts(opts) {
   await catalogPoolConnect;
 
   const where = [];
-  const req   = catalogPool.request();
+
+  // Filtro obligatorio: solo productos activos
+  where.push("P.ValidFor = 'Y'");
+
+  const req = catalogPool.request();
 
   if (opts.itemCode) {
     where.push('P.ItemCode LIKE @itemCode');
     req.input('itemCode', sql.NVarChar(50), `%${opts.itemCode}%`);
   }
+
   if (opts.name) {
     where.push('P.ItemName LIKE @name');
     req.input('name', sql.NVarChar(100), `%${opts.name}%`);
   }
+
   if (opts.category) {
     where.push('(P.U_Categoria = @category OR C.Name = @category)');
     req.input('category', sql.NVarChar(200), opts.category);
   }
+
   if (opts.barcode) {
     where.push('P.CodeBars = @barcode');
     req.input('barcode', sql.NVarChar(254), opts.barcode);
   }
- 
-  const whereSQL  = where.length ? 'WHERE ' + where.join(' AND ') : '';
-  const sortBy    = VALID_SORT.includes(opts.sortBy) ? opts.sortBy : 'ItemCode';
-  const sortOrder = opts.sortOrder.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+  const whereSQL = 'WHERE ' + where.join(' AND ');
+
+  const sortBy = VALID_SORT.includes(opts.sortBy) ? opts.sortBy : 'ItemCode';
+  const sortOrder = (opts.sortOrder || '').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
   const sqlText = `
     WITH Q AS (
@@ -49,47 +58,45 @@ async function getProducts(opts) {
         P.UpdatedAt   AS DateModified,
         P.UserSign    AS UserId,
         CASE P.ValidFor
-            WHEN 'Y' THEN 'Activo'
-            WHEN 'N' THEN 'Inactivo'
-            ELSE P.ValidFor 
-        END          AS Status,
-        P.CodeBars    AS Eans,
+          WHEN 'Y' THEN 'Activo'
+          WHEN 'N' THEN 'Inactivo'
+          ELSE P.ValidFor 
+        END AS Status,
+        P.CodeBars AS Eans,
         COUNT(*) OVER() AS totalRecords
       FROM dbo.OITM_Products AS P
-      LEFT JOIN dbo.CATEGORIA AS C
-             ON C.Code = P.U_Categoria
+      LEFT JOIN dbo.CATEGORIA AS C ON C.Code = P.U_Categoria
       ${whereSQL}
     )
     SELECT
       Image, Name, ItemCode, Category, Brand,
-      TotalSalesChannel, DateModified,UserId, Status, Eans,
+      TotalSalesChannel, DateModified, UserId, Status, Eans,
       totalRecords
     FROM Q
     ORDER BY ${sortBy} ${sortOrder}
-    OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;`;
+    OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+  `;
 
-  req.input('offset',   sql.Int, (opts.page - 1) * opts.pageSize);
-  req.input('pageSize', sql.Int,  opts.pageSize);
+  req.input('offset', sql.Int, (opts.page - 1) * opts.pageSize);
+  req.input('pageSize', sql.Int, opts.pageSize);
 
   const r = await req.query(sqlText);
+
   console.log('🔍 Productos recibidos desde OMS:', r.recordset);
-  /* const totalRecords = r.recordset[0]?.totalRecords ?? 0;
-  const data         = r.recordset.map(({ totalRecords, ...row }) => row); */
-  const userIds  = [...new Set(r.recordset.map(row => row.UserId).filter(Boolean))];
+
+  const userIds = [...new Set(r.recordset.map(row => row.UserId).filter(Boolean))];
   console.log('🧾 userIds extraídos:', userIds);
+
   const userInfo = await getUsersByIds(userIds);
   console.log('📬 userInfo recibido de SAP:', userInfo);
-  const userMap  = Object.fromEntries(userIds.map((id, i) => [id, userInfo[i]]));
 
- 
-console.log('🗺️ Mapeo final de usuarios (userMap):', userMap);
-
+  const userMap = Object.fromEntries(userIds.map((id, i) => [id, userInfo[i]]));
 
   const totalRecords = r.recordset[0]?.totalRecords ?? 0;
   const data = r.recordset.map(({ totalRecords, UserId, ...row }) => ({
     ...row,
-    CreatedName  : userMap[UserId]?.name  ?? null,
-    CreatedEmail : userMap[UserId]?.email ?? null
+    CreatedName: userMap[UserId]?.name ?? null,
+    CreatedEmail: userMap[UserId]?.email ?? null
   }));
 
   return {
@@ -114,6 +121,8 @@ async function getProductBySku(itemCode) {
         P.ItemCode    AS SKU,
         C.Name        AS Category,
         P.U_Marca     AS Brand,
+        p.CreateDate  AS CreateDate,
+        p.CreateTS    AS CreateTime,
         CAST(NULL AS INT) AS TotalSalesChannel,
         P.UpdatedAt   AS DateModified,
         P.UserSign    AS UserId,
