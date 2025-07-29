@@ -17,4 +17,5 @@ router.get('/price-lists/:listNum',  priceListCtrl.getPriceListById);
 router.get('/listprices', listPriceController.getListPrices);
 router.get('/listprices/:itemCode/:priceList', listPriceController.getListPriceById);
 
+
 module.exports = router;

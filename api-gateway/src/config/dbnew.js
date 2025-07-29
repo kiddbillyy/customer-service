@@ -1,6 +1,5 @@
-// dbnew.js
-const sql = require('mssql');
-require('dotenv').config();
+// src/config/dbnew.js (ESM)
+import sql from 'mssql';         // <--- default import
 
 const omsConfig = {
   user: process.env.DB_USER,
@@ -12,11 +11,9 @@ const omsConfig = {
   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
 };
 
-console.log("config: ",omsConfig)
-
-const IdServicePool = new sql.ConnectionPool(omsConfig);
-const IdServicePoolConnect = IdServicePool.connect()
+const catalogPool = new sql.ConnectionPool(omsConfig);
+const catalogPoolConnect = catalogPool.connect()
   .then(() => console.log('✅ Conectado a ID-SERVICE (OMS) DB'))
   .catch(err => console.error('❌ Error conectando a ID-SERVICE DB:', err));
 
-module.exports = { sql, IdServicePool, IdServicePoolConnect };
+export { sql, catalogPool, catalogPoolConnect };
