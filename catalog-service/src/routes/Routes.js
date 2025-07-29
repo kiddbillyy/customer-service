@@ -1,7 +1,6 @@
 // routes/Routes.js
 const express = require('express');
 const router = express.Router();
-const { obtenerItemFijo } = require('../controllers/prueba');
 const listPriceController = require('../controllers/price-list');
 const productCtrl = require('../controllers/Product-Controller');
 const priceListCtrl = require('../controllers/ListPrice-Controller');
@@ -18,6 +17,4 @@ router.get('/price-lists/:listNum',  priceListCtrl.getPriceListById);
 router.get('/listprices', listPriceController.getListPrices);
 router.get('/listprices/:itemCode/:priceList', listPriceController.getListPriceById);
 
-/* ──────────── CEMENTO ──────────── */
-router.get('/item-cemento', obtenerItemFijo);
 module.exports = router;
