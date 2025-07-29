@@ -12,9 +12,11 @@ const omsConfig = {
   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
 };
 
-const catalogPool = new sql.ConnectionPool(omsConfig);
-const catalogPoolConnect = catalogPool.connect()
+console.log("config: ",omsConfig)
+
+const IdServicePool = new sql.ConnectionPool(omsConfig);
+const IdServicePoolConnect = IdServicePool.connect()
   .then(() => console.log('✅ Conectado a ID-SERVICE (OMS) DB'))
   .catch(err => console.error('❌ Error conectando a ID-SERVICE DB:', err));
 
-module.exports = { sql, catalogPool, catalogPoolConnect };
+module.exports = { sql, IdServicePool, IdServicePoolConnect };
