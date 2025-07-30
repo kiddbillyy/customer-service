@@ -1,4 +1,4 @@
 # APIs
 ## Obtener Departamento
 
-https://catalogomimbral.loclx.io/api/idservice/getdepartments
+https://catalogomimbral.loclx.io/api/idservice/departments
