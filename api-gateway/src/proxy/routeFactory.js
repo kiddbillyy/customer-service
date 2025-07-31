@@ -1,7 +1,5 @@
-// src/proxy/routeFactory.js
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { Buffer } from 'buffer';
 import createBreaker from '../utils/createBreaker.js';
 import auth from '../middlewares/auth.js';
 
@@ -22,24 +20,11 @@ export function makeRoute({ path, target, requireAuth = false, publicPaths = [],
     createProxyMiddleware({
       target,
       changeOrigin: true,
-      // ⬇️ Si tu micro usa prefijo, prependemos el mountPoint:
       pathRewrite: prependBasePath
-        ? (incomingPath) => `${path}${incomingPath}`  // '/api/catalog' + '/getcategory'
+        ? (incomingPath) => `${path}${incomingPath}`
         : undefined,
-
-      onProxyReq: (proxyReq, req) => {
-        if (!breaker.closed) throw new Error(`Circuit open for ${target}`);
-        const method = req.method.toUpperCase();
-        const hasBody = method === 'POST' || method === 'PUT' || method === 'PATCH';
-        const isJSON = (req.headers['content-type'] || '').includes('application/json');
-        if (hasBody && isJSON && req.body && typeof req.body === 'object') {
-          const bodyData = JSON.stringify(req.body);
-          proxyReq.setHeader('Content-Type', 'application/json');
-          proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-          proxyReq.write(bodyData);
-        }
-      },
-
+      timeout: 15000,
+      proxyTimeout: 15000,
       onError: (err, _req, res) => {
         console.error(`[ProxyError] ${target}:`, err.message);
         res.status(502).json({ message: 'Microservicio no disponible' });

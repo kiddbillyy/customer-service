@@ -10,27 +10,34 @@ import errorHandler from './middlewares/errorHandler.js';
 
 const app = express();
 
-// 🚫 Caso A: SIN proxy/LB delante ⇒ NO confiar en proxies
-app.set('trust proxy', false); // también puedes borrar esta línea; por defecto es false
+app.set('trust proxy', false);
 
-// Middlewares base
+// Middlewares base (NO parsee el body aquí)
 app.use(cors());
 app.use(helmet());
 app.use(compression());
 app.use(logger);
 
-// 📌 Importante: parsear body ANTES de montar proxies
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true }));
+// Log de entrada (útil para depurar)
+app.use((req, _res, next) => {
+  const ct = req.headers['content-type'] || '';
+  const cl = req.headers['content-length'] || 'N/A';
+  console.log('[GW-IN]', req.method, req.originalUrl, 'CT=', ct, 'CL=', cl);
+  next();
+});
 
-// Rate limit (sin trustProxy)
+// Rate limit antes de los proxies (ok)
 app.use(rateLimiter);
 
-// Monta dinámicamente cada ruta-proxy
+// 👉 Monta dinámicamente cada ruta-proxy **ANTES** de parsear body
 Object.values(services).forEach((cfg) => {
   const { mountPoint, handler } = makeRoute(cfg);
   app.use(mountPoint, handler);
 });
+
+// (Opcional) Si el Gateway tiene endpoints PROPIOS que necesitan body parser, colócalos DESPUÉS:
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 app.get('/health', (_req, res) => res.send('OK'));
 
