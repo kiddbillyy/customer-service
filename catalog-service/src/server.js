@@ -5,7 +5,6 @@ const { connectProducer } = require('./utils/kafkaProducer');
 require('./sheduler/scheduler_OITM_ITM1');   
 const pruebaRoutes = require('./routes/Routes');
 const categoryRoutes = require('./routes/Category.Routes');
-const pruebaRoutes = require('./routes/Routes');
 
 
 dotenv.config();

@@ -14,9 +14,9 @@ export default {
   pricing:  { path: '/api/pricing',   target: 'http://inventory-service:5005' },
 
   // Rutas Microservicio Catalog Service
-  //catalog: { path: '/api/catalog', target: 'http://catalog-service:5006', requireAuth: true, prependBasePath: true },
+ // catalog: { path: '/api/catalog', target: 'http://catalog-service:5006', requireAuth: true, prependBasePath: true },
   catalog: { path: '/api/catalog', target: 'http://catalog-service:5006', requireAuth: false },
   
   //Rutas Microservicio ID SERVICE 
-  login:    { path: '/api/login',     target: 'http://id-service:5007' },
-};
+  login:    { path: '/api/idservice',     target: 'http://id-service:5007',requireAuth: false },
+};                                                                       
