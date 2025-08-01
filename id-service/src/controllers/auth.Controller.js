@@ -1,19 +1,23 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { sql, IdServicePool } = require('../config/dbnew');
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
 require('dotenv').config();
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const login = async (req, res) => {
   const { correo, password, plataformaId, ip, dispositivo, forzarSesion = false } = req.body;
 
-  // Validaciones iniciales
   if (!correo || !password || !plataformaId) {
     return res.status(400).json({ error: 'Correo, contraseña y plataformaId son obligatorios.' });
   }
 
   const pool = await IdServicePool.connect();
 
-  // Buscar usuario por correo
   const usuarioResult = await pool.request()
     .input('Correo', sql.NVarChar(255), correo)
     .query(`SELECT * FROM Usuarios WHERE CorreoElectronico = @Correo`);
@@ -28,13 +32,11 @@ const login = async (req, res) => {
     return res.status(403).json({ error: 'El usuario no está activo.' });
   }
 
-  // Validar contraseña
   const esValida = bcrypt.compareSync(password, usuario.HashPassword);
   if (!esValida) {
     return res.status(401).json({ error: 'Contraseña incorrecta.' });
   }
 
-  // Verificar acceso activo a la plataforma
   const accesoPlataforma = await pool.request()
     .input('UsuarioID', sql.Int, usuario.UsuarioID)
     .input('PlataformaID', sql.Int, plataformaId)
@@ -47,7 +49,6 @@ const login = async (req, res) => {
     return res.status(403).json({ error: 'No tienes acceso activo a esta plataforma.' });
   }
 
-  // Verificar sesión activa
   const tokenExistente = await pool.request()
     .input('UsuarioID', sql.Int, usuario.UsuarioID)
     .input('PlataformaID', sql.Int, plataformaId)
@@ -63,7 +64,6 @@ const login = async (req, res) => {
     });
   }
 
-  // Invalidar sesión previa si se forzó
   if (tokenExistente.recordset.length > 0 && forzarSesion) {
     await pool.request()
       .input('UsuarioID', sql.Int, usuario.UsuarioID)
@@ -75,20 +75,18 @@ const login = async (req, res) => {
       `);
   }
 
-  // Generar nuevo JWT
   const payload = {
     usuarioId: usuario.UsuarioID,
     correo: usuario.CorreoElectronico,
     plataformaId: plataformaId
   };
 
-   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7h' });
+  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7h' });
 
-   const now = new Date();
-   const expiracion = new Date(now.getTime() + 7 * 60 * 60 * 1000); // 7 horas
+  // Convertir hora de Santiago a UTC
+  const nowUtc = dayjs().tz('America/Santiago').utc().toDate();
+  const expiracionUtc = dayjs(nowUtc).add(7, 'hour').toDate();
 
-
-  // Guardar en TOKENS_ACTIVOS
   await pool.request()
     .input('UsuarioID', sql.Int, usuario.UsuarioID)
     .input('PlataformaID', sql.Int, plataformaId)
@@ -96,8 +94,8 @@ const login = async (req, res) => {
     .input('Valido', sql.Bit, 1)
     .input('IP', sql.NVarChar(50), ip ?? null)
     .input('Dispositivo', sql.NVarChar(100), dispositivo ?? null)
-    .input('FechaCreacion', sql.DateTime, now)
-    .input('FechaExpiracion', sql.DateTime, expiracion)
+    .input('FechaCreacion', sql.DateTime, nowUtc)
+    .input('FechaExpiracion', sql.DateTime, expiracionUtc)
     .query(`
       INSERT INTO TOKENS_ACTIVOS (
         USUARIO_ID, PLATAFORMA_ID, TOKEN, VALIDO, IP, DISPOSITIVO, FECHA_CREACION, FECHA_EXPIRACION
@@ -107,11 +105,10 @@ const login = async (req, res) => {
       )
     `);
 
-  // Guardar en HISTORIAL_SESIONES
   await pool.request()
     .input('UsuarioID', sql.Int, usuario.UsuarioID)
     .input('PlataformaID', sql.Int, plataformaId)
-    .input('FechaInicio', sql.DateTime, now)
+    .input('FechaInicio', sql.DateTime, nowUtc)
     .input('Token', sql.NVarChar, token)
     .input('IP', sql.NVarChar(50), ip ?? null)
     .input('Dispositivo', sql.NVarChar(100), dispositivo ?? null)
@@ -134,14 +131,13 @@ const login = async (req, res) => {
       )
     `);
 
-  // Enviar token al cliente
   res.status(200).json({
     message: 'Inicio de sesión exitoso.',
     token,
     usuarioId: usuario.UsuarioID,
     correo: usuario.CorreoElectronico,
     plataformaId,
-    expiracion: expiracion.toISOString()
+    expiracion: expiracionUtc.toISOString()
   });
 };
 
