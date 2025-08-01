@@ -12,7 +12,6 @@ const omsConfig = {
   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
 };
 
-console.log("config: ",omsConfig)
 
 const IdServicePool = new sql.ConnectionPool(omsConfig);
 const IdServicePoolConnect = IdServicePool.connect()
