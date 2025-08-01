@@ -11,9 +11,10 @@ async function getListPrices(opts){
   const priceIvaExpr = `CAST(CASE WHEN P.TaxCodeAR = 'IVA_EXE' THEN L.Price ELSE L.Price * 1.19 END AS NUMERIC(19,6))`;
 
   if (opts.itemCode){
-    where.push('L.ItemCode LIKE @itemCode');
-    req.input('itemCode', sql.NVarChar(50), `%${opts.itemCode}%`);
+    where.push('(L.ItemCode LIKE @itemCode OR P.ItemName LIKE @itemCode)');
+    req.input('itemCode', sql.NVarChar(100), `%${opts.itemCode}%`);
   }
+  
   if (opts.price != null) {
     where.push('L.Price = @price');
     req.input('price', sql.Numeric(19,6), opts.price);
@@ -35,55 +36,56 @@ async function getListPrices(opts){
     req.input('maxPrice', sql.Numeric(19,6), opts.maxPrice);
   }
 
+  where.push(`P.ValidFor = 'Y'`);
 
   const whereSQL   = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const sortBy     = VALID_SORT.includes(opts.sortBy) ? opts.sortBy : 'ItemCode';
   const sortOrder  = opts.sortOrder.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
   const sqlText = `
-   WITH Q AS (
-    SELECT  L.ItemCode,
-            L.PriceList,
-            L.Price,
-            ${priceIvaExpr} AS PriceIVA,
-            L.CreatedAt,
-            L.UpdatedAt,
-            P.ItemName,
-            P.MinLevel  AS MinQuantity,
-            P.ValidFrom AS DateFrom,
-            P.ValidTo   AS DateTo,
-            P.UpdatedAt AS DateModified,
-            COUNT(*) OVER() AS totalRecords
-    FROM dbo.ITM1_ListPrice  AS L
-    JOIN dbo.OITM_Products   AS P ON P.ItemCode = L.ItemCode
-    ${whereSQL}
-  )
-  SELECT ItemCode, PriceList, Price, PriceIVA,
-         CreatedAt, UpdatedAt,
-         ItemName, MinQuantity, DateFrom, DateTo, DateModified,
-         totalRecords
-  FROM Q
-  ORDER BY ${sortBy} ${sortOrder}
-  OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
-`;
-
+    WITH Q AS (
+      SELECT  L.ItemCode,
+              L.PriceList,
+              L.Price,
+              ${priceIvaExpr} AS PriceIVA,
+              L.CreatedAt,
+              L.UpdatedAt,
+              P.ItemName,
+              P.MinLevel  AS MinQuantity,
+              P.ValidFrom AS DateFrom,
+              CASE WHEN P.ValidFor = 'Y' THEN 'Active' ELSE 'Inactive' END AS Status,
+              P.ValidTo   AS DateTo,
+              P.UpdatedAt AS DateModified,
+              COUNT(*) OVER() AS totalRecords
+      FROM dbo.ITM1_ListPrice  AS L
+      JOIN dbo.OITM_Products   AS P ON P.ItemCode = L.ItemCode
+      ${whereSQL}
+    )
+    SELECT ItemCode, PriceList, Price, PriceIVA,
+           CreatedAt, UpdatedAt,
+           ItemName, MinQuantity, DateFrom, DateTo, DateModified,Status,
+           totalRecords
+    FROM Q
+    ORDER BY ${sortBy} ${sortOrder}
+    OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+  `;
 
   req.input('offset', sql.Int, (opts.page - 1) * opts.pageSize);
   req.input('pageSize', sql.Int, opts.pageSize);
 
   const r = await req.query(sqlText);
-  console.log("consulta: ",sqlText)
-  const totalRecords = r.recordset[0]?.totalRecords ?? 0;
+  console.log("consulta: ", sqlText);
 
+  const totalRecords = r.recordset[0]?.totalRecords ?? 0;
   const data = r.recordset.map(({ totalRecords, ...row }) => row);
 
   return {
-  page: opts.page,
-  pageSize: opts.pageSize,
-  totalRecords,
-  totalPages: Math.ceil(totalRecords / opts.pageSize),
-  data
-};
+    page: opts.page,
+    pageSize: opts.pageSize,
+    totalRecords,
+    totalPages: Math.ceil(totalRecords / opts.pageSize),
+    data
+  };
 }
 
 async function getListPriceById(itemCode, priceList) {
@@ -115,3 +117,5 @@ module.exports = {
   getListPrices,
   getListPriceById
 };
+
+
