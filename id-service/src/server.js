@@ -1,13 +1,9 @@
+//server.js
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-/* const rolesRoutes   = require('./routes/Role.Router');
-const departmentsRoutes = require('./routes/Departments.Routes');
-const modulosPlataformaRoutes = require('./routes/ModulosPlataforma.Routes');
-const submodulosRoutes = require('./routes/SubModulos.Routes');
-const endpointsApiRoutes = require('./routes/Endpoints.Routes') */
-const apiRoutes = require('./routes/index')
 
+const apiRoutes = require('./routes/index')
 
 dotenv.config();
 

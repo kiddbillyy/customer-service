@@ -20,6 +20,7 @@ services:
       DB_USER: DEV
       DB_PASSWORD: "1234"
       DB_NAME: ID_SERVICE_DB
+      JWT_SECRET: mysupersecretkey
       TZ: America/Santiago
     networks:
       - orders-service_kafka_network
