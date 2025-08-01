@@ -82,10 +82,11 @@ const login = async (req, res) => {
     plataformaId: plataformaId
   };
 
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7h' });
 
-  const now = new Date();
-  const expiracion = new Date(now.getTime() + 60 * 60 * 1000); // 1 hora
+   const now = new Date();
+   const expiracion = new Date(now.getTime() + 7 * 60 * 60 * 1000); // 7 horas
+
 
   // Guardar en TOKENS_ACTIVOS
   await pool.request()
