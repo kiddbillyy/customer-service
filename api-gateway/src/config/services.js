@@ -1,4 +1,3 @@
-// src/config/services.js
 export default {
   orders:   { path: '/api/orders',    target: 'http://orders-service:5000' },
   picking:  { path: '/api/picking',   target: 'http://picking-service:5001' },
@@ -14,9 +13,21 @@ export default {
   pricing:  { path: '/api/pricing',   target: 'http://inventory-service:5005' },
 
   // Rutas Microservicio Catalog Service
- // catalog: { path: '/api/catalog', target: 'http://catalog-service:5006', requireAuth: true, prependBasePath: true },
-  catalog: { path: '/api/catalog', target: 'http://catalog-service:5006', requireAuth: false },
-  
-  //Rutas Microservicio ID SERVICE 
-  login:    { path: '/api/idservice',     target: 'http://id-service:5007',requireAuth: false },
-};                                                                       
+  // catalog: { path: '/api/catalog', target: 'http://catalog-service:5006', requireAuth: true, prependBasePath: true },
+  catalog:  { path: '/api/catalog',  target: 'http://catalog-service:5006', requireAuth: false },
+
+  // Rutas Microservicio ID SERVICE
+  idserviceLogin: {
+    path: '/api/idservice/auth/login',       
+    target: 'http://id-service:5007',
+    requireAuth: false,
+    prependBasePath: true
+  },
+
+  idservice: {
+    path: '/api/idservice',                
+    target: 'http://id-service:5007',
+    requireAuth: true,
+    prependBasePath: true
+  }
+};

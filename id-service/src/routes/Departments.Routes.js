@@ -3,7 +3,7 @@ const { getDepartamentos, createDepartamento } = require('../controllers/Departm
 
 
 const router = Router();
-router.get('/departments', getDepartamentos);
-router.post('/postdepartments', createDepartamento);
+router.get('/get', getDepartamentos);
+router.post('/post', createDepartamento);
 
 module.exports = router;
