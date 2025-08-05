@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 
-const rolesRoutes = require('./Role.Router');
+const rolesRoutes = require('./Role.Routes');
 const departmentsRoutes = require('./Departments.Routes');
 
 const modulosPlataformaRoutes = require('./ModulosPlataforma.Routes');
