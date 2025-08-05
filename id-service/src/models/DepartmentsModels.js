@@ -1,4 +1,3 @@
-// CommonJS
 const { sql, IdServicePool, IdServicePoolConnect } = require('../config/dbnew');
 
 async function findAll({ soloActivos = false, buscar = null } = {}) {
@@ -12,7 +11,6 @@ async function findAll({ soloActivos = false, buscar = null } = {}) {
   }
 
   if (buscar) {
-    // Búsqueda parcial por nombre del departamento
     where.push('d.Nombre LIKE @Buscar');
     req.input('Buscar', sql.NVarChar(100), `%${buscar}%`);
   }
@@ -42,24 +40,6 @@ async function findAll({ soloActivos = false, buscar = null } = {}) {
   return recordset;
 }
 
-
-// NUEVO: resolver userId por email (ajusta nombre de tabla/columnas si difieren)
-async function findUserIdByEmail(email) {
-  await IdServicePoolConnect;
-
-  const req = IdServicePool.request()
-    .input('Email', sql.NVarChar(255), email);
-
-    const q = `
-    SELECT TOP 1 UsuarioID
-    FROM dbo.Usuarios
-    WHERE CorreoElectronico = @Email;
-    `;
-
-  const { recordset } = await req.query(q);
-  return recordset?.[0]?.UsuarioID ?? null;
-}
-
 async function create({ nombre, descripcion = null, contacto = null, estado = 1, usuarioCreador }) {
   await IdServicePoolConnect;
 
@@ -84,4 +64,7 @@ async function create({ nombre, descripcion = null, contacto = null, estado = 1,
   return recordset[0];
 }
 
-module.exports = { findAll, create, findUserIdByEmail };
+module.exports = {
+  findAll,
+  create
+};

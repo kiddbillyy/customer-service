@@ -13,6 +13,7 @@ const AsignarRolRoutes = require('./UsuarioRol.Routes')
 const plataformasRoutes = require('./Plataformas.Routes');
 const usuariosRoutes = require('./Usuario.Routes');
 const authRoutes = require('./auth.Routes');
+const PerfilesRoutes = require('./Perfiles.Routes');
 
 router.use('', rolesRoutes);
 router.use('', AsignarRolRoutes);
@@ -24,6 +25,7 @@ router.use('/departments', departmentsRoutes);
 router.use('/plataformas', plataformasRoutes);
 router.use('/usuarios', usuariosRoutes);
 router.use('/auth', authRoutes);
+router.use('/perfiles', PerfilesRoutes);
 
 module.exports = router;
 
