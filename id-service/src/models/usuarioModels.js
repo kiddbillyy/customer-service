@@ -6,119 +6,303 @@ const obtenerUsuarioPorCorreo = async (correo) => {
   const result = await pool.request()
     .input('correo', sql.NVarChar, correo)
     .query('SELECT * FROM Usuarios WHERE CorreoElectronico = @correo');
-  
   return result.recordset[0];
 };
 
-// Obtener ID de usuario por correo
-const findUserIdByEmail = async (email) => {
+// Insertar nuevo usuario y crear perfil (campos del perfil opcionales)
+const insertarUsuario = async (
+  correo,
+  hashPassword,
+  activo,
+  usuarioCreadorId,
+  perfil = {},
+  rolId = null,
+  plataformaIds = [] // nuevo parámetro: array de IDs de plataformas
+) => {
   const pool = await IdServicePool.connect();
-  const result = await pool.request()
-    .input('Email', sql.NVarChar(255), email)
-    .query(`
-      SELECT TOP 1 UsuarioID
-      FROM dbo.Usuarios
-      WHERE CorreoElectronico = @Email;
-    `);
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
 
-  return result.recordset?.[0]?.UsuarioID ?? null;
-};
+  try {
+    const request = transaction.request();
 
-// Insertar nuevo usuario con el ID del creador
-const insertarUsuario = async (correo, hashPassword, activo, correoCreador) => {
-  const pool = await IdServicePool.connect();
+    request.input('correo', sql.NVarChar, correo);
+    request.input('hashPassword', sql.NVarChar, hashPassword);
+    request.input('activo', sql.Bit, activo);
+    request.input('usuarioCreador', sql.Int, usuarioCreadorId);
 
-  const usuarioCreadorId = await findUserIdByEmail(correoCreador);
-
-  if (!usuarioCreadorId) {
-    throw new Error(`No se encontró un usuario con el correo: ${correoCreador}`);
-  }
-
-  const result = await pool.request()
-    .input('correo', sql.NVarChar, correo)
-    .input('hashPassword', sql.NVarChar, hashPassword)
-    .input('activo', sql.Bit, activo)
-    .input('usuarioCreador', sql.Int, usuarioCreadorId)
-    .query(`
-      INSERT INTO Usuarios (CorreoElectronico, HashPassword, FechaCreacion, FechaActualizacion, Activo, UsuarioCreador)
-      VALUES (@correo, @hashPassword, GETDATE(), NULL, @activo, @usuarioCreador);
+    // Insertar usuario
+    const usuarioResult = await request.query(`
+      INSERT INTO Usuarios (
+        CorreoElectronico,
+        HashPassword,
+        FechaCreacion,
+        FechaActualizacion,
+        Activo,
+        UsuarioCreador
+      )
+      VALUES (
+        @correo,
+        @hashPassword,
+        GETDATE(),
+        NULL,
+        @activo,
+        @usuarioCreador
+      );
       SELECT SCOPE_IDENTITY() AS UsuarioID;
     `);
 
-  return result.recordset[0];
-};
+    const usuarioId = usuarioResult.recordset[0].UsuarioID;
 
-const actualizarUsuarioYPerfil = async (usuarioId, datosUsuario, datosPerfil, correoActualizador) => {
-  const pool = await IdServicePool.connect();
+    // Insertar perfil asociado
+    const perfilRequest = transaction.request();
+    perfilRequest.input('UsuarioID', sql.Int, usuarioId);
+    perfilRequest.input('Nombres', sql.NVarChar(100), perfil.nombres ?? null);
+    perfilRequest.input('Apellidos', sql.NVarChar(100), perfil.apellidos ?? null);
+    perfilRequest.input('RUT', sql.NVarChar(20), perfil.rut ?? null);
+    perfilRequest.input('DepartamentoID', sql.Int, perfil.departamentoId ?? null);
+    perfilRequest.input('Telefono', sql.NVarChar(20), perfil.telefono ?? null);
+    perfilRequest.input('URLImagenPerfil', sql.NVarChar(255), perfil.urlImagenPerfil ?? null);
 
-  const usuarioActualizadorId = await findUserIdByEmail(correoActualizador);
-  if (!usuarioActualizadorId) {
-    throw new Error(`No se encontró un usuario con el correo: ${correoActualizador}`);
-  }
-
-  const request = pool.request();
-
-  // Inputs para tabla Usuarios
-  request.input('UsuarioID', sql.Int, usuarioId);
-  request.input('Correo', sql.NVarChar, datosUsuario.correo);
-  request.input('Activo', sql.Bit, datosUsuario.activo);
-  request.input('UsuarioActualizador', sql.Int, usuarioActualizadorId);
-
-  // Inputs para tabla Perfiles
-  request.input('Nombres', sql.NVarChar(100), datosPerfil.nombres ?? null);
-  request.input('Apellidos', sql.NVarChar(100), datosPerfil.apellidos ?? null);
-  request.input('RUT', sql.NVarChar(20), datosPerfil.rut ?? null);
-  request.input('DepartamentoID', sql.Int, datosPerfil.departamentoId ?? null);
-  request.input('Telefono', sql.NVarChar(20), datosPerfil.telefono ?? null);
-
-  const query = `
-    BEGIN TRANSACTION;
-
-    -- Actualiza los datos del usuario
-    UPDATE Usuarios
-    SET CorreoElectronico = @Correo,
-        Activo = @Activo,
-        FechaActualizacion = GETDATE(),
-        UsuarioActualizador = @UsuarioActualizador
-    WHERE UsuarioID = @UsuarioID;
-
-    -- Si el perfil existe, lo actualiza
-    IF EXISTS (SELECT 1 FROM Perfiles WHERE UsuarioID = @UsuarioID)
-    BEGIN
-      UPDATE Perfiles
-      SET Nombres = @Nombres,
-          Apellidos = @Apellidos,
-          RUT = @RUT,
-          DepartamentoID = @DepartamentoID,
-          Telefono = @Telefono
-      WHERE UsuarioID = @UsuarioID;
-    END
-    ELSE
-    BEGIN
+    await perfilRequest.query(`
       INSERT INTO Perfiles (
         UsuarioID,
         Nombres,
         Apellidos,
         RUT,
         DepartamentoID,
-        Telefono
-      ) VALUES (
+        Telefono,
+        URLImagenPerfil
+      )
+      VALUES (
         @UsuarioID,
         @Nombres,
         @Apellidos,
         @RUT,
         @DepartamentoID,
-        @Telefono
+        @Telefono,
+        @URLImagenPerfil
       );
-    END
+    `);
 
-    COMMIT;
+    // Insertar en USUARIO_ROL si aplica
+    if (rolId !== null) {
+      const rolRequest = transaction.request();
+      rolRequest.input('UsuarioID', sql.Int, usuarioId);
+      rolRequest.input('RolID', sql.Int, rolId);
+
+      await rolRequest.query(`
+        INSERT INTO USUARIO_ROL (USUARIO_ID, ROL_ID)
+        VALUES (@UsuarioID, @RolID);
+      `);
+    }
+
+    // Insertar en USUARIO_PLATAFORMA
+    for (const plataformaId of plataformaIds) {
+      const plataformaRequest = transaction.request();
+      plataformaRequest.input('UsuarioID', sql.Int, usuarioId);
+      plataformaRequest.input('PlataformaID', sql.Int, plataformaId);
+      plataformaRequest.input('Activo', sql.Bit, 1); // Por defecto activo
+
+      await plataformaRequest.query(`
+        INSERT INTO USUARIO_PLATAFORMA (USUARIO_ID, PLATAFORMA_ID, ACTIVO)
+        VALUES (@UsuarioID, @PlataformaID, @Activo);
+      `);
+    }
+
+    await transaction.commit();
+    return { UsuarioID: usuarioId };
+
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
+};
+
+
+const actualizarUsuarioYPerfil = async ( usuarioId, datosUsuario, datosPerfil, usuarioActualizadorId, rolId = null, plataformaIds = [] ) => {
+  const pool = await IdServicePool.connect();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    const request = transaction.request();
+
+    // Usuarios
+    request.input('UsuarioID', sql.Int, usuarioId);
+    request.input('Correo', sql.NVarChar, datosUsuario.correo);
+    request.input('Activo', sql.Bit, datosUsuario.activo);
+    request.input('UsuarioActualizador', sql.Int, usuarioActualizadorId);
+
+    // Perfiles
+    request.input('Nombres', sql.NVarChar(100), datosPerfil.nombres ?? null);
+    request.input('Apellidos', sql.NVarChar(100), datosPerfil.apellidos ?? null);
+    request.input('RUT', sql.NVarChar(20), datosPerfil.rut ?? null);
+    request.input('DepartamentoID', sql.Int, datosPerfil.departamentoId ?? null);
+    request.input('Telefono', sql.NVarChar(20), datosPerfil.telefono ?? null);
+    request.input('URLImagenPerfil', sql.NVarChar(255), datosPerfil.urlImagenPerfil ?? null);
+
+    const query = `
+      -- Actualiza Usuario
+      UPDATE Usuarios
+      SET CorreoElectronico = @Correo,
+          Activo = @Activo,
+          FechaActualizacion = GETDATE(),
+          UsuarioActualizador = @UsuarioActualizador
+      WHERE UsuarioID = @UsuarioID;
+
+      -- Inserta o actualiza Perfil
+      IF EXISTS (SELECT 1 FROM Perfiles WHERE UsuarioID = @UsuarioID)
+      BEGIN
+        UPDATE Perfiles
+        SET Nombres = @Nombres,
+            Apellidos = @Apellidos,
+            RUT = @RUT,
+            DepartamentoID = @DepartamentoID,
+            Telefono = @Telefono,
+            URLImagenPerfil = @URLImagenPerfil
+        WHERE UsuarioID = @UsuarioID;
+      END
+      ELSE
+      BEGIN
+        INSERT INTO Perfiles (
+          UsuarioID,
+          Nombres,
+          Apellidos,
+          RUT,
+          DepartamentoID,
+          Telefono,
+          URLImagenPerfil
+        ) VALUES (
+          @UsuarioID,
+          @Nombres,
+          @Apellidos,
+          @RUT,
+          @DepartamentoID,
+          @Telefono,
+          @URLImagenPerfil
+        );
+      END;
+
+      -- Elimina rol anterior y asigna nuevo si se envía
+      DELETE FROM USUARIO_ROL WHERE USUARIO_ID = @UsuarioID;
+    `;
+
+    await request.query(query);
+
+    if (rolId !== null) {
+      const rolReq = transaction.request();
+      rolReq.input('UsuarioID', sql.Int, usuarioId);
+      rolReq.input('RolID', sql.Int, rolId);
+
+      await rolReq.query(`
+        INSERT INTO USUARIO_ROL (USUARIO_ID, ROL_ID)
+        VALUES (@UsuarioID, @RolID);
+      `);
+    }
+
+    // Insertar nuevas plataformas (solo si no existen)
+    if (Array.isArray(plataformaIds) && plataformaIds.length > 0) {
+      for (const plataformaId of plataformaIds) {
+        const checkReq = transaction.request();
+        checkReq.input('UsuarioID', sql.Int, usuarioId);
+        checkReq.input('PlataformaID', sql.Int, plataformaId);
+
+        const check = await checkReq.query(`
+          SELECT 1 FROM USUARIO_PLATAFORMA
+          WHERE USUARIO_ID = @UsuarioID AND PLATAFORMA_ID = @PlataformaID
+        `);
+
+        if (check.recordset.length === 0) {
+          const insertReq = transaction.request();
+          insertReq.input('UsuarioID', sql.Int, usuarioId);
+          insertReq.input('PlataformaID', sql.Int, plataformaId);
+          insertReq.input('ACTIVO', sql.Bit, 1);
+
+          await insertReq.query(`
+            INSERT INTO USUARIO_PLATAFORMA (USUARIO_ID, PLATAFORMA_ID, ACTIVO)
+            VALUES (@UsuarioID, @PlataformaID, @ACTIVO);
+          `);
+        }
+      }
+    }
+
+    await transaction.commit();
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
+};
+async function getUsuarios(opts) {
+  await IdServicePool;
+
+  const where = [];
+  const request = IdServicePool.request();
+
+  if (opts.document) {
+    where.push('p.RUT LIKE @document');
+    request.input('document', sql.NVarChar(20), `%${opts.document}%`);
+  }
+
+  if (opts.firstname) {
+    where.push('p.Nombres LIKE @firstname');
+    request.input('firstname', sql.NVarChar(100), `%${opts.firstname}%`);
+  }
+
+  if (opts.lastname) {
+    where.push('p.Apellidos LIKE @lastname');
+    request.input('lastname', sql.NVarChar(100), `%${opts.lastname}%`);
+  }
+
+  if (opts.email) {
+    where.push('u.CorreoElectronico LIKE @correo');
+    request.input('correo', sql.NVarChar(255), `%${opts.email}%`);
+  }
+
+  const whereSQL = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+  const sqlText = `
+    WITH Q AS (
+      SELECT 
+        u.UsuarioID AS ID,
+        p.RUT AS DOCUMENT,
+        u.CorreoElectronico AS EMAIL,
+        p.Nombres AS FIRSTNAME,
+        p.Apellidos AS LASTNAME,
+        d.Nombre AS DEPARTMENTS,
+        pc.URLImagenPerfil AS IMAGE_USER_CREATED,
+        pc.Nombres AS USER_NAME_CREATED,
+        uc.CorreoElectronico AS EMAIL_USER_CREATED,
+        u.FechaCreacion AS DATE_CREATED,
+        COUNT(*) OVER() AS totalRecords
+      FROM Usuarios u
+      LEFT JOIN Perfiles p ON p.UsuarioID = u.UsuarioID
+      LEFT JOIN Departamentos d ON d.DepartamentoID = p.DepartamentoID
+      LEFT JOIN Usuarios uc ON u.UsuarioCreador = uc.UsuarioID
+      LEFT JOIN Perfiles pc ON pc.UsuarioID = uc.UsuarioID
+      ${whereSQL}
+    )
+    SELECT *
+    FROM Q
+    ORDER BY DATE_CREATED DESC
+    OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
   `;
 
-  await request.query(query);
-};
+  request.input('offset', sql.Int, (opts.page - 1) * opts.pageSize);
+  request.input('pageSize', sql.Int, opts.pageSize);
 
-module.exports = {
-  obtenerUsuarioPorCorreo,
-  insertarUsuario, actualizarUsuarioYPerfil,
-};
+  const result = await request.query(sqlText);
+
+  const totalRecords = result.recordset[0]?.totalRecords || 0;
+
+  return {
+    page: opts.page,
+    pageSize: opts.pageSize,
+    totalRecords,
+    totalPages: Math.ceil(totalRecords / opts.pageSize),
+    data: result.recordset.map(({ totalRecords, ...row }) => row)
+  };
+}
+
+
+module.exports = { obtenerUsuarioPorCorreo, insertarUsuario, actualizarUsuarioYPerfil, getUsuarios, };
