@@ -14,16 +14,20 @@ const plataformasRoutes = require('./Plataformas.Routes');
 const usuariosRoutes = require('./Usuario.Routes');
 const authRoutes = require('./auth.Routes');
 
+const UserPermission = require('./UserPermissions.Route')
+
 router.use('', rolesRoutes);
 router.use('', AsignarRolRoutes);
 router.use('/modulos', modulosPlataformaRoutes);
-router.use('/submodulos', submodulosRoutes);
+router.use('', submodulosRoutes);
 router.use('/endpoints', endpointsApiRoutes);
 
 router.use('/departments', departmentsRoutes);
 router.use('/plataformas', plataformasRoutes);
 router.use('/usuarios', usuariosRoutes);
 router.use('/auth', authRoutes);
+
+router.use('',UserPermission);
 
 module.exports = router;
 

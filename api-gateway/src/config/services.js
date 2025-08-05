@@ -27,7 +27,7 @@ export default {
   idservice: {
     path: '/api/idservice',                
     target: 'http://id-service:5007',
-    requireAuth: true,
+    requireAuth: false,
     prependBasePath: true
   }
 };
