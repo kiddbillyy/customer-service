@@ -1,5 +1,7 @@
 const { sql, IdServicePool } = require('../config/dbnew');
+const moment = require('moment-timezone'); 
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const cerrarSesion = async (usuarioId, plataformaId, token) => {
   const pool = await IdServicePool.connect();
@@ -73,4 +75,111 @@ const validarCredencialesParaRenovar = async (correo, password) => {
 
   return usuario;
 };
-module.exports = { cerrarSesion, validarCredencialesParaRenovar };
+
+const generarCodigoOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const crearOtpYEnviar = async (correo, sendOtpEvent) => {
+  const pool = await IdServicePool.connect();
+
+  // 1. Verificar si el usuario existe y está activo
+  const usuarioResult = await pool.request()
+    .input('correo', sql.NVarChar(255), correo)
+    .query(`
+      SELECT UsuarioID, Activo FROM Usuarios
+      WHERE CorreoElectronico = @correo
+    `);
+
+  const usuario = usuarioResult.recordset[0];
+
+  if (!usuario) {
+    throw new Error('El correo no está registrado.');
+  }
+
+  if (!usuario.Activo) {
+    throw new Error('El usuario está inactivo.');
+  }
+
+  const usuarioId = usuario.UsuarioID;
+
+  // 2. Generar código OTP
+  const codigo = generarCodigoOTP();
+
+  // 3. Guardar en la tabla OTP
+  const now = new Date();
+  const expiracion = new Date(now.getTime() + 10 * 60 * 1000); // +10 minutos
+
+  await pool.request()
+    .input('usuarioId', sql.Int, usuarioId)
+    .input('codigo', sql.NVarChar(6), codigo)
+    .input('fechaCreacion', sql.DateTime, now)
+    .input('fechaExpiracion', sql.DateTime, expiracion)
+    .input('usado', sql.Bit, 0)
+    .query(`
+      INSERT INTO OTP (
+        USUARIO_ID,
+        CODIGO,
+        FECHA_CREACION,
+        FECHA_EXPIRACION,
+        USADO
+      )
+      VALUES (
+        @usuarioId,
+        @codigo,
+        @fechaCreacion,
+        @fechaExpiracion,
+        @usado
+      )
+    `);
+
+  // 4. Enviar a Kafka
+  await sendOtpEvent({ to: correo, code: codigo, template: 'recuperacion-otp' });
+
+  return { message: 'Código OTP generado y enviado al correo.' };
+};
+
+//VALIDAR OTP
+const validarOtp = async (correo, codigoOtp) => {
+    const pool = await IdServicePool;
+    const query = `
+        SELECT o.USUARIO_ID, o.CODIGO, o.FECHA_EXPIRACION, o.USADO, u.HashPassword 
+        FROM OTP o
+        JOIN USUARIOS u ON u.UsuarioID = o.USUARIO_ID
+        WHERE u.CorreoElectronico = @correo AND o.CODIGO = @codigoOtp AND o.USADO = 0
+    `;
+    const result = await pool.request()
+        .input('correo', sql.NVarChar, correo)
+        .input('codigoOtp', sql.NVarChar, codigoOtp)
+        .query(query);
+
+    if (result.recordset.length === 0) {
+        return null;
+    }
+
+    const otpData = result.recordset[0];
+
+    const fechaExpiracion = moment(otpData.FECHA_EXPIRACION).tz('America/Santiago');
+    if (fechaExpiracion.isBefore(moment().tz('America/Santiago'))) {
+        return null;
+    }
+
+    return otpData;
+};
+
+// Marcar OTP como usado (CORREGIDO)
+const marcarOtpComoUsado = async (usuarioId, codigoOtp) => {
+    const pool = await IdServicePool;
+    const query = `
+        UPDATE OTP 
+        SET USADO = 1
+        WHERE CODIGO = @codigoOtp AND USUARIO_ID = @usuarioId
+    `;
+    await pool.request()
+        .input('codigoOtp', sql.NVarChar, codigoOtp)
+        .input('usuarioId', sql.Int, usuarioId) // Usamos directamente el ID
+        .query(query);
+};
+
+
+module.exports = { cerrarSesion, validarCredencialesParaRenovar, crearOtpYEnviar,validarOtp, marcarOtpComoUsado };

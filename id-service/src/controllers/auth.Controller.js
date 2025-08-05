@@ -4,7 +4,8 @@ const { sql, IdServicePool } = require('../config/dbnew');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 const timezone = require('dayjs/plugin/timezone');
-const { cerrarSesion, validarCredencialesParaRenovar } = require('../models/authModels');
+const { cerrarSesion, validarCredencialesParaRenovar, crearOtpYEnviar, validarOtp, actualizarContraseña, marcarOtpComoUsado } = require('../models/authModels');
+const { sendOtpEvent } = require('../utils/kafkaUtils')
 require('dotenv').config();
 
 dayjs.extend(utc);
@@ -292,6 +293,96 @@ const renovarSesion = async (req, res) => {
   }
 };
 
+const solicitarRecuperacionController = async (req, res) => {
+  try {
+    const { correo } = req.body;
+
+    if (!correo) {
+      return res.status(400).json({ error: 'El campo correo es obligatorio.' });
+    }
+
+    const resultado = await crearOtpYEnviar(correo, sendOtpEvent);
+
+    return res.status(200).json(resultado);
+  } catch (error) {
+    console.error('Error al generar código OTP:', error);
+    return res.status(500).json({ error: error.message || 'Error interno del servidor.' });
+  }
+};
+
+// Cambiar contraseña
+const cambiarContraseña = async (req, res) => {
+    const { correo, codigoOtp, nuevaContraseña, confirmarContraseña } = req.body;
+
+    if (nuevaContraseña !== confirmarContraseña) {
+        return res.status(400).json({ message: 'Las contraseñas no coinciden' });
+    }
+
+    // Obtener el usuario y verificar OTP
+    const otpData = await validarOtp(correo, codigoOtp);
+    if (!otpData) {
+        return res.status(400).json({ message: 'Código OTP inválido, expirado o ya usado' });
+    }
+
+    // Obtener el hash de la contraseña del usuario para compararla
+    const pool = await IdServicePool;
+    const query = `
+        SELECT HashPassword 
+        FROM USUARIOS 
+        WHERE UsuarioID = @usuarioId
+    `;
+    const result = await pool.request()
+        .input('usuarioId', sql.Int, otpData.USUARIO_ID)
+        .query(query);
+
+    if (result.recordset.length === 0) {
+        return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    const hashAlmacenado = result.recordset[0].HashPassword;
+
+    // Comparar la nueva contraseña con la anterior
+    const esContraseñaValida = await bcrypt.compare(nuevaContraseña, hashAlmacenado);
+    if (esContraseñaValida) {
+        return res.status(400).json({ message: 'La nueva contraseña no puede ser la misma que la anterior' });
+    }
+
+    // Encriptar la nueva contraseña
+    const salt = bcrypt.genSaltSync(10);
+    const hashNuevaContraseña = bcrypt.hashSync(nuevaContraseña, salt);
+
+    console.log('Nuevo Hash de Contraseña:', hashNuevaContraseña);
+
+    // Comenzar una transacción para actualizar la contraseña y marcar el OTP
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
+
+        const request = transaction.request();
+        await request.input('hashPassword', sql.NVarChar, hashNuevaContraseña);
+        await request.input('usuarioId', sql.Int, otpData.USUARIO_ID);
+        
+        await request.query(`
+            UPDATE USUARIOS
+            SET HashPassword = @hashPassword, FechaActualizacion = GETDATE()
+            WHERE UsuarioID = @usuarioId;
+        `);
+
+        // Marcar OTP como usado (con la función corregida)
+        await marcarOtpComoUsado(otpData.USUARIO_ID, codigoOtp);
+
+        // Commit de la transacción
+        await transaction.commit();
+        res.status(200).json({ message: 'Contraseña cambiada exitosamente' });
+
+    } catch (error) {
+        // Si hay algún error, revertimos la transacción
+        await transaction.rollback();
+        console.error(error);
+        res.status(500).json({ message: 'Error al cambiar la contraseña' });
+    }
+};
+
 module.exports = {
-  login, cerrarSesionController, renovarSesion 
+  login, cerrarSesionController, renovarSesion, solicitarRecuperacionController, cambiarContraseña 
 };

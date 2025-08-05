@@ -102,7 +102,7 @@ const insertarUsuario = async (
       const plataformaRequest = transaction.request();
       plataformaRequest.input('UsuarioID', sql.Int, usuarioId);
       plataformaRequest.input('PlataformaID', sql.Int, plataformaId);
-      plataformaRequest.input('Activo', sql.Bit, 1); // Por defecto activo
+      plataformaRequest.input('Activo', sql.Bit, 1); 
 
       await plataformaRequest.query(`
         INSERT INTO USUARIO_PLATAFORMA (USUARIO_ID, PLATAFORMA_ID, ACTIVO)
