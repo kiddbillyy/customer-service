@@ -8,9 +8,10 @@ const { IdServicePool, IdServicePoolConnect, sql } = require('../config/dbnew');
  * @param {string} subModuloData.nombre - Nombre del submódulo.
  * @param {string} subModuloData.codigo - Código único del submódulo (ej. 'PROD_MNGT_CATALOGO').
  * @param {string} [subModuloData.descripcion] - Descripción del submódulo (opcional).
+ * @param {string} subModuloData.ruta - Ruta de acceso al submódulo.
  * @returns {Promise<object>} Objeto con el ID del submódulo creado.
  */
-async function createSubModulo({ moduloId, nombre, codigo, descripcion }) {
+async function createSubModulo({ moduloId, nombre, codigo, descripcion, ruta }) {
   await IdServicePoolConnect;
   const tx = new sql.Transaction(IdServicePool);
   await tx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
@@ -37,10 +38,11 @@ async function createSubModulo({ moduloId, nombre, codigo, descripcion }) {
       .input('n', sql.NVarChar(100), nombre)
       .input('c', sql.NVarChar(50), codigo)
       .input('d', sql.NVarChar(255), descripcion)
+      .input('r', sql.NVarChar(255), ruta)
       .query(`
-        INSERT INTO SUBMODULOS (MODULO_ID, NOMBRE, CODIGO, DESCRIPCION)
+        INSERT INTO SUBMODULOS (MODULO_ID, NOMBRE, CODIGO, DESCRIPCION, RUTA)
         OUTPUT INSERTED.ID
-        VALUES (@mId, @n, @c, @d);
+        VALUES (@mId, @n, @c, @d, @r);
       `);
 
     const newSubModuloId = result.recordset[0].ID;

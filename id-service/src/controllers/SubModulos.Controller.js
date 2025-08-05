@@ -2,14 +2,14 @@
 const subModuloModel = require('../models/SubModulosModels');
 
 async function createSubModulo(req, res) {
-  const { moduloId, nombre, codigo, descripcion } = req.body;
+  const { moduloId, nombre, codigo, descripcion, ruta } = req.body;
 
-  if (!moduloId || !nombre || !codigo) {
-    return res.status(400).json({ message: 'moduloId, nombre y codigo son requeridos.' });
+  if (!moduloId || !nombre || !codigo || !ruta) {
+    return res.status(400).json({ message: 'moduloId, nombre, codigo y ruta son requeridos.' });
   }
 
   try {
-    const out = await subModuloModel.createSubModulo({ moduloId, nombre, codigo, descripcion });
+    const out = await subModuloModel.createSubModulo({ moduloId, nombre, codigo, descripcion, ruta });
     res.status(201).json({ subModuloId: out.subModuloId, message: 'Submódulo creado exitosamente.' });
   } catch (err) {
     console.error(err);
