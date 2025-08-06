@@ -13,21 +13,38 @@ export default {
   pricing:  { path: '/api/pricing',   target: 'http://inventory-service:5005' },
 
   // Rutas Microservicio Catalog Service
-  // catalog: { path: '/api/catalog', target: 'http://catalog-service:5006', requireAuth: true, prependBasePath: true },
   catalog:  { path: '/api/catalog',  target: 'http://catalog-service:5006', requireAuth: false },
 
   // Rutas Microservicio ID SERVICE
   idserviceLogin: {
-    path: '/api/idservice/auth/login',       
+    path: '/api/idservice/auth/login',
     target: 'http://id-service:5007',
     requireAuth: false,
     prependBasePath: true
   },
 
-  idservice: {
-    path: '/api/idservice',                
+  idserviceBase: {
+    path: '/api/idservice',
     target: 'http://id-service:5007',
     requireAuth: false,
     prependBasePath: true
-  }
+  },
+
+  idserviceRecuperar: {
+    method: 'PATCH',
+    path: '/api/idservice/auth/recuperar',
+    target: 'http://id-service:5007',
+    requireAuth: false,
+    prependBasePath: true
+  },
+
+  idserviceCambiarContrasena: {
+    method: 'PATCH',
+    path: '/api/idservice/auth/cambiar-contrasena',
+    target: 'http://id-service:5007',
+    requireAuth: false,
+    prependBasePath: true
+  },
+  email:  { path: '/api/email',  target: 'http://email-service:5008', requireAuth: false },
 };
+
