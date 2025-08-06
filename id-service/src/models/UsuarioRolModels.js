@@ -16,7 +16,7 @@ async function createUsuarioRol({ usuarioId, rolId }) {
   try {
     const usuarioExist = (await tx.request()
       .input('uId', sql.Int, usuarioId)
-      .query(`SELECT ID FROM Usuarios WHERE ID = @uId`)
+      .query(`SELECT UsuarioID FROM Usuarios WHERE UsuarioID = @uId`)
     ).recordset[0];
     if (!usuarioExist) {
       throw new Error('USER_NOT_FOUND');
@@ -59,4 +59,44 @@ async function createUsuarioRol({ usuarioId, rolId }) {
   }
 }
 
-module.exports = { createUsuarioRol };
+
+/**
+ * Activa o desactiva un rol ya asignado a un usuario.
+ *
+ * @param {number} usuarioId
+ * @param {number} rolId
+ * @param {boolean} activo            // true = 1, false = 0
+ * @returns {Promise<{ message:string }>}
+ */
+async function updateUsuarioRolActivo({ usuarioId, rolId, activo }) {
+  await IdServicePoolConnect;
+  const tx = new sql.Transaction(IdServicePool);
+  await tx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+
+  try {
+    /* validar que exista la fila */
+    const fila = (await tx.request()
+      .input('uid', sql.Int, usuarioId)
+      .input('rid', sql.Int, rolId)
+      .query('SELECT ID, ACTIVO FROM USUARIO_ROL WHERE USUARIO_ID=@uid AND ROL_ID=@rid')
+    ).recordset[0];
+
+    if (!fila)        throw new Error('ASSIGNMENT_NOT_FOUND');
+    if (fila.ACTIVO === (activo ? 1 : 0))
+      throw new Error('NO_CHANGE_NEEDED');
+
+    await tx.request()
+      .input('id',  sql.Int, fila.ID)
+      .input('act', sql.Bit, activo ? 1 : 0)
+      .query('UPDATE USUARIO_ROL SET ACTIVO=@act WHERE ID=@id');
+
+    await tx.commit();
+    return { message: 'Estado actualizado' };
+
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  }
+}
+
+module.exports = { createUsuarioRol, updateUsuarioRolActivo };

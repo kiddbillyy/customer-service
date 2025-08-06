@@ -14,7 +14,7 @@ export default {
 
   // Rutas Microservicio Catalog Service
   // catalog: { path: '/api/catalog', target: 'http://catalog-service:5006', requireAuth: true, prependBasePath: true },
-  catalog:  { path: '/api/catalog',  target: 'http://catalog-service:5006', requireAuth: false },
+  catalog:  { path: '/api/catalog',  target: 'http://catalog-service:5006', requireAuth: true,  requireRbac: true  },
 
   // Rutas Microservicio ID SERVICE
   idserviceLogin: {
@@ -28,6 +28,7 @@ export default {
     path: '/api/idservice',                
     target: 'http://id-service:5007',
     requireAuth: false,
-    prependBasePath: true
+    prependBasePath: true,
+    requireRbac: true
   }
 };

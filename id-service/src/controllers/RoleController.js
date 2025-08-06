@@ -77,7 +77,15 @@ async function updateRole(req, res) {
     }
 
     try {
-        const out = await roleModel.updateRole({ roleId, nombre, descripcion, plataformaCod, permisos, usuarioId, activo: activo === undefined ? undefined : (activo ? 1 : 0) });
+        const out = await roleModel.updateRole({ 
+            roleId, 
+            nombre, 
+            descripcion, 
+            plataformaCod, 
+            permisos, 
+            usuarioId, 
+            activo: activo === undefined ? undefined : (activo ? 1 : 0) 
+        });
  
         res.status(200).json(out);
     } catch (err) {

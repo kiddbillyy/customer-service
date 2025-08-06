@@ -57,4 +57,94 @@ async function createEndpointApi({ subModuloId, metodoHttp, path, target, activo
   }
 }
 
-module.exports = { createEndpointApi };
+/**
+ * Obtiene todos los endpoints de API, sin filtros.
+ * @returns {Promise<Array<object>>} Un array con todos los endpoints.
+ */
+async function getAllEndpoints() {
+    try {
+        await IdServicePoolConnect;
+        const result = await IdServicePool.request().query('SELECT * FROM ENDPOINTS_API');
+        return result.recordset;
+    } catch (err) {
+        console.error('Error fetching all endpoints:', err);
+        throw err;
+    }
+}
+
+
+/**
+ * Devuelve la lista de endpoints (método + path + target) que
+ * un usuario puede invocar en una plataforma.
+ *
+ * @param {number} usuarioId
+ * @param {number} plataformaId
+ * @returns {Promise<Array<{ subModuloId, metodoHttp, path, target }>>}
+ */
+async function getAllowedEndpoints({ usuarioId, plataformaId }) {
+  if (!Number.isInteger(usuarioId) || !Number.isInteger(plataformaId)) {
+    throw new Error('INVALID_PARAMS');
+  }
+
+  await IdServicePoolConnect;
+
+  const { recordset } = await IdServicePool.request()
+    .input('uid', sql.Int, usuarioId)
+    .input('pid', sql.Int, plataformaId)
+    .query(`
+      WITH RolesUsuario AS (
+        SELECT ur.ROL_ID
+        FROM   USUARIO_ROL        ur
+        JOIN   USUARIO_PLATAFORMA up
+               ON up.USUARIO_ID    = ur.USUARIO_ID
+              AND up.PLATAFORMA_ID = @pid
+              AND up.ACTIVO        = 1
+        WHERE  ur.USUARIO_ID = @uid
+          AND  ur.ACTIVO     = 1
+      ),
+      PermisosPorRol AS (
+        SELECT rsa.SUBMODULO_ID, rsa.ACCION_ID
+        FROM   ROL_SUBMODULO_ACCION rsa
+        JOIN   RolesUsuario         ru ON ru.ROL_ID = rsa.ROL_ID
+        WHERE  rsa.ACTIVO = 1
+      ),
+      PermisosDirectos AS (
+        SELECT SUBMODULO_ID, ACCION_ID
+        FROM   USUARIO_SUBMODULO_ACCION
+        WHERE  USUARIO_ID = @uid
+          AND  ACTIVO     = 1
+      ),
+      PermisosEfectivos AS (
+        SELECT * FROM PermisosPorRol
+        UNION ALL
+        SELECT * FROM PermisosDirectos
+      )
+      SELECT DISTINCT
+             e.SUBMODULO_ID AS subModuloId,
+             e.METODO_HTTP  AS metodoHttp,
+             e.PATH         AS path,
+             e.TARGET       AS target
+      FROM   ENDPOINTS_API     e
+      JOIN   PermisosEfectivos p
+             ON p.SUBMODULO_ID = e.SUBMODULO_ID
+      WHERE  e.ACTIVO = 1
+        AND (
+              (p.ACCION_ID = 1 AND e.METODO_HTTP = 'GET')
+           OR (p.ACCION_ID = 2 AND e.METODO_HTTP = 'POST')
+           OR (p.ACCION_ID = 3 AND e.METODO_HTTP IN ('PUT','PATCH'))
+           OR (p.ACCION_ID = 4 AND e.METODO_HTTP = 'DELETE')
+        )
+        AND EXISTS (
+              SELECT 1
+              FROM   SUBMODULOS s
+              JOIN   MODULOS_PLATAFORMA mp ON mp.ID = s.MODULO_ID
+              WHERE  s.ID = e.SUBMODULO_ID
+                AND  mp.PLATAFORMA_ID = @pid
+        )
+      ORDER BY e.PATH, e.METODO_HTTP;
+    `);
+
+  return recordset;
+}
+
+module.exports = { createEndpointApi, getAllEndpoints, getAllowedEndpoints };
