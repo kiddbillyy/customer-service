@@ -120,7 +120,14 @@ const insertarUsuario = async (
 };
 
 
-const actualizarUsuarioYPerfil = async ( usuarioId, datosUsuario, datosPerfil, usuarioActualizadorId, rolId = null, plataformaIds = [] ) => {
+const actualizarUsuarioYPerfil = async (
+  usuarioId,
+  datosUsuario,
+  datosPerfil,
+  usuarioActualizadorId,
+  rolId = null,
+  plataformaIds = []
+) => {
   const pool = await IdServicePool.connect();
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
@@ -190,6 +197,7 @@ const actualizarUsuarioYPerfil = async ( usuarioId, datosUsuario, datosPerfil, u
 
     await request.query(query);
 
+    // Insertar nuevo rol 
     if (rolId !== null) {
       const rolReq = transaction.request();
       rolReq.input('UsuarioID', sql.Int, usuarioId);
@@ -201,29 +209,44 @@ const actualizarUsuarioYPerfil = async ( usuarioId, datosUsuario, datosPerfil, u
       `);
     }
 
-    // Insertar nuevas plataformas (solo si no existen)
-    if (Array.isArray(plataformaIds) && plataformaIds.length > 0) {
-      for (const plataformaId of plataformaIds) {
-        const checkReq = transaction.request();
-        checkReq.input('UsuarioID', sql.Int, usuarioId);
-        checkReq.input('PlataformaID', sql.Int, plataformaId);
+    // Manejo de plataformas (sincronización completa)
+    if (Array.isArray(plataformaIds)) {
+      const currentReq = transaction.request();
+      currentReq.input('UsuarioID', sql.Int, usuarioId);
 
-        const check = await checkReq.query(`
-          SELECT 1 FROM USUARIO_PLATAFORMA
-          WHERE USUARIO_ID = @UsuarioID AND PLATAFORMA_ID = @PlataformaID
+      const currentResult = await currentReq.query(`
+        SELECT PLATAFORMA_ID
+        FROM USUARIO_PLATAFORMA
+        WHERE USUARIO_ID = @UsuarioID
+      `);
+
+      const plataformasActuales = currentResult.recordset.map(p => p.PLATAFORMA_ID);
+      const plataformasAInsertar = plataformaIds.filter(id => !plataformasActuales.includes(id));
+      const plataformasAEliminar = plataformasActuales.filter(id => !plataformaIds.includes(id));
+
+      // Insertar nuevas plataformas
+      for (const plataformaId of plataformasAInsertar) {
+        const insertReq = transaction.request();
+        insertReq.input('UsuarioID', sql.Int, usuarioId);
+        insertReq.input('PlataformaID', sql.Int, plataformaId);
+        insertReq.input('ACTIVO', sql.Bit, 1);
+
+        await insertReq.query(`
+          INSERT INTO USUARIO_PLATAFORMA (USUARIO_ID, PLATAFORMA_ID, ACTIVO)
+          VALUES (@UsuarioID, @PlataformaID, @ACTIVO);
         `);
+      }
 
-        if (check.recordset.length === 0) {
-          const insertReq = transaction.request();
-          insertReq.input('UsuarioID', sql.Int, usuarioId);
-          insertReq.input('PlataformaID', sql.Int, plataformaId);
-          insertReq.input('ACTIVO', sql.Bit, 1);
+      // Eliminar accesos no deseados
+      if (plataformasAEliminar.length > 0) {
+        const deleteReq = transaction.request();
+        deleteReq.input('UsuarioID', sql.Int, usuarioId);
 
-          await insertReq.query(`
-            INSERT INTO USUARIO_PLATAFORMA (USUARIO_ID, PLATAFORMA_ID, ACTIVO)
-            VALUES (@UsuarioID, @PlataformaID, @ACTIVO);
-          `);
-        }
+        const ids = plataformasAEliminar.join(',');
+        await deleteReq.query(`
+          DELETE FROM USUARIO_PLATAFORMA
+          WHERE USUARIO_ID = @UsuarioID AND PLATAFORMA_ID IN (${ids});
+        `);
       }
     }
 

@@ -2,18 +2,31 @@ const Departamentos = require('../models/DepartmentsModels');
 
 async function getDepartamentos(req, res) {
   try {
+    // Filtro opcional: ?activos=true
     const soloActivos = String(req.query.activos || '').toLowerCase() === 'true';
-    const buscar = (req.query.buscar ?? '').toString().trim(); // ← nuevo
+
+    // Filtro opcional: ?buscar=nombre parcial
+    const buscar = typeof req.query.buscar === 'string'
+      ? req.query.buscar.trim()
+      : null;
 
     const data = await Departamentos.findAll({
       soloActivos,
-      buscar: buscar || null, 
+      buscar: buscar || null,
     });
 
-    res.json({ ok: true, total: data.length, data });
+    return res.status(200).json({
+      ok: true,
+      total: data.length,
+      data
+    });
+
   } catch (err) {
     console.error('getDepartamentos error:', err);
-    res.status(500).json({ ok: false, message: 'Error obteniendo departamentos' });
+    return res.status(500).json({
+      ok: false,
+      message: 'Error obteniendo departamentos'
+    });
   }
 }
 
@@ -52,7 +65,10 @@ async function createDepartamento(req, res) {
 
     console.log('[createDepartamento] insert OK, DepartmentId:', row?.DepartamentoID);
 
-    return res.status(201).json({ ok: true, data: row });
+      return res.status(200).json({
+        ok: true,
+        message: 'Departamento creado correctamente'
+      });
 
   } catch (err) {
     const num = err?.number || err?.originalError?.info?.number;
@@ -64,6 +80,67 @@ async function createDepartamento(req, res) {
     return res.status(500).json({ ok: false, message: 'Error creando departamento' });
   }
 }
+async function updateDepartamento(req, res) {
+  try {
+    const departamentoId = parseInt(req.params.departamentoId, 10);
 
+    // Validación del ID
+    if (isNaN(departamentoId)) {
+      return res.status(400).json({ ok: false, message: 'ID de departamento inválido' });
+    }
 
-module.exports = { getDepartamentos, createDepartamento };
+    const {
+      nombre,
+      descripcion = null,
+      contacto = null,
+      estado = 1,
+      usuarioActualizador
+    } = req.body || {};
+
+    // Validaciones adicionales
+    if (!usuarioActualizador || typeof usuarioActualizador !== 'number') {
+      return res.status(400).json({
+        ok: false,
+        message: 'El ID del usuario actualizador es obligatorio y debe ser numérico'
+      });
+    }
+
+    if (!nombre || typeof nombre !== 'string' || !nombre.trim()) {
+      return res.status(400).json({
+        ok: false,
+        message: 'El nombre es obligatorio y no puede estar vacío'
+      });
+    }
+
+    // Llamar al modelo
+    const updatedRow = await Departamentos.update({
+      departamentoId,
+      nombre: nombre.trim(),
+      descripcion,
+      contacto,
+      estado,
+      usuarioActualizador
+    });
+
+    if (!updatedRow) {
+      return res.status(404).json({
+        ok: false,
+        message: 'Departamento no encontrado'
+      });
+    }
+
+  return res.status(200).json({
+    ok: true,
+    message: 'Departamento actualizado correctamente'
+  });
+
+  } catch (error) {
+    console.error('updateDepartamento error:', error);
+    return res.status(500).json({
+      ok: false,
+      message: 'Error actualizando departamento'
+    });
+  }
+}
+
+module.exports = { getDepartamentos, createDepartamento, updateDepartamento };

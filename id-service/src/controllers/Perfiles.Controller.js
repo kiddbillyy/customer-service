@@ -55,19 +55,23 @@ const subirImagenPerfil = async (req, res) => {
       return res.status(400).json({ mensaje: 'No se recibió una imagen' });
     }
 
+    // 🔁 Subir con nombre fijo a carpeta personalizada
     const resultado = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'perfiles',
+      folder: `perfiles/${usuarioId}`,          
+      public_id: 'foto_perfil',                 
       use_filename: true,
       unique_filename: false,
-      overwrite: true
+      overwrite: true                           
     });
 
+    //  Eliminar archivo temporal
     try {
       fs.unlinkSync(req.file.path);
     } catch (err) {
       console.warn('No se pudo eliminar el archivo temporal:', err.message);
     }
 
+    //  Guardar la URL final en la base de datos
     await actualizarUrlImagenPerfil(usuarioId, resultado.secure_url);
 
     const perfilActualizado = await getPerfilPorUsuarioId(usuarioId);
@@ -83,6 +87,7 @@ const subirImagenPerfil = async (req, res) => {
     res.status(500).json({ mensaje: 'Error del servidor' });
   }
 };
+
 
 
 module.exports = {

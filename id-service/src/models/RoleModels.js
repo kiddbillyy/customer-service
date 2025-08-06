@@ -198,33 +198,89 @@ async function updateRole({ roleId, nombre, descripcion, plataformaCod, permisos
  * Obtiene todos los roles de la base de datos.
  * @returns {Promise<Array>} Un array de objetos con los roles.
  */
-async function getAllRoles() {
-  await IdServicePoolConnect;
+async function getAllRoles(opts) {
+  await IdServicePool;
 
-  try {
-    const { recordset } = await IdServicePool.request()
-      .query(`
-        SELECT
-          r.ID,
-          r.NOMBRE,
-          r.DESCRIPCION,
-          r.FECHA_CREACION,
-          r.FECHA_ACTUALIZACION,
-          r.ACTIVO,
-          uc_perfil.Nombres AS UsuarioCreadorNombre,
-          ua_perfil.Nombres AS UsuarioActualizadorNombre
-        FROM ROLES AS r
-        LEFT JOIN Perfiles AS uc_perfil ON r.UsuarioCreador = uc_perfil.UsuarioID
-        LEFT JOIN Perfiles AS ua_perfil ON r.UsuarioActualizador = ua_perfil.UsuarioID
-        ORDER BY r.NOMBRE;
-      `);
+  const where = [];
+  const request = IdServicePool.request();
 
-    return recordset;
-
-  } catch (err) {
-    console.error("Error fetching all roles:", err);
-    throw err;
+  // Filtros
+  if (opts.name) {
+    where.push('r.NOMBRE LIKE @name');
+    request.input('name', sql.NVarChar(100), `%${opts.name}%`);
   }
+
+  if (opts.creatorName) {
+    where.push('(uc_perfil.Nombres LIKE @creatorName OR uc_perfil.Apellidos LIKE @creatorName)');
+    request.input('creatorName', sql.NVarChar(100), `%${opts.creatorName}%`);
+  }
+
+  if (opts.creatorEmail) {
+    where.push('uc.CorreoElectronico LIKE @creatorEmail');
+    request.input('creatorEmail', sql.NVarChar(255), `%${opts.creatorEmail}%`);
+  }
+
+  if (opts.createdFrom && opts.createdTo) {
+    where.push('r.FECHA_CREACION BETWEEN @createdFrom AND @createdTo');
+    request.input('createdFrom', sql.DateTime, opts.createdFrom);
+    request.input('createdTo', sql.DateTime, opts.createdTo);
+  }
+
+  if (opts.updatedFrom && opts.updatedTo) {
+    where.push('r.FECHA_ACTUALIZACION BETWEEN @updatedFrom AND @updatedTo');
+    request.input('updatedFrom', sql.DateTime, opts.updatedFrom);
+    request.input('updatedTo', sql.DateTime, opts.updatedTo);
+  }
+
+  const whereSQL = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+  const sqlText = `
+    WITH Q AS (
+      SELECT
+        r.ID,
+        r.NOMBRE,
+        r.DESCRIPCION,
+        r.FECHA_CREACION,
+        r.FECHA_ACTUALIZACION,
+        r.ACTIVO,
+
+        uc.CorreoElectronico AS CorreoCreador,
+        CONCAT(uc_perfil.Nombres, ' ', ISNULL(uc_perfil.Apellidos, '')) AS NombreCreador,
+        uc_perfil.URLImagenPerfil AS ImagenCreador,
+
+        ua.CorreoElectronico AS CorreoActualizador,
+        CONCAT(ua_perfil.Nombres, ' ', ISNULL(ua_perfil.Apellidos, '')) AS NombreActualizador,
+        ua_perfil.URLImagenPerfil AS ImagenActualizador,
+
+        COUNT(*) OVER() AS totalRecords
+      FROM ROLES AS r
+      LEFT JOIN USUARIOS AS uc ON r.UsuarioCreador = uc.UsuarioID
+      LEFT JOIN PERFILES AS uc_perfil ON r.UsuarioCreador = uc_perfil.UsuarioID
+      LEFT JOIN USUARIOS AS ua ON r.UsuarioActualizador = ua.UsuarioID
+      LEFT JOIN PERFILES AS ua_perfil ON r.UsuarioActualizador = ua_perfil.UsuarioID
+      ${whereSQL}
+    )
+    SELECT *
+    FROM Q
+    ORDER BY FECHA_CREACION DESC
+    OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+  `;
+
+  // Paginación
+  request.input('offset', sql.Int, (opts.page - 1) * opts.pageSize);
+  request.input('pageSize', sql.Int, opts.pageSize);
+
+  const result = await request.query(sqlText);
+
+  const totalRecords = result.recordset[0]?.totalRecords || 0;
+
+  return {
+    page: opts.page,
+    pageSize: opts.pageSize,
+    totalRecords,
+    totalPages: Math.ceil(totalRecords / opts.pageSize),
+    data: result.recordset.map(({ totalRecords, ...row }) => row)
+  };
 }
 
 /* 
