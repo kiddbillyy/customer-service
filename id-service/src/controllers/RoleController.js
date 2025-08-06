@@ -57,13 +57,56 @@ async function createRole(req, res) {
 
 async function getAllRoles(req, res) {
   try {
-    const roles = await roleModel.getAllRoles();
-    res.json(roles);
+    const opts = {
+      name: req.query.name,
+      creatorName: req.query.creatorName,
+      creatorEmail: req.query.creatorEmail,
+      createdFrom: req.query.createdFrom,
+      createdTo: req.query.createdTo,
+      updatedFrom: req.query.updatedFrom,
+      updatedTo: req.query.updatedTo,
+      page: parseInt(req.query.page, 10) || 1,
+      pageSize: parseInt(req.query.pageSize, 10) || 10
+    };
+
+    const roles = await roleModel.getAllRoles(opts);
+
+    // Reestructurar cada rol
+    const rolesTransformados = {
+      page: roles.page,
+      pageSize: roles.pageSize,
+      totalRecords: roles.totalRecords,
+      totalPages: roles.totalPages,
+      data: roles.data.map(role => ({
+        ID: role.ID,
+        NOMBRE: role.NOMBRE,
+        DESCRIPCION: role.DESCRIPCION,
+        FECHA_CREACION: role.FECHA_CREACION,
+        FECHA_ACTUALIZACION: role.FECHA_ACTUALIZACION,
+        ACTIVO: role.ACTIVO,
+
+        creador: {
+          correo: role.CorreoCreador,
+          nombre: role.NombreCreador,
+          imagen: role.ImagenCreador
+        },
+        actualizador: {
+          correo: role.CorreoActualizador,
+          nombre: role.NombreActualizador,
+          imagen: role.ImagenActualizador
+        }
+      }))
+    };
+
+    res.status(200).json(rolesTransformados);
+
   } catch (err) {
-    console.error(err);
+    console.error('Error al obtener los roles:', err);
     res.status(500).json({ message: 'Error al obtener los roles' });
   }
 }
+
+
 
 async function updateRole(req, res) {
     console.log('Params recibidos:', req.params);

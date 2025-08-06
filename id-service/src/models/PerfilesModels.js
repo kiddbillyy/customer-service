@@ -35,6 +35,41 @@ const editarPerfilUsuario = async (usuarioId, datosPerfil) => {
   await request.query(query);
 };
 
+const getPerfilPorUsuarioId = async (usuarioId) => {
+  const pool = await IdServicePool;
+  const result = await pool.request()
+    .input('usuarioId', usuarioId)
+    .query(`
+      SELECT 
+        P.PerfilID,
+        P.UsuarioID,
+        U.CorreoElectronico,
+        P.Nombres,
+        P.Apellidos,
+        P.RUT,
+        D.Nombre AS NombreDepartamento,
+        P.Telefono,
+        P.URLImagenPerfil
+      FROM PERFILES P
+      JOIN USUARIOS U ON P.UsuarioID = U.UsuarioID
+      LEFT JOIN DEPARTAMENTOS D ON P.DepartamentoID = D.DepartamentoID
+      WHERE P.UsuarioID = @usuarioId
+    `);
+
+  return result.recordset[0] || null;
+};
+const actualizarUrlImagenPerfil = async (usuarioId, urlImagen) => {
+  const pool = await IdServicePool;
+  await pool.request()
+    .input('usuarioId', usuarioId)
+    .input('urlImagen', urlImagen)
+    .query(`
+      UPDATE PERFILES
+      SET URLImagenPerfil = @urlImagen
+      WHERE UsuarioID = @usuarioId
+    `);
+};
+
 module.exports = {
-  editarPerfilUsuario,
+  editarPerfilUsuario, getPerfilPorUsuarioId, actualizarUrlImagenPerfil
 };

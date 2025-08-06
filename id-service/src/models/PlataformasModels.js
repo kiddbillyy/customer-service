@@ -20,6 +20,44 @@ const insertarPlataforma = async (nombre, codigo, descripcion) => {
   }
 };
 
+async function getPlataformas() {
+  await IdServicePool.connect();
+
+  const result = await IdServicePool.request().query(`
+    SELECT 
+      ID, 
+      NOMBRE, 
+      CODIGO, 
+      DESCRIPCION
+    FROM PLATAFORMAS
+    ORDER BY NOMBRE;
+  `);
+
+  return result.recordset;
+}
+
+async function actualizarPlataforma({ id, nombre, descripcion }) {
+  await IdServicePool.connect();
+
+  const request = IdServicePool.request();
+  request.input('ID', sql.Int, id);
+  request.input('Nombre', sql.NVarChar(100), nombre);
+  request.input('Descripcion', sql.NVarChar(sql.MAX), descripcion ?? null);
+
+  const result = await request.query(`
+    UPDATE PLATAFORMAS
+    SET NOMBRE = @Nombre,
+        DESCRIPCION = @Descripcion
+    WHERE ID = @ID;
+
+    SELECT ID, NOMBRE, CODIGO, DESCRIPCION
+    FROM PLATAFORMAS
+    WHERE ID = @ID;
+  `);
+
+  return result.recordset[0];
+}
+
 module.exports = {
-  insertarPlataforma,
+  insertarPlataforma, getPlataformas, actualizarPlataforma
 };
