@@ -111,7 +111,7 @@ async function createRole({ nombre, descripcion, plataformaCod, permisos, usuari
   }
 }
 
-async function updateRole({ roleId, nombre, descripcion, plataformaCod, permisos, usuarioId }) {
+async function updateRole({ roleId, nombre, descripcion, plataformaCod, permisos, usuarioId, activo }) {
     await IdServicePoolConnect;
     const tx = new sql.Transaction(IdServicePool);
     await tx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);

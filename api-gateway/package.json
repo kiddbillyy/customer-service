@@ -20,8 +20,11 @@
     "helmet": "^8.1.0",
     "http-proxy-middleware": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
+    "lru-cache": "^11.1.0",
+    "micromatch": "^4.0.5",
     "morgan": "^1.10.0",
     "mssql": "^11.0.1",
-    "opossum": "^8.4.0"
+    "opossum": "^8.4.0",
+    "node-fetch": "^3.3.2"
   }
 }

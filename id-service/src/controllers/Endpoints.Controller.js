@@ -23,4 +23,39 @@ async function createEndpointApi(req, res) {
   }
 }
 
-module.exports = { createEndpointApi };
+/**
+ * Controlador que obtiene todos los endpoints de la base de datos y los envía en la respuesta.
+ * @param {object} req - Objeto de la petición.
+ * @param {object} res - Objeto de la respuesta.
+ */
+async function getAllEndpoints(req, res) {
+    try {
+        const endpoints = await endpointApiModel.getAllEndpoints();
+        res.status(200).json(endpoints);
+    } catch (err) {
+        // En caso de error, respondemos con un error de servidor
+        res.status(500).json({ error: 'Error al obtener los endpoints.' });
+    }
+}
+
+async function allowedEndpoints(req, res) {
+  const usuarioId    = parseInt(req.query.user, 10);
+  const plataformaId = parseInt(req.query.plat, 10);
+
+  if (isNaN(usuarioId) || isNaN(plataformaId)) {
+    return res.status(400).json({ message: 'user y plat deben ser numéricos' });
+  }
+
+  try {
+    const endpoints = await endpointApiModel.getAllowedEndpoints({ usuarioId, plataformaId });
+    res.json({ usuarioId, plataformaId, total: endpoints.length, endpoints });
+  } catch (err) {
+    console.error(err);
+    const map = {
+      INVALID_PARAMS: 400
+    };
+    res.status(map[err.message] || 500).json({ message: 'Error al obtener endpoints' });
+  }
+}
+
+module.exports = { createEndpointApi, getAllEndpoints, allowedEndpoints };
