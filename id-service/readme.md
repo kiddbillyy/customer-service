@@ -160,7 +160,7 @@ services:
 
 ---
 
-# Flujo de Autenticación y Autorización
+## Flujo de Autenticación y Autorización
 
 1. El cliente realiza **login**  en la **plataforma**
 2. Si el cliente no tiene otra sesión activa obtiene un token **JWT** siempre y cuando su estado de cuenta sea activo y tenga acceso a esa plataforma.
@@ -185,6 +185,7 @@ services:
 2. El usuario ingresa su codigo enviado al correo, si es valido puede cambiar su contraseña.
 
 
+
 ## Estructura del Proyecto
 
 ```
@@ -205,10 +206,9 @@ id-service/
 
 ## Consideraciones
 
-- **Seguridad**: Todas las operaciones sensibles requieren autenticación vía JWT y validación de permisos RBAC.
+- **Seguridad**: Todas las operaciones necesitan del ID-SERVICE para poder operar con **JWT**, este es validado en el middleware **auth** en *API Gateway** y los permisos en el middleware de **RBAC**. 
 - **Cacheo**: Los permisos se cachean en memoria con TTL para mejorar el rendimiento.
-- **Integración**: Funciona en conjunto con API Gateway y otros microservicios para el control centralizado de acceso.
-
+- **Integración**: Funciona en conjunto con API Gateway y otros microservicios para el control centralizado de acceso. Todos los servicios requieren del token para realizar acciones.
 
 ## Endpoints con Ejemplos
 
@@ -227,8 +227,26 @@ id-service/
 **Respuesta:**
 ```json
 {
-  "token": "jwt-token",
-  "usuario": { "id": 1, "nombre": "Jonathan" }
+    "message": "Inicio de sesión exitoso.",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c3VhcmlvSWQiOjIyLCJjb3JyZW8iOiJqbW9saW5hQG1pbWJyYWwuY2wiLCJwbGF0YWZvcm1hSWQiOjEsImlhdCI6MTc1NDUxNDg3NywiZXhwIjoxNzU0NTQwMDc3fQ.Aaxga7XidNiuS04Dxavfx70ZnHvLdd-xfrn4GOBioco",
+    "usuarioId": 22,
+    "correo": "jmolina@mimbral.cl",
+    "plataformaId": 1,
+    "expiracion": "2025-08-07 00:14:37"
+}
+```
+**Validaciones**
+
+```json
+{
+    "error": "Contraseña incorrecta."
+}
+```
+
+```json
+{
+    "error": "Ya existe una sesión activa. ¿Deseas cerrarla e iniciar una nueva?",
+    "requiereConfirmacion": true
 }
 ```
 
@@ -240,9 +258,13 @@ id-service/
   "plataformaId": 1
 }
 ```
-
+**Respuesta: 200 OK**
+```json
+{
+    "message": "Sesión cerrada exitosamente."
+}
+```
 ---
-
 ### 👥 Usuarios
 
 #### POST /usuarios/crear
@@ -263,7 +285,25 @@ id-service/
   "plataformaIds": [1, 3]
 }
 ```
-
+**Respuesta: 200 OK**
+```json
+{
+    "message": "Usuario creado exitosamente.",
+    "usuarioId": 24
+}
+```
+**Respuesta: 400 Bad Request**
+```json
+{
+    "error": "El correo ya está registrado."
+}
+```
+**Respuesta: 409 Conflict**
+```json
+{
+    "error": "El RUT ya está registrado en otro perfil."
+}
+```
 ---
 
 ### 🏢 Departamentos
@@ -279,9 +319,21 @@ id-service/
   "usuarioCreador": 3
 }
 ```
-
+**Respuesta: 200 OK**
+```json
+{
+    "ok": true,
+    "message": "Departamento creado correctamente"
+}
+```
+**Respuesta: 409 Conflict**
+```json{
+    "ok": false,
+    "message": "Ya existe un departamento con ese nombre"
+}
+```
 #### GET /departments/get?buscar=
-**Respuesta:**
+**Respuesta: 200 OK**
 ```json
 [
   { "id": 1, "nombre": "TI" }
@@ -301,6 +353,23 @@ id-service/
   "descripcion": "Plataforma de analisis de datos."
 }
 ```
+**Respuesta: 200 OK**
+```json
+{
+    "message": "Plataforma creada exitosamente.",
+    "data": {
+        "ID": 7
+    }
+}
+```
+
+**Respuesta: 500 Internal Server Error**
+```json
+{
+    "message": "Error del servidor al crear la plataforma.",
+    "error": "Violation of UNIQUE KEY constraint 'UQ__PLATAFOR__CC87E126F4AF086C'. Cannot insert duplicate key in object 'dbo.PLATAFORMAS'. The duplicate key value is (AN002)."
+}
+```
 
 #### POST /submodulos
 **Body:**
@@ -311,6 +380,12 @@ id-service/
   "codigo": "NUEVO_SUBMOD_PRUEBA",
   "descripcion": "Descripción del submódulo.",
   "ruta": "/nueva/ruta/prueba"
+}
+```
+**Respuesta: 409 Conflict**
+```json
+{
+    "message": "SUBMODULE_CODE_EXISTS"
 }
 ```
 
