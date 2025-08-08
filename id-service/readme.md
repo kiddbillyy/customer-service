@@ -183,7 +183,9 @@ services:
 2. El usuario ingresa su codigo enviado al correo, si es valido puede cambiar su contraseña.
 
 ## Diagrama de base de datos:
-![Diagrama ER](diagrama_bd.png)
+
+<img src="diagrama_bd.png" alt="Diagrama ER" width="400">
+
 
 ---
 
