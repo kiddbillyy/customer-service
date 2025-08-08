@@ -210,170 +210,6 @@ id-service/
 - **Cacheo**: Los permisos se cachean en memoria con TTL para mejorar el rendimiento.
 - **Integración**: Funciona en conjunto con API Gateway y otros microservicios para el control centralizado de acceso. Todos los servicios requieren del token para realizar acciones.
 
-## Endpoints con Ejemplos
-
-### 🔑 Autenticación y Sesiones
-
-#### POST /auth/login
-**Body:**
-```json
-{
-  "correo": "jmolina@mimbral.cl",
-  "password": "nuevaContrasena123",
-  "plataformaId": 1,
-  "forzarSesion": false
-}
-```
-**Respuesta:**
-```json
-{
-    "message": "Inicio de sesión exitoso.",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c3VhcmlvSWQiOjIyLCJjb3JyZW8iOiJqbW9saW5hQG1pbWJyYWwuY2wiLCJwbGF0YWZvcm1hSWQiOjEsImlhdCI6MTc1NDUxNDg3NywiZXhwIjoxNzU0NTQwMDc3fQ.Aaxga7XidNiuS04Dxavfx70ZnHvLdd-xfrn4GOBioco",
-    "usuarioId": 22,
-    "correo": "jmolina@mimbral.cl",
-    "plataformaId": 1,
-    "expiracion": "2025-08-07 00:14:37"
-}
-```
-
-
-#### POST /auth/logout
-**Body:**
-```json
-{
-  "usuarioId": 1,
-  "plataformaId": 1
-}
-```
----
-### 👥 Usuarios
-
-#### POST /usuarios/crear
-**Body:**
-```json
-{
-  "correo": "jmolina@mimbral.cl",
-  "password": "1234M!",
-  "activo": true,
-  "usuarioCreadorId": 1,
-  "nombres": "Jonathan",
-  "apellidos": "Molina",
-  "rut": "20.230.330-7",
-  "departamentoId": 2,
-  "telefono": "+56911112222",
-  "urlImagenPerfil": "https://miapp.cl/perfiles/nuevo.png",
-  "rolId": 3,
-  "plataformaIds": [1, 3]
-}
-```
----
-
-### 🏢 Departamentos
-
-#### POST /departments/post
-**Body:**
-```json
-{
-  "nombre": "Prueba 5",
-  "descripcion": "Área de Prueba Mantenimiento",
-  "contacto": "TI@mimbral.cl",
-  "estado": 1,
-  "usuarioCreador": 3
-}
-```
-#### GET /departments/get?buscar=
-**Respuesta: 200 OK**
-```json
-[
-  { "id": 1, "nombre": "TI" }
-]
-```
-
----
-
-### 🖥 Plataformas y Módulos
-
-#### POST /plataformas
-**Body:**
-```json
-{
-  "nombre": "Analisis 360",
-  "codigo": "AN001",
-  "descripcion": "Plataforma de analisis de datos."
-}
-```
-
-
-#### POST /submodulos
-**Body:**
-```json
-{
-  "moduloId": 1,
-  "nombre": "Nuevo Submódulo de Prueba",
-  "codigo": "NUEVO_SUBMOD_PRUEBA",
-  "descripcion": "Descripción del submódulo.",
-  "ruta": "/nueva/ruta/prueba"
-}
-```
-
----
-
-### 🛡 Roles y Permisos
-
-#### POST /create-rol
-**Body:**
-```json
-{
-  "nombre": "Gestor de Precios",
-  "descripcion": "Rol para administrar precios.",
-  "plataformaCod": "MIMBRAL_360",
-  "permisos": [
-    {
-      "subModuloId": 3,
-      "accionesId": [1, 3]
-    }
-  ],
-  "usuarioId": 22
-}
-```
-
-#### PATCH /users/{id}/permissions
-**Body:**
-```json
-{
-  "permisos": [
-    { "subModuloId": 4, "accionesId": [3, 2] },
-    { "subModuloId": 6, "accionesId": [1] }
-  ],
-  "adminId": 1
-}
-```
-
----
-
-## Configuración
-
-Variables de entorno principales:
-```
-PORT=5007
-DB_HOST=host.docker.internal
-DB_USER=DEV
-DB_PASSWORD=1234
-DB_NAME=ID_SERVICE_DB
-DB_PORT=1433
-JWT_SECRET=secret
-JWT_EXPIRES_IN=1h
-RBAC_CACHE_TTL_MS=60000
-IDSERVICE_INTERNAL=http://id-service:5007
-```
-
----
-
-¿Quieres que añada el resto de endpoints con sus ejemplos completos en la misma estructura?
-
-
-
----
 
 # Endpoints Detallados (ID-Service)
 
@@ -389,6 +225,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ## 🔑 Auth
 
 ### Iniciar sesión
+
+Permite autenticar a un usuario con su correo, contraseña y plataforma asociada, devolviendo un token JWT para el uso de la API.
+
 **POST** `/auth/login`
 
 **Body (JSON)**
@@ -418,6 +257,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Cerrar sesión
+
+Finaliza la sesión activa del usuario en una plataforma, invalidando el token asociado.
+
 **POST** `/auth/logout`
 
 **Headers**
@@ -439,6 +281,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Renovar sesión
+
+Genera un nuevo token JWT a partir de uno válido y vigente, extendiendo el tiempo de sesión.
+
 **POST** `/auth/renovar`
 
 **Headers**
@@ -457,6 +302,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Generar OTP (recuperación)
+
+Envía un código OTP al correo electrónico para iniciar el proceso de recuperación de contraseña.
+
 **POST** `/auth/recuperar`
 
 **Body (JSON)**
@@ -471,6 +319,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Validar OTP
+
+Verifica que el código OTP ingresado sea válido para el correo especificado.
+
 **POST** `/auth/verificar-otp`
 
 **Body (JSON)**
@@ -485,6 +336,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Cambiar contraseña con OTP
+
+Permite restablecer la contraseña de un usuario usando un código OTP previamente validado.
+
 **POST** `/auth/cambiar-contrasena`
 
 **Body (JSON)**
@@ -506,6 +360,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ## 👥 Usuarios
 
 ### Crear usuario
+
+Registra un nuevo usuario con sus datos personales, credenciales, rol y plataformas asignadas.
+
 **POST** `/usuarios/crear`
 
 **Headers**
@@ -543,6 +400,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Editar usuario
+
+Actualiza la información de un usuario existente, incluyendo datos personales, rol y plataformas
+
 **PUT** `/usuarios/editar/:id`
 
 **Headers**
@@ -573,6 +433,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Listar usuarios
+
+Obtiene un listado paginado y filtrado de usuarios registrados en el sistema.
+
 **GET** `/usuarios`
 
 **Headers**
@@ -606,6 +469,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ## 🏢 Departamentos
 
 ### Crear departamento
+
+Registra un nuevo departamento con nombre, descripción, contacto y estado.
+
 **POST** `/departments/post`
 
 **Headers**
@@ -630,6 +496,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Listar departamentos
+
+Devuelve la lista de departamentos registrados, con opción de búsqueda por nombre.
+
 **GET** `/departments/get?buscar=`
 
 **200 OK**
@@ -646,6 +515,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Editar departamento
+
+Modifica la información de un departamento existente.
+
 **PUT** `/departments/put/:id`
 
 **Body (JSON)**
@@ -667,7 +539,62 @@ IDSERVICE_INTERNAL=http://id-service:5007
 
 ## 🖥 Plataformas, Módulos y Endpoints
 
+### Obtener estructura de la plataforma
+
+Recupera la estructura completa de módulos, submódulos y acciones disponibles para una **plataforma específica**.
+
+---
+
+#### URL
+
+`GET /estructura/:CodigoPlataforma`
+
+---
+
+#### Parámetros de ruta
+
+| Parámetro | Tipo | Descripción |
+| --- | --- | --- |
+| `CodigoPlataforma` | `String` | Código único que identifica a la plataforma de la cual se desea obtener la estructura. |
+
+---
+
+#### Ejemplo de respuesta (200 OK)
+
+``` json
+[
+    {
+        "id": 1,
+        "codigo": "OMS-CA",
+        "nombre": "CATÁLOGO",
+        "submodulos": [
+            {
+                "id": 1,
+                "codigo": "CAT_MNGT_CATALOGO",
+                "nombre": "Gestión de Categorías",
+                "acciones": [
+                    {
+                        "id": 1,
+                        "codigo": "READ",
+                        "nombre": "Lectura"
+                    },
+                    {
+                        "id": 2,
+                        "codigo": "CREATE",
+                        "nombre": "Crear"
+                    }
+                ]
+            }
+        ]
+    }
+]
+
+ ```
+
 ### Crear plataforma
+
+Registra una nueva plataforma con nombre, código y descripción.
+
 **POST** `/plataformas`
 
 **Body (JSON)**
@@ -686,6 +613,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Obtener plataformas
+
+Lista todas las plataformas registradas en el sistema.
+
 **GET** `/plataformas/obtener`
 
 **Headers**
@@ -703,6 +633,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Editar plataforma
+
+Actualiza los datos de una plataforma existente.
+
 **PUT** `/plataformas/editar/:id`
 
 **Headers**
@@ -724,6 +657,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Crear módulo de plataforma
+
+Agrega un nuevo módulo a una plataforma específica.
+
 **POST** `/modulos-plataforma`
 
 **Body (JSON)**
@@ -743,6 +679,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Crear submódulo
+
+Registra un nuevo submódulo vinculado a un módulo existente.
+
 **POST** `/submodulos`
 
 **Body (JSON)**
@@ -763,6 +702,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Registrar endpoint API
+
+Asocia un nuevo endpoint HTTP a un submódulo, especificando método, ruta y destino.
+
 **POST** `/endpoint-api`
 
 **Body (JSON)**
@@ -784,7 +726,108 @@ IDSERVICE_INTERNAL=http://id-service:5007
 
 ## 🛡 Roles y Permisos
 
+
+#### Obtener permisos de un rol específico
+
+Muestra las acciones y submódulos permitidos para un rol determinado.
+
+**GET** `/role/:id/permisos`
+
+**Headers**
+- `Authorization: Bearer <token>`
+- `x-plataforma-id: 1`
+
+**200 OK**
+```json
+{
+  "rolId": 2,
+  "permisos": [
+    { "subModuloId": 1, "accionesId": [1,2] },
+    { "subModuloId": 3, "accionesId": [1] }
+  ]
+}
+```
+
+---
+
+#### Obtener permisos individuales de un usuario
+
+Lista los permisos asignados directamente a un usuario.
+
+**GET** `/users/:id/permissions`
+
+**Headers**
+- `Authorization: Bearer <token>`
+- `x-plataforma-id: 1`
+
+**200 OK**
+```json
+{
+  "usuarioId": 22,
+  "permisos": [
+    { "subModuloId": 4, "accionesId": [3,2] },
+    { "subModuloId": 6, "accionesId": [1] }
+  ]
+}
+```
+
+#### Obtener permisos de acuerdo a usuario y plataforma
+
+Devuelve los permisos combinados de un usuario para una plataforma específica.
+
+**GET** `/permissions`
+
+**Query**
+`usuarioId=22&plataformaId=1`
+
+**Headers**
+- `Authorization: Bearer <token>`
+- `x-plataforma-id: 1`
+
+**200 OK**
+```json
+{
+  "usuarioId": 22,
+  "plataformaId": 1,
+  "permisos": [
+    { "subModuloId": 1, "accionesId": [1] },
+    { "subModuloId": 2, "accionesId": [1] }
+  ]
+}
+```
+
+---
+
+#### Asignar rol a usuario
+
+Asigna un rol a un usuario determinado.
+
+**POST** `/asignar-rol`
+
+**Headers**
+- `Authorization: Bearer <token>`
+- `x-plataforma-id: 1`
+
+**Body (JSON)**
+```json
+{
+  "usuarioId": 22,
+  "rolId": 5,
+  "adminId": 1
+}
+```
+**200 OK**
+```json
+{ "message": "Rol asignado" }
+```
+
+
+---
+
 ### Crear rol
+
+Crea un nuevo rol y le asigna permisos sobre submódulos y acciones.
+
 **POST** `/create-rol`
 
 **Body (JSON)**
@@ -807,6 +850,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Actualizar rol
+
+Edita la información y permisos de un rol existente.
+
 **PUT** `/role/:id`
 
 **Body (JSON)**
@@ -832,6 +878,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Dar permiso puntual a usuario
+
+Agrega o actualiza permisos específicos para un usuario sin modificar su rol.
+
 **PATCH** `/users/:id/permissions`
 
 **Body (JSON)**
@@ -852,6 +901,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Activar/Desactivar rol de usuario
+
+Activa o desactiva la relación de un usuario con un rol.
+
 **PATCH** `/users/:userId/roles/:roleId`
 
 **200 OK**
@@ -862,6 +914,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Listar roles
+
+Obtiene un listado paginado de roles registrados, con opciones de filtro.
+
 **GET** `/all-roles`
 
 **Query**
@@ -885,6 +940,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ## 📄 Perfil de Usuario
 
 ### Editar perfil
+
+Modifica los datos personales y de contacto del perfil de un usuario.
+
 **PUT** `/perfiles/editar/:id`
 
 **Headers**
@@ -909,6 +967,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Obtener perfil por usuario
+
+Muestra la información del perfil de un usuario específico.
+
 **GET** `/perfiles/:id`
 
 **200 OK**
@@ -926,6 +987,9 @@ IDSERVICE_INTERNAL=http://id-service:5007
 ---
 
 ### Subir imagen de perfil
+
+Permite actualizar la imagen de perfil de un usuario.
+
 **PUT** `/perfiles/subir-imagen/:id`
 
 **FormData**
