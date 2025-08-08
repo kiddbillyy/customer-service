@@ -1,4 +1,4 @@
-# Microservicio ID-Service
+<img width="1036" height="906" alt="image" src="https://github.com/user-attachments/assets/94336d34-fdcd-4ef9-9052-31ac12bba950" /># Microservicio ID-Service
 
 ## Descripción General
 
@@ -184,7 +184,10 @@ services:
 1. El usuario ingresa su correo y se envia un código de validación a su correo.
 2. El usuario ingresa su codigo enviado al correo, si es valido puede cambiar su contraseña.
 
+## Diagrama de base de datos:
+![Diagrama ER](diagrama_bd.png)
 
+---
 
 ## Estructura del Proyecto
 
