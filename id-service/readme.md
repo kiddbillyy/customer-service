@@ -2,9 +2,9 @@
 
 ## Descripción General
 
-El **ID-Service** es el microservicio encargado de la **gestión centralizada de identidad, permisos y control de acceso** en el ecosistema de microservicios de Mimbral. Permite administrar usuarios, roles, plataformas, módulos, submódulos y endpoints, asegurando un control robusto basado en autenticación y autorización RBAC.
+El **ID-Service** es el microservicio encargado de la **gestión centralizada de identidad, permisos y control de acceso de las plataformas** en el ecosistema de microservicios de Mimbral. Permite administrar usuarios, roles, plataformas, módulos, submódulos y endpoints, asegurando un control robusto basado en autenticación y autorización RBAC.
 
-Este servicio se integra con el **API Gateway** para validar y enrutar las solicitudes según los permisos del usuario autenticado.
+Este microservicio se integra con el **API Gateway** para validar y enrutar y proteger las solicitudes según los permisos del usuario autenticado.
 
 ---
 
@@ -17,7 +17,8 @@ Este servicio se integra con el **API Gateway** para validar y enrutar las solic
 - **Bcrypt**: Hashing seguro de contraseñas.
 - **LRU Cache**: Cacheo de permisos para mejorar el rendimiento en validaciones RBAC.
 - **Docker**: Contenerización para despliegue en entornos aislados.
-
+- **Cloudinary**: Base de datos para almacenar las imagenes de los usuarios segun su id.
+- **Kafkajs**: Encargado de enviar Topic para que consuman otros microservicios.
 ---
 
 ## Endpoints Principales
@@ -28,26 +29,27 @@ Este servicio se integra con el **API Gateway** para validar y enrutar las solic
 - **POST /auth/logout** → Cerrar sesión.
 - **POST /auth/renovar** → Renovar sesión.
 - **POST /auth/recuperar** → Generar OTP de recuperación.
-- **POST /auth/cambiar-contrasena** → Cambiar contraseña con OTP.
 - **POST /auth/verificar-otp** → Validar OTP.
+- **POST /auth/cambiar-contrasena** → Cambiar contraseña con OTP.
+
 
 ### 👥 Usuarios
 
 - **POST /usuarios/crear** → Crear usuario.
-- **PUT /usuarios/editar/\*\*\*\*\*\*\*\*****:id** → Editar usuario.
+- **PUT /usuarios/editar/:id** → Editar usuario.
 - **GET /usuarios** → Listar usuarios.
 
 ### 🏢 Departamentos
 
 - **POST /departments/post** → Crear departamento.
 - **GET /departments/get** → Listar departamentos.
-- **PUT /departments/put/\*\*\*\*\*\*\*\*****:id** → Editar departamento.
+- **PUT /departments/put/:id** → Editar departamento.
 
 ### 🖥 Plataformas, Módulos y Endpoints
 
 - **POST /plataformas** → Crear plataforma.
 - **GET /plataformas/obtener** → Listar plataformas.
-- **PUT /plataformas/editar/\*\*\*\*\*\*\*\*****:id** → Editar plataforma.
+- **PUT /plataformas/editar/:id** → Editar plataforma.
 - **POST /modulos-plataforma** → Crear módulo.
 - **POST /submodulos** → Crear submódulo.
 - **POST /endpoint-api** → Registrar endpoint.
@@ -55,17 +57,21 @@ Este servicio se integra con el **API Gateway** para validar y enrutar las solic
 ### 🛡 Roles y Permisos
 
 - **POST /create-rol** → Crear rol con permisos.
-- **PUT /role/\*\*\*\*\*\*\*\*****:id** → Actualizar rol.
-- **PATCH /users/****:id****/permissions** → Dar permisos puntuales.
+- **GET /estructura/MIMBRAL_360** → Obtener modulos y permisos
+- **GET /role/6** → Obtener permisos de un rol
+- **PUT /role/:id** → Actualizar rol.
+- **PATCH /users/:id/permissions** → Dar permisos puntuales.
+- **GET /users/:id/permissions** → Obtener permisos individuales de un usuario.
+- **GET /users/:id/permissions/:idplataforma** → Obtener permisos de acuerdo a usuario y plataforma
 - **POST /asignar-rol** → Asignar rol a usuario.
-- **PATCH /users/****:userId****/roles/\*\*\*\*\*\*\*\*****:roleId** → Activar/Desactivar rol.
+- **PATCH /users/:userId/roles/:roleId** → Activar/Desactivar rol.
 - **GET /all-roles** → Listar roles.
 
 ### 📄 Perfil de Usuario
 
-- **PUT /perfiles/editar/\*\*\*\*\*\*\*\*****:id** → Editar perfil.
-- **GET /perfiles/\*\*\*\*\*\*\*\*****:id** → Obtener perfil.
-- **PUT /perfiles/subir-imagen/\*\*\*\*\*\*\*\*****:id** → Subir imagen de perfil.
+- **PUT /perfiles/editar/:id** → Editar perfil.
+- **GET /perfiles/:id** → Obtener perfil.
+- **PUT /perfiles/subir-imagen/:id** → Subir imagen de perfil.
 
 ---
 
@@ -73,18 +79,22 @@ Este servicio se integra con el **API Gateway** para validar y enrutar las solic
 
 ### Variables de Entorno (`.env`)
 
-| Variable             | Descripción                                 | Ejemplo                  |
-| -------------------- | ------------------------------------------- | ------------------------ |
-| `PORT`               | Puerto del servidor                         | `5007`                   |
-| `DB_HOST`            | Host de la base de datos                    | `host.docker.internal`   |
-| `DB_USER`            | Usuario de la base de datos                 | `sa`                     |
-| `DB_PASSWORD`        | Contraseña de la base de datos              | `*****`                  |
-| `DB_NAME`            | Nombre de la base de datos                  | `ID_SERVICE_DB`          |
-| `DB_PORT`            | Puerto del servidor MSSQL                   | `1433`                   |
-| `JWT_SECRET`         | Clave secreta para generación de tokens JWT | `********`               |
-| `JWT_EXPIRES_IN`     | Tiempo de expiración del token              | `1h`                     |
-| `RBAC_CACHE_TTL_MS`  | Tiempo de vida del cache de permisos (ms)   | `60000`                  |
-| `IDSERVICE_INTERNAL` | URL interna para validación de permisos     | `http://id-service:5007` |
+| Variable                 | Descripción                                        | Ejemplo                   |
+|--------------------------|----------------------------------------------------|---------------------------|
+| `PORT`                  | Puerto del servidor                                | `5007`                    |
+| `DB_HOST`               | Host de la base de datos                           | `host.docker.internal`    |
+| `DB_USER`               | Usuario de la base de datos                        | `DEV`                     |
+| `DB_PASSWORD`           | Contraseña de la base de datos                     | `1234`                    |
+| `DB_NAME`               | Nombre de la base de datos                         | `ID_SERVICE_DB`           |
+| `DB_PORT`               | Puerto del servidor MSSQL                          | `1433`                    |
+| `KAFKA_BROKER`          | Dirección del broker de Kafka                      | `kafka:9092`              |
+| `KAFKA_CLIENT_ID`       | Identificador del cliente Kafka                    | `id-service`              |
+| `JWT_SECRET`            | Clave secreta para generación de tokens JWT        | `mysupersecretkey`        |
+| `CLOUDINARY_CLOUD_NAME` | Nombre del cloud en Cloudinary                     | `dwpbqvmxe`               |
+| `CLOUDINARY_API_KEY`    | API Key de Cloudinary                              | `871616758667551`         |
+| `CLOUDINARY_API_SECRET` | API Secret de Cloudinary                           | `9OwBqheBqC_Z5LvvXi50RpoG5F0` |
+
+
 
 ---
 
@@ -106,6 +116,11 @@ CMD ["npm", "start"]
 
 ```yaml
 version: '3.8'
+
+networks:
+  orders-service_kafka_network:
+    external: true
+
 services:
   id-service:
     build: .
@@ -113,6 +128,13 @@ services:
     restart: always
     ports:
       - "5007:5007"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "win-hp03dio6fsk:192.168.0.165"
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8         
+      - 1.1.1.1 
     environment:
       PORT: 5007
       DB_HOST: host.docker.internal
@@ -120,12 +142,20 @@ services:
       DB_PASSWORD: 1234
       DB_NAME: ID_SERVICE_DB
       DB_PORT: 1433
-      JWT_SECRET: secret
-      JWT_EXPIRES_IN: 1h
-      RBAC_CACHE_TTL_MS: 60000
-      IDSERVICE_INTERNAL: http://id-service:5007
+      JWT_SECRET: mysupersecretkey
+      KAFKA_BROKER: kafka:9092
+      KAFKA_CLIENT_ID: id-service
+      VTEX_APP_KEY: ${VTEX_APP_KEY}
+      VTEX_APP_TOKEN: ${VTEX_APP_TOKEN}
+      VTEX_ACCOUNT: ${VTEX_ACCOUNT}
+      VTEX_ENVIRONMENT: ${VTEX_ENVIRONMENT}
+      SAP_BASE_URL: ${SAP_BASE_URL}
+      SAP_COMPANY_DB: ${SAP_COMPANY_DB}
+      SAP_USERNAME: ${SAP_USERNAME}
+      SAP_PASSWORD: ${SAP_PASSWORD}
     networks:
-      - kafka_network
+      - orders-service_kafka_network
+
 ```
 
 ---
