@@ -182,10 +182,40 @@ services:
 1. El usuario ingresa su correo y se envia un código de validación a su correo.
 2. El usuario ingresa su codigo enviado al correo, si es valido puede cambiar su contraseña.
 
+---
+
+## Funcionamiento del Proceso, Control de Acceso y Relación con Submódulos
+
+Para que el proceso y el microservicio operen de forma correcta y ordenada, es necesario que se registren todos los datos correspondientes en la base de datos.  
+El sistema implementa un control de acceso a los endpoints, de modo que **cualquier solicitud que no cumpla con los permisos asignados al usuario será bloqueada**.
+
+### Criterios de Permisos
+- **Lectura (Read)**
+- **Escritura (Create)**
+- **Actualización (Update)**
+- **Eliminación (Delete)**
+
+### Lógica de Autorización
+Cuando se necesita determinar a qué endpoints puede acceder un usuario, el sistema **compara los permisos asociados** con el tipo de solicitud HTTP que se está intentando ejecutar.  
+Si existe coincidencia (match) entre el permiso y la acción solicitada, el acceso al endpoint será autorizado. En caso contrario, la solicitud será denegada.
+
+
+> **Nota:**  
+> - Todos estos permisos y reglas de acceso están enlazados al **submódulo correspondiente** dentro de la plataforma. Esto asegura que la autorización no solo dependa del tipo de operación, sino también del submódulo al que pertenece el recurso o endpoint.  
+> - Un usuario puede obtener permisos de dos maneras:  
+>   1. **Mediante el rol asignado**, utilizando la relación establecida en la tabla `usuario_rol`.  
+>   2. **Mediante permisos puntuales sobre un submódulo específico**, asignados directamente en la tabla `usuario_submodulo_accion`.
+
+### Beneficios
+- Seguridad en la ejecución de operaciones.
+- Organización y coherencia en el flujo de datos.
+- Control granular por submódulo y tipo de operación.
+- Restricción de acceso únicamente a funcionalidades permitidas para cada usuario.
+
 ## Diagrama de base de datos:
-
-<img src="diagrama_bd.png" alt="Diagrama ER" width="400">
-
+<p align="center">
+  <img src="diagrama_bd.png" alt="Diagrama ER" width="600">
+</p>
 
 ---
 
