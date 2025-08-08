@@ -1,5 +1,3 @@
-<img width="1036" height="906" alt="image" src="https://github.com/user-attachments/assets/94336d34-fdcd-4ef9-9052-31ac12bba950" /># Microservicio ID-Service
-
 ## Descripción General
 
 El **ID-Service** es el microservicio encargado de la **gestión centralizada de identidad, permisos y control de acceso de las plataformas** en el ecosistema de microservicios de Mimbral. Permite administrar usuarios, roles, plataformas, módulos, submódulos y endpoints, asegurando un control robusto basado en autenticación y autorización RBAC.
