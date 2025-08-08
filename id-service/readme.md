@@ -235,20 +235,7 @@ id-service/
     "expiracion": "2025-08-07 00:14:37"
 }
 ```
-**Validaciones**
 
-```json
-{
-    "error": "Contraseña incorrecta."
-}
-```
-
-```json
-{
-    "error": "Ya existe una sesión activa. ¿Deseas cerrarla e iniciar una nueva?",
-    "requiereConfirmacion": true
-}
-```
 
 #### POST /auth/logout
 **Body:**
@@ -256,12 +243,6 @@ id-service/
 {
   "usuarioId": 1,
   "plataformaId": 1
-}
-```
-**Respuesta: 200 OK**
-```json
-{
-    "message": "Sesión cerrada exitosamente."
 }
 ```
 ---
@@ -285,25 +266,6 @@ id-service/
   "plataformaIds": [1, 3]
 }
 ```
-**Respuesta: 200 OK**
-```json
-{
-    "message": "Usuario creado exitosamente.",
-    "usuarioId": 24
-}
-```
-**Respuesta: 400 Bad Request**
-```json
-{
-    "error": "El correo ya está registrado."
-}
-```
-**Respuesta: 409 Conflict**
-```json
-{
-    "error": "El RUT ya está registrado en otro perfil."
-}
-```
 ---
 
 ### 🏢 Departamentos
@@ -317,19 +279,6 @@ id-service/
   "contacto": "TI@mimbral.cl",
   "estado": 1,
   "usuarioCreador": 3
-}
-```
-**Respuesta: 200 OK**
-```json
-{
-    "ok": true,
-    "message": "Departamento creado correctamente"
-}
-```
-**Respuesta: 409 Conflict**
-```json{
-    "ok": false,
-    "message": "Ya existe un departamento con ese nombre"
 }
 ```
 #### GET /departments/get?buscar=
@@ -353,23 +302,7 @@ id-service/
   "descripcion": "Plataforma de analisis de datos."
 }
 ```
-**Respuesta: 200 OK**
-```json
-{
-    "message": "Plataforma creada exitosamente.",
-    "data": {
-        "ID": 7
-    }
-}
-```
 
-**Respuesta: 500 Internal Server Error**
-```json
-{
-    "message": "Error del servidor al crear la plataforma.",
-    "error": "Violation of UNIQUE KEY constraint 'UQ__PLATAFOR__CC87E126F4AF086C'. Cannot insert duplicate key in object 'dbo.PLATAFORMAS'. The duplicate key value is (AN002)."
-}
-```
 
 #### POST /submodulos
 **Body:**
@@ -380,12 +313,6 @@ id-service/
   "codigo": "NUEVO_SUBMOD_PRUEBA",
   "descripcion": "Descripción del submódulo.",
   "ruta": "/nueva/ruta/prueba"
-}
-```
-**Respuesta: 409 Conflict**
-```json
-{
-    "message": "SUBMODULE_CODE_EXISTS"
 }
 ```
 
