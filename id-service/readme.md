@@ -160,13 +160,30 @@ services:
 
 ---
 
-## Flujo de Autenticación y Autorización
+# Flujo de Autenticación y Autorización
 
-1. El cliente realiza **login** y obtiene un token JWT.
-2. El **API Gateway** valida el token y consulta **ID-Service** para verificar permisos vía RBAC.
-3. El microservicio responde según si el usuario tiene permisos para el recurso solicitado.
+1. El cliente realiza **login**  en la **plataforma**
+2. Si el cliente no tiene otra sesión activa obtiene un token **JWT** siempre y cuando su estado de cuenta sea activo y tenga acceso a esa plataforma.
+3. Si el cliente ya tiene una sesión abierta en otro dispositivo le informa que tiene una sesión ya abierta, ¿Desea cerrarla e iniciar sesión? si confirma podrá iniciar sesión y la sesión antes abierta se invalida
+4. El **API Gateway** valida el token y consulta  al Microservicio de **ID-Service** para verificar permisos vía RBAC.
+5. El microservicio responde según si el usuario tiene permisos para el recurso solicitado y lo puede consumir.
 
 ---
+
+## FLUJO CERRAR SESIÓN
+
+1. El cliente al cerrar sesión invalida su Token **JWT** cambiando su estado a inactivo en la base de datos
+2. El cleinte al cerrar sesión en una plataforma solo se invalida esa sesión, si el usuario tiene otra sesión válida en otra plataforma no se invalida
+
+## FLUJO DE RENOVAR SESIÓN
+1. El cliente puede renovar su sesion por 3 horas más antes de que su sesión finalice.
+2. Se genera un nuevo JWT y el anterior es revocado.
+
+## FLUJO RECUPERAR CONTRASEÑA
+
+1. El usuario ingresa su correo y se envia un código de validación a su correo.
+2. El usuario ingresa su codigo enviado al correo, si es valido puede cambiar su contraseña.
+
 
 ## Estructura del Proyecto
 
