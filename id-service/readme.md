@@ -266,11 +266,12 @@ Permite autenticar a un usuario con su correo, contraseña y plataforma asociada
 **Body (JSON)**
 ```json
 {
-  "correo": "usuario@dominio.cl",
-  "password": "contrasenaSegura",
+  "correo": "jmolina@mimbral.cl",
+  "password": "nuevaContrasena23",
   "plataformaId": 1,
   "forzarSesion": false
 }
+
 ```
 **200 OK**
 ```json
