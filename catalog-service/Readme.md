@@ -558,6 +558,28 @@ https://catalogomimbral.loclx.io/api/catalog/listprices/:itemCode/:priceList
 }
 ```
 
+## GET /api/catalog/getmarca?code=&name=&fromdate=&todate
+
+Obtiene Las marcas en la vista de marcas.
+
+**URL de ejemplo:**
+
+https://catalogomimbral.loclx.io/api/catalog/getmarca?page=&pagesize=code=&name=&fromdate=&todate
+
+```json
+{
+  "ItemCode": "001001002",
+  "PriceList": 1,
+  "Price": 999989,
+  "PriceIVA": 1189986.91,
+  "CreatedAt": "2025-07-28T14:00:13.910Z",
+  "UpdatedAt": null,
+  "ItemName": "XXXCEMENTO PREMEZCLADO HN15 CON GRAVILLA",
+  "MinQuantity": 0,
+  "DateFrom": null,
+  "DateTo": null,
+  "DateModified": null
+}
 -----
 
 ## Configuración
