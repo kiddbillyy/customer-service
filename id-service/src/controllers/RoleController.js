@@ -143,19 +143,7 @@ async function updateRole(req, res) {
     }
 }
 
-/* async function getRolePermissions(req, res) {
-  const roleId = parseInt(req.params.roleId);
-  if (isNaN(roleId)) return res.status(400).json({ message: 'roleId inválido' });
 
-  try {
-    const permisos = await roleModel.getRolePermissions(roleId);
-    res.json(permisos);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error al obtener permisos del rol' });
-  }
-}
- */
 async function getRoleById(req, res) {
     const roleId = parseInt(req.params.roleId, 10);
     if (isNaN(roleId)) {

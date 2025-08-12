@@ -8,7 +8,7 @@ import { sql, catalogPool, catalogPoolConnect } from '../config/dbnew.js';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'clave_super_secreta';
+const JWT_SECRET = process.env.JWT_SECRET ;
 const CHECK_IP = false;
 const CHECK_UA = false;
 
@@ -28,17 +28,15 @@ export default async function auth(req, res, next) {
     );
   }
 
-  const token = authHeader.slice(7); // Remueve "Bearer "
+  const token = authHeader.slice(7);
 
-  // 1) Decodificar/validar JWT
   let payload;
   try {
-    payload = jwt.verify(token, JWT_SECRET); // { usuarioId, correo, plataformaId }
+    payload = jwt.verify(token, JWT_SECRET);
   } catch (e) {
     return fail(e.name === 'TokenExpiredError' ? 'Token expirado.' : 'Token inválido.');
   }
 
-  // 2) Validación del payload
   if (!payload?.usuarioId || !payload?.plataformaId) {
     return fail('Token inválido (faltan campos requeridos).');
   }
@@ -46,7 +44,6 @@ export default async function auth(req, res, next) {
   const usuarioId = payload.usuarioId;
   const plataformaId = payload.plataformaId;
 
-  // 3) Validar que el frontend esté enviando la misma plataforma en el header
   const plataformaHeader = req.headers['x-plataforma-id'] || req.headers['plataformaid'];
   const plataformaIdPeticion = parseInt(plataformaHeader, 10);
 
@@ -54,7 +51,7 @@ export default async function auth(req, res, next) {
     return fail(`Token no coincide con la plataforma esperada. Token: ${plataformaId}, header: ${plataformaIdPeticion}`, 403);
   }
 
-  // 4) Validar en BD que el token está registrado y activo
+
   try {
     await catalogPoolConnect;
 
@@ -86,7 +83,7 @@ export default async function auth(req, res, next) {
 
     const row = rs.recordset[0];
 
-    // (Opcional) Validar contexto de IP y Dispositivo
+
     if (CHECK_IP && row.IP && ip && row.IP !== ip) {
       return fail('Contexto de sesión inválido (IP).');
     }
@@ -95,7 +92,6 @@ export default async function auth(req, res, next) {
       return fail('Contexto de sesión inválido (dispositivo).');
     }
 
-    // ✔️ Éxito: inyecta info al request
     req.user = {
       usuarioId: payload.usuarioId,
       correo: payload.correo,

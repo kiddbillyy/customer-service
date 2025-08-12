@@ -9,7 +9,6 @@ const obtenerUsuarioPorCorreo = async (correo) => {
   return result.recordset[0];
 };
 
-// Insertar nuevo usuario y crear perfil (campos del perfil opcionales)
 const insertarUsuario = async (
   correo,
   hashPassword,
@@ -17,7 +16,7 @@ const insertarUsuario = async (
   usuarioCreadorId,
   perfil = {},
   rolId = null,
-  plataformaIds = [] // nuevo parámetro: array de IDs de plataformas
+  plataformaIds = []
 ) => {
   const pool = await IdServicePool.connect();
   const transaction = new sql.Transaction(pool);
@@ -31,7 +30,6 @@ const insertarUsuario = async (
     request.input('activo', sql.Bit, activo);
     request.input('usuarioCreador', sql.Int, usuarioCreadorId);
 
-    // Insertar usuario
     const usuarioResult = await request.query(`
       INSERT INTO Usuarios (
         CorreoElectronico,
@@ -54,7 +52,6 @@ const insertarUsuario = async (
 
     const usuarioId = usuarioResult.recordset[0].UsuarioID;
 
-    // Insertar perfil asociado
     const perfilRequest = transaction.request();
     perfilRequest.input('UsuarioID', sql.Int, usuarioId);
     perfilRequest.input('Nombres', sql.NVarChar(100), perfil.nombres ?? null);
@@ -85,7 +82,6 @@ const insertarUsuario = async (
       );
     `);
 
-    // Insertar en USUARIO_ROL si aplica
     if (rolId !== null) {
       const rolRequest = transaction.request();
       rolRequest.input('UsuarioID', sql.Int, usuarioId);
@@ -97,7 +93,6 @@ const insertarUsuario = async (
       `);
     }
 
-    // Insertar en USUARIO_PLATAFORMA
     for (const plataformaId of plataformaIds) {
       const plataformaRequest = transaction.request();
       plataformaRequest.input('UsuarioID', sql.Int, usuarioId);

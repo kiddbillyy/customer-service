@@ -56,7 +56,6 @@ async function syncPriceList() {
     if (!lastSync) {
       metrics.initialLoad = true;
 
-      // CARGA INICIAL
       const tFull0 = performance.now();
       const sapReq = new sql.Request(sapPool);
       const allRes = await sapReq.query(`
