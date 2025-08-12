@@ -4,12 +4,13 @@ const { sql, IdServicePool } = require('../config/dbnew');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 const timezone = require('dayjs/plugin/timezone');
-const { cerrarSesion, validarCredencialesParaRenovar, crearOtpYEnviar, validarOtp, actualizarContraseña, marcarOtpComoUsado } = require('../models/authModels');
+const { cerrarSesion, validarCredencialesParaRenovar, crearOtpYEnviar, validarOtp, actualizarContraseña, marcarOtpComoUsado, validarSoloOtp } = require('../models/authModels');
 const { sendOtpEvent } = require('../utils/kafkaUtils')
 require('dotenv').config();
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+
 
 const login = async (req, res) => {
   const { correo, password, plataformaId, ip, dispositivo, forzarSesion = false } = req.body;
@@ -22,7 +23,18 @@ const login = async (req, res) => {
 
   const usuarioResult = await pool.request()
     .input('Correo', sql.NVarChar(255), correo)
-    .query(`SELECT * FROM Usuarios WHERE CorreoElectronico = @Correo`);
+    .query(`
+      SELECT
+        u.UsuarioID,
+        u.CorreoElectronico,
+        u.HashPassword,
+        u.Activo,
+        p.Nombres,
+        p.Apellidos
+      FROM Usuarios u
+      LEFT JOIN Perfiles p ON u.UsuarioID = p.UsuarioID
+      WHERE u.CorreoElectronico = @Correo
+    `);
 
   const usuario = usuarioResult.recordset[0];
 
@@ -49,7 +61,7 @@ const login = async (req, res) => {
     .input('PlataformaID', sql.Int, plataformaId)
     .query(`
       SELECT * FROM TOKENS_ACTIVOS
-      WHERE USUARIO_ID = @UsuarioID AND PLATAFORMA_ID = @PlataformaID AND VALIDO = 1
+      WHERE USUARIO_ID = @UsuarioID AND PLATAFORMA_ID = @PlataformaID AND VALIDO = 1 AND FECHA_EXPIRACION > GETDATE()
     `);
 
   if (tokenExistente.recordset.length > 0 && !forzarSesion) {
@@ -78,6 +90,7 @@ const login = async (req, res) => {
 
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7h' });
 
+
   // Hora de Santiago como string plano para SQL Server
   const nowSantiago = dayjs().tz('America/Santiago');
   const expiracionSantiago = nowSantiago.add(7, 'hour');
@@ -102,11 +115,25 @@ const login = async (req, res) => {
         @UsuarioID, @PlataformaID, @Token, @Valido, @IP, @Dispositivo, @FechaCreacion, @FechaExpiracion
       )
     `);
+  // Después de insertar el nuevo token
+  await pool.request()
+    .input('UsuarioID', sql.Int, usuario.UsuarioID)
+    .input('PlataformaID', sql.Int, plataformaId)
+    .input('Token', sql.NVarChar, token)
+    .query(`
+      UPDATE TOKENS_ACTIVOS
+      SET VALIDO = 0
+      WHERE USUARIO_ID = @UsuarioID
+        AND PLATAFORMA_ID = @PlataformaID
+        AND VALIDO = 1
+        AND TOKEN <> @Token;  -- no toques el recién insertado
+    `);
 
   await pool.request()
     .input('UsuarioID', sql.Int, usuario.UsuarioID)
     .input('PlataformaID', sql.Int, plataformaId)
     .input('FechaInicio', sql.DateTime, nowFormatted)
+    .input('FechaCierre', sql.DateTime, expiracionFormatted)
     .input('Token', sql.NVarChar, token)
     .input('IP', sql.NVarChar(50), ip ?? null)
     .input('Dispositivo', sql.NVarChar(100), dispositivo ?? null)
@@ -115,6 +142,7 @@ const login = async (req, res) => {
         USUARIO_ID,
         PLATAFORMA_ID,
         FECHA_INICIO,
+        FECHA_CIERRE,
         TOKEN,
         IP,
         DISPOSITIVO
@@ -123,6 +151,7 @@ const login = async (req, res) => {
         @UsuarioID,
         @PlataformaID,
         @FechaInicio,
+        @FechaCierre,
         @Token,
         @IP,
         @Dispositivo
@@ -134,11 +163,12 @@ const login = async (req, res) => {
     token,
     usuarioId: usuario.UsuarioID,
     correo: usuario.CorreoElectronico,
+    nombre: usuario.Nombres,
+    apellido: usuario.Apellidos,
     plataformaId,
     expiracion: expiracionFormatted
   });
 };
-
 
 // CERRAR SESIÓN 
 const cerrarSesionController = async (req, res) => {
@@ -383,6 +413,26 @@ const cambiarContraseña = async (req, res) => {
     }
 };
 
+const verificarOtpValido = async (req, res) => {
+  const { correo, codigoOtp } = req.body;
+
+  if (!correo || !codigoOtp) {
+    return res.status(400).json({ message: 'Correo y código OTP son requeridos' });
+  }
+
+  try {
+    const esValido = await validarSoloOtp(correo, codigoOtp);
+
+    if (!esValido) {
+      return res.status(400).json({ message: 'Código OTP inválido, usado o expirado' });
+    }
+
+    return res.status(200).json({ message: 'Código OTP válido' });
+  } catch (error) {
+    console.error('❌ Error al validar OTP:', error);
+    res.status(500).json({ message: 'Error al validar el código OTP' });
+  }
+};
 module.exports = {
-  login, cerrarSesionController, renovarSesion, solicitarRecuperacionController, cambiarContraseña 
+  login, cerrarSesionController, renovarSesion, solicitarRecuperacionController, cambiarContraseña, verificarOtpValido 
 };

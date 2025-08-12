@@ -1,4 +1,5 @@
 const { sql, catalogPoolConnect, catalogPool } = require('../config/dbnew');
+
 //MODELS BUSCAR CATEGORIAS
 const buscarCategorias = async (buscar) => {
   await catalogPoolConnect;

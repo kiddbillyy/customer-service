@@ -2,6 +2,7 @@
 const { performance } = require('perf_hooks');
 const { sql, sapPool } = require('../config/dbnewsap');
 const { catalogPool }  = require('../config/dbnew');
+const { sendPriceListEvents } = require('../utils/kafkaProducer');
 
 const CHUNK_INSERT = 1000;
 
@@ -54,7 +55,12 @@ async function syncPriceLists () {
       ) VALUES (
         S.ListNum, S.ListName, S.GroupCode, S.UserSign, S.UserSign2,
         S.UpdateDate, S.ValidFor, S.ValidFrom, S.ValidTo, S.CreateDate
-      );`
+      )
+      OUTPUT
+        $action AS ActionType,
+        inserted.ListNum,
+        inserted.ListName,
+        inserted.CreateDate;`
   };
 
   try {
@@ -82,10 +88,21 @@ async function syncPriceLists () {
       await tx.request().bulk(tvp);
     }
 
-    /* 3│ MERGE */
-    await tx.request().query(tbl.mergeSql);
+    /* 3│ MERGE con OUTPUT */
+    const result = await tx.request().query(tbl.mergeSql);
     await tx.commit();
-    console.log(`✔️  syncPriceLists completado en ${(performance.now()-t0).toFixed(0)} ms`);
+
+    console.log(`✔️  syncPriceLists completado en ${(performance.now()-t0).toFixed(0)} ms`);
+
+    // Filtrar solo inserciones
+    const newPriceLists = result.recordset.filter(r => r.ActionType === 'INSERT');
+    if (newPriceLists.length > 0) {
+      await sendPriceListEvents(newPriceLists);
+      console.log(`📤 ${newPriceLists.length} nuevas listas enviadas a Kafka.`);
+    } else {
+      console.log('No se insertaron nuevas listas de precios, nada que enviar a Kafka.');
+    }
+
     return true;
 
   } catch (err) {
