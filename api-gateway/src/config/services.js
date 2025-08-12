@@ -28,12 +28,11 @@ export default {
   idserviceBase: {
     path: '/api/idservice',
     target: 'http://id-service:5007',
-    requireAuth: false,
+    requireAuth: true,
     prependBasePath: true,
     requireRbac: true
   },
   
-
   idserviceRecuperar: {
     method: 'PATCH',
     path: '/api/idservice/auth/recuperar',

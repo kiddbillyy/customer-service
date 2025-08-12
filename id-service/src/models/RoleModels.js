@@ -283,57 +283,6 @@ async function getAllRoles(opts) {
   };
 }
 
-/* 
-async function getRolePermissions(roleId) {
-  await IdServicePoolConnect;
-
-  try {
-    const { recordset } = await IdServicePool.request()
-      .input('id', sql.Int, roleId)
-      .query(`
-        SELECT
-              sm.CODIGO AS subModuloCod,
-              sm.MODULO_ID AS moduloID,
-              ta.CODIGO AS accionCod,
-              ta.ID AS accionID,
-              rs.nombre AS NOMBRE,
-              rs.DESCRIPCION as DESCRIPCION
-          FROM
-              ROL_SUBMODULO_ACCION rsa
-          JOIN
-              ROLES rs ON rsa.ROL_ID = rs.ID
-          JOIN
-              SUBMODULOS sm ON rsa.SUBMODULO_ID = sm.ID
-          JOIN
-              TIPOS_ACCION ta ON rsa.ACCION_ID = ta.ID
-          WHERE
-      `);
-    const permisosPorSubModulo = new Map();
-
-    for (const row of recordset) {
-      const key = `${row.moduloID}|${row.subModuloCod}`;
-      if (!permisosPorSubModulo.has(key)) {
-        permisosPorSubModulo.set(key, {
-          moduloID: row.moduloID,
-          subModuloCod: row.subModuloCod,
-          acciones: []
-        });
-      }
-      permisosPorSubModulo.get(key).acciones.push({
-        id: row.accionID,
-        codigo: row.accionCod
-      });
-    }
-
-    return Array.from(permisosPorSubModulo.values());
-
-  } catch (err) {
-    console.error("Error al obtener permisos del rol:", err);
-    throw err;
-  }
-} */
-
-// models/RolesModel.js
 
 async function getRoleById(roleId) {
     await IdServicePoolConnect;
