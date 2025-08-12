@@ -10,11 +10,6 @@ const connectProducer = async () => {
   console.log('🟢 Kafka Producer conectado');
 };
 
-/**
- * Envía uno o más ItemCodes como eventos de producto nuevo.
- * Se parte en lotes de 500 y se comprime con GZIP para evitar
- * el error MESSAGE_TOO_LARGE (1 MB por ProduceRequest en el broker).
- */
 const sendNewProductEvents = async (itemCodes) => {
   if (!producer) {
     console.error('Producer no inicializado');
@@ -50,4 +45,37 @@ const sendNewProductEvents = async (itemCodes) => {
   }
 };
 
-module.exports = { connectProducer, sendNewProductEvents };
+const sendPriceListEvents = async (priceLists) => {
+  if (!producer) {
+    console.error('Producer no inicializado');
+    return;
+  }
+  if (!Array.isArray(priceLists) || priceLists.length === 0) {
+    console.log('No hay listas de precios para enviar a Kafka.');
+    return;
+  }
+
+  for (let i = 0; i < priceLists.length; i += BATCH_SIZE) {
+    const slice = priceLists.slice(i, i + BATCH_SIZE);
+    const messages = slice.map(pl => ({
+      value: JSON.stringify({
+        listNum: pl.ListNum,
+        listName: pl.ListName,
+        createDate: pl.CreateDate
+      }),
+    }));
+
+    try {
+      await producer.send({
+        topic: 'sap.price-list.sync',
+        messages,
+        compression: CompressionTypes.GZIP,
+      });
+      console.log(`📤 Enviado batch listas de precios: ${messages.length}`);
+    } catch (error) {
+      console.error('Error al enviar batch de listas de precios a Kafka:', error);
+      throw error;
+    }
+  }
+};
+module.exports = { connectProducer, sendNewProductEvents, sendPriceListEvents };
