@@ -38,7 +38,7 @@ async function syncAuxCatalogs () {
     },
     {
       nombre: 'PrimerNivel',
-      sapSql : 'SELECT Code, Name FROM [@PRIMERNIVEL]',
+      sapSql : 'SELECT Code, Name FROM [@PRIMER_NIVEL]',
       cols   : [
         { n: 'Code', len: 50  },
         { n: 'Name', len: 100 }

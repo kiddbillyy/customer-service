@@ -182,4 +182,29 @@ const marcarOtpComoUsado = async (usuarioId, codigoOtp) => {
 };
 
 
-module.exports = { cerrarSesion, validarCredencialesParaRenovar, crearOtpYEnviar,validarOtp, marcarOtpComoUsado };
+const validarSoloOtp = async (correo, codigoOtp) => {
+  const pool = await IdServicePool;
+
+  const query = `
+    SELECT o.FECHA_EXPIRACION, o.USADO
+    FROM OTP o
+    JOIN USUARIOS u ON u.UsuarioID = o.USUARIO_ID
+    WHERE u.CorreoElectronico = @correo
+      AND o.CODIGO = @codigoOtp
+      AND o.USADO = 0
+  `;
+
+  const result = await pool.request()
+    .input('correo', sql.NVarChar, correo)
+    .input('codigoOtp', sql.NVarChar, codigoOtp)
+    .query(query);
+
+  const otp = result.recordset[0];
+  if (!otp) return false;
+
+  const expiracion = moment(otp.FECHA_EXPIRACION).tz('America/Santiago');
+  return expiracion.isAfter(moment().tz('America/Santiago'));
+};
+
+
+module.exports = { cerrarSesion, validarCredencialesParaRenovar, crearOtpYEnviar,validarOtp, marcarOtpComoUsado, validarSoloOtp };

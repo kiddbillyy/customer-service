@@ -1,14 +1,32 @@
 const { catalogPool, catalogPoolConnect, sql } = require('../config/dbnew');
 
 
-const {sapPool,sapPoolConnect} = require('../config/dbnewsap')
+const { sapPool, sapPoolConnect } = require('../config/dbnewsap');
+
+// ✅ Función para convertir fecha a formato YYYY-MM-DD
+function formatDate(date) {
+  if (!date) return null;
+  const d = new Date(date);
+  return d.toISOString().split('T')[0];
+}
+
+function formatTime(intTime) {
+  if (typeof intTime !== 'number') return '00:00:00';
+
+  const padded = intTime.toString().padStart(6, '0');
+  const hh = padded.slice(0, 2);
+  const mm = padded.slice(2, 4);
+  const ss = padded.slice(4, 6);
+
+  return `${hh}:${mm}:${ss}`;
+}
 
 const VALID_SORT = [
   'ItemCode',
   'ItemName',
   'Category',
   'U_Marca',
-  'UpdatedAt'
+  'UpdateDate'
 ];
 
 async function getProducts(opts) {
@@ -53,29 +71,32 @@ async function getProducts(opts) {
         P.ItemName    AS Name,
         P.ItemCode    AS ItemCode,
         C.Name        AS Category,
-        P.U_Marca     AS Brand,
+        M.Name        AS Brand, 
         CAST(NULL AS INT) AS TotalSalesChannel,
-        P.UpdatedAt   AS DateModified,
-        P.UserSign    AS UserId,
+        P.UpdateDate   AS DateModified,
+        P.UpdateTS     AS UpdateTS,
+        P.UserSign     AS UserId,
         CASE P.ValidFor
           WHEN 'Y' THEN 'Activo'
           WHEN 'N' THEN 'Inactivo'
           ELSE P.ValidFor 
         END AS Status,
-        P.CodeBars AS Eans,
+        P.CodeBars     AS Eans,
         COUNT(*) OVER() AS totalRecords
       FROM dbo.OITM_Products AS P
       LEFT JOIN dbo.CATEGORIA AS C ON C.Code = P.U_Categoria
+      LEFT JOIN dbo.MARCA AS M ON M.Code = P.U_Marca 
       ${whereSQL}
     )
     SELECT
       Image, Name, ItemCode, Category, Brand,
-      TotalSalesChannel, DateModified, UserId, Status, Eans,
+      TotalSalesChannel, DateModified, UpdateTS, UserId, Status, Eans,
       totalRecords
     FROM Q
     ORDER BY ${sortBy} ${sortOrder}
     OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
   `;
+
 
   req.input('offset', sql.Int, (opts.page - 1) * opts.pageSize);
   req.input('pageSize', sql.Int, opts.pageSize);
@@ -93,8 +114,9 @@ async function getProducts(opts) {
   const userMap = Object.fromEntries(userIds.map((id, i) => [id, userInfo[i]]));
 
   const totalRecords = r.recordset[0]?.totalRecords ?? 0;
-  const data = r.recordset.map(({ totalRecords, UserId, ...row }) => ({
+  const data = r.recordset.map(({ totalRecords, UserId, DateModified, UpdateTS,...row }) => ({
     ...row,
+    DateModified: `${formatDate(DateModified)} ${formatTime(UpdateTS)}`,
     CreatedName: userMap[UserId]?.name ?? null,
     CreatedEmail: userMap[UserId]?.email ?? null
   }));
@@ -108,11 +130,10 @@ async function getProducts(opts) {
   };
 }
 
-
 async function getProductBySku(itemCode) {
   await catalogPoolConnect;
 
-  const {recordset} = await catalogPool.request()
+  const { recordset } = await catalogPool.request()
     .input('itemCode', sql.NVarChar(50), itemCode)
     .query(`
       SELECT
@@ -120,76 +141,84 @@ async function getProductBySku(itemCode) {
         P.ItemName    AS Name,
         P.ItemCode    AS SKU,
         C.Name        AS Category,
-        P.U_Marca     AS Brand,
-        p.CreateDate  AS CreateDate,
-        p.CreateTS    AS CreateTime,
+        M.Name        AS Brand,
+        P.CreateDate  AS CreateDate,
+        P.CreateTS    AS CreateTime,
         CAST(NULL AS INT) AS TotalSalesChannel,
-        P.UpdatedAt   AS DateModified,
+        P.UpdateDate  AS DateModified,
+        P.UpdateTS    AS UpdateTime,
         P.UserSign    AS UserId,
         P.ValidFor    AS Status,
         P.CodeBars    AS Eans
       FROM dbo.OITM_Products AS P
-      LEFT JOIN dbo.CATEGORIA AS C
-             ON C.Code = P.U_Categoria
+      LEFT JOIN dbo.CATEGORIA AS C ON C.Code = P.U_Categoria
+      LEFT JOIN dbo.MARCA AS M ON M.Code = P.U_Marca
       WHERE P.ItemCode = @itemCode;
     `);
+
   const row = recordset[0];
-  
-  console.log("row",row)
   if (!row) return null;
 
-  console.log('🔎 Resultado de búsqueda por SKU:', recordset);
   const [user] = await getUsersByIds([row.UserId]);
-  console.log('👤 Usuario recuperado para SKU:', user);
-  return {
-    ...row,
-    UpdatedByName  : user.name,
-    UpdatedByEmail : user.email
-  };
-}
 
+  //  Excluir CreateTime y UpdateTime
+  const {
+    CreateTime,
+    UpdateTime,
+    ...rest
+  } = row;
+
+  return {
+    ...rest,
+    CreateDate: `${formatDate(row.CreateDate)} ${formatTime(CreateTime)}`,
+    DateModified: `${formatDate(row.DateModified)} ${formatTime(UpdateTime)}`,
+    UpdatedByName: user.name,
+    UpdatedByEmail: user.email
+  };
+
+}
 
 const usersCache = new Map();
-let   cacheUntil = 0;
+let cacheUntil = 0;
 
 async function getUsersByIds(ids) {
-    console.log("📥 Recibiendo IDs para consulta SAP:", ids);
-    await sapPoolConnect;
-    const now = Date.now();
-    if (now < cacheUntil && ids.every(id => usersCache.has(id))) {
-        console.log("🧠 Todos los IDs están en caché. Retornando desde cache...");
-        return ids.map(id => usersCache.get(id));
-    }
+  console.log("📥 Recibiendo IDs para consulta SAP:", ids);
+  await sapPoolConnect;
+  const now = Date.now();
+  if (now < cacheUntil && ids.every(id => usersCache.has(id))) {
+    console.log("🧠 Todos los IDs están en caché. Retornando desde cache...");
+    return ids.map(id => usersCache.get(id));
+  }
 
-    // consulta SAP solo para los IDs faltantes
-    const missing = ids.filter(id => !usersCache.has(id));
-    console.log("❗ IDs faltantes que irán a SAP:", missing);
-    if (missing.length) {
-        const req = sapPool.request();
-        missing.forEach((id, idx) => req.input(`id${idx}`, sql.Int, id));
-        const inList = missing.map((_, idx) => `@id${idx}`).join(',');
+  const missing = ids.filter(id => !usersCache.has(id));
+  console.log("❗ IDs faltantes que irán a SAP:", missing);
 
-        console.log("📄 Parámetros construidos para consulta SAP:", inList);
-        
-        const rows = (await req.query(`
-        SELECT USERID, U_NAME, E_Mail
-        FROM OUSR
-        WHERE USERID IN (${inList})
-        `)).recordset;
+  if (missing.length) {
+    const req = sapPool.request();
+    missing.forEach((id, idx) => req.input(`id${idx}`, sql.Int, id));
+    const inList = missing.map((_, idx) => `@id${idx}`).join(',');
 
-         console.log("📦 Respuesta cruda de SAP (OUSR):", rows);
+    console.log("📄 Parámetros construidos para consulta SAP:", inList);
 
-        rows.forEach(r => usersCache.set(r.USERID, { name: r.U_NAME, email: r.E_Mail }));
-    }
+    const rows = (await req.query(`
+      SELECT USERID, U_NAME, E_Mail
+      FROM OUSR
+      WHERE USERID IN (${inList})
+    `)).recordset;
 
-    cacheUntil = now + 5 * 60 * 1000; // 5 min de caché
+    console.log("📦 Respuesta cruda de SAP (OUSR):", rows);
 
-    console.log("🧠 Caché actualizada:", Array.from(usersCache.entries()));
+    rows.forEach(r => usersCache.set(r.USERID, {
+      name: r.U_NAME,
+      email: r.E_Mail
+    }));
+  }
 
-    return ids.map(id => usersCache.get(id) ?? { name: null, email: null });
+  cacheUntil = now + 5 * 60 * 1000; // 5 minutos de caché
+  console.log("🧠 Caché actualizada:", Array.from(usersCache.entries()));
+
+  return ids.map(id => usersCache.get(id) ?? { name: null, email: null });
 }
-
-
 
 module.exports = {
   getProducts,

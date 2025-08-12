@@ -5,6 +5,7 @@ const runAuxSyncJob = require('../jobs/CategoryJob');
 const runItmsJobs = require('../jobs/ItmsGrpJob');
 const runBarcodeJob =require('../jobs/BarcodeJob');
 const runPriceListJob = require('../jobs/PriceListJob')
+const runBrandSyncJobs = require('../jobs/BrandJob');
 console.log('Tipo de runPriceListJob:', typeof runPriceListJob);
 
 console.log('🔁 Job unificado de sincronización programado para ejecutarse cada 5 minutos...');
@@ -42,6 +43,11 @@ cron.schedule('*/5 * * * *', async () => {
     console.log('🔹 Iniciando sincronización de códigos de barras...');
     await runBarcodeJob();
     console.log('✅ Códigos barra sincronizados correctamente.');
+
+    // Paso 7: Marcas
+    console.log('🔹 Iniciando sincronización de marcas...');
+    await runBrandSyncJobs();
+    console.log('✅ Marcas sincronizadas correctamente.');
 
   } catch (err) {
     console.error('❌ Error general durante la sincronización:', err.message);
