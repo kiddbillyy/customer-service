@@ -305,7 +305,7 @@ Obtiene el detalle de la categoria seleccionada en el catalogo de las categorias
 
 ### `GET /api/catalog/products`
 
-Obtiene un listado paginado de productos disponibles en el catálogo. Se pueden aplicar filtros por `itemCode`, `name`, `category`, y `barcode`, así como ordenamiento y paginación.
+Obtiene un listado paginado de productos disponibles en el catálogo. Se pueden aplicar filtros por `itemCode`, `name`, `category`, `brand`,  y `barcode`,  así como ordenamiento y paginación.
 
 **URL de ejemplo:**
 
@@ -318,6 +318,7 @@ https://catalogomimbral.loclx.io/api/catalog/products
 - `itemCode` (string): Código del producto
 - `name` (string): Nombre del producto
 - `category` (string): Categoría del producto
+- `Brand` (string): Marca del producto
 - `barcode` (string): Código de barras
 - `sortBy` (string): Campo por el cual ordenar (por defecto: `ItemCode`)
 - `sortOrder` (`ASC` | `DESC`): Orden de resultados (por defecto: `ASC`)
