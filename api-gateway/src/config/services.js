@@ -24,5 +24,8 @@ export default {
   
   // Rutas Microservicio Email Service
   email:  { path: '/api/email',  target: 'http://email-service:5008', requireAuth: false },
+
+  // Rutas Microservicio Comerce Service
+  comerceService:  { path: '/api/comerce-service',  target: 'http://comerce-service:5009', requireAuth: false,  requireRbac: false  },
 };
 
