@@ -3,6 +3,9 @@ const { sapPool } = require('../config/dbnewsap');
 
 const VALID_SORT = ['ItemCode', 'PriceList', 'Price', 'PriceIVA', 'CreatedAt', 'UpdatedAt'];
 
+
+
+
 async function getLatestCostsFromSAP(itemCodes) {
   if (!itemCodes || itemCodes.length === 0) return {};
 
@@ -89,6 +92,7 @@ async function getListPrices(opts) {
               ${priceIvaExpr} AS PriceIVA,
               L.CreatedAt,
               L.UpdatedAt,
+              L.UpdatedSap,
               P.ItemName,
               P.MinLevel  AS MinQuantity,
               P.ValidFrom AS DateFrom,
@@ -101,7 +105,7 @@ async function getListPrices(opts) {
       ${whereSQL}
     )
     SELECT ItemCode, PriceList, Price, PriceIVA,
-           CreatedAt, UpdatedAt,
+           CreatedAt, UpdatedAt,UpdatedSap,
            ItemName, MinQuantity, DateFrom, DateTo, DateModified, Status,
            totalRecords
     FROM Q
@@ -158,6 +162,7 @@ async function getListPriceById(itemCode, priceList) {
             CAST(CASE WHEN P.TaxCodeAR = 'IVA_EXE' THEN L.Price ELSE L.Price * 1.19 END AS NUMERIC(19,6)) AS PriceIVA,
             L.CreatedAt,
             L.UpdatedAt,
+            L.UpdatedSap,
             P.ItemName,
             P.MinLevel  AS MinQuantity,
             P.ValidFrom AS DateFrom,

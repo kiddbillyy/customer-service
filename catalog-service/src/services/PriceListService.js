@@ -58,19 +58,71 @@ async function syncPriceList() {
 
       const tFull0 = performance.now();
       const sapReq = new sql.Request(sapPool);
-      const allRes = await sapReq.query(`
+      /* const allRes = await sapReq.query(`
         SELECT 
           ItemCode = ItemCode COLLATE ${DEST_COLLATION},
           PriceList,
           Price
         FROM ITM1
-      `);
+      `); */
+
+      const allRes = await sapReq.query(`
+        WITH CAMBIO_BASE AS (
+        SELECT c.Code AS ItemCode, CAST(1 AS SMALLINT) AS PriceList,
+              CAST(c.U_Fecha AS DATETIME) AS EventDTLocal
+        FROM [@CAMBIO] c
+        WHERE c.U_Fecha IS NOT NULL
+
+        UNION ALL            -- T2 (clon del T1)
+        SELECT c.Code, CAST(2 AS SMALLINT),
+              CAST(c.U_Fecha AS DATETIME)
+        FROM [@CAMBIO] c
+        WHERE c.U_Fecha IS NOT NULL
+      ),
+      CAMBIOT3_BASE AS (     -- T3
+        SELECT c.Code AS ItemCode, CAST(3 AS SMALLINT) AS PriceList,
+              CASE WHEN c.U_Hora IS NOT NULL THEN DATEADD(SECOND,
+                    (CAST(SUBSTRING(c.U_Hora,1,2) AS INT) * 3600) +
+                    (CAST(SUBSTRING(c.U_Hora,4,2) AS INT) * 60) +
+                    CAST(SUBSTRING(c.U_Hora,7,2) AS INT),
+                    CAST(c.U_Fecha AS DATETIME))
+                ELSE CAST(c.U_Fecha AS DATETIME) END AS EventDTLocal
+        FROM [@CAMBIOT3] c
+        WHERE c.U_Fecha IS NOT NULL AND c.U_Lista = 'T3'
+      ),
+      CAMBIO_LAST AS (       -- última fecha por Item+Lista
+        SELECT ItemCode, PriceList, MAX(EventDTLocal) AS UpdatedSapLocal
+        FROM (
+          SELECT * FROM CAMBIO_BASE
+          UNION ALL
+          SELECT * FROM CAMBIOT3_BASE
+        ) X
+        GROUP BY ItemCode, PriceList
+      )
+      SELECT 
+        ItemCode = i.ItemCode COLLATE ${DEST_COLLATION},
+        i.PriceList,
+        i.Price,
+        UpdatedSapUTC = CAST(cl.UpdatedSapLocal AS DATETIME2)
+    
+      FROM ITM1 i
+      LEFT JOIN CAMBIO_LAST cl
+        ON cl.ItemCode = i.ItemCode AND cl.PriceList = i.PriceList;
+      `)
       metrics.duration.fullLoadFetchMs = performance.now() - tFull0;
 
       metrics.scannedPrices = allRes.recordset.length;
 
+      const allRows = allRes.recordset.map(r => ({
+        ItemCode: r.ItemCode,
+        PriceList: r.PriceList,
+        Price: r.Price,
+        UpdatedSap: r.UpdatedSapUTC || null
+      }));
+
+
       const tMerge0 = performance.now();
-      const { inserted, updated } = await bulkMergePricesTx(tx, allRes.recordset);
+      const { inserted, updated } = await bulkMergePricesTx(tx, allRows);
       metrics.duration.batchesMergeMs += (performance.now() - tMerge0);
       metrics.inserted = inserted;
       metrics.updated = updated;
@@ -230,21 +282,71 @@ async function syncPriceList() {
       const inList = codes.map((_, idx) => '@code' + idx).join(',');
 
       const tFetchB0 = performance.now();
-      const priceRes = await priceReq.query(`
+      /* const priceRes = await priceReq.query(`
         SELECT 
           ItemCode = ItemCode COLLATE ${DEST_COLLATION},
           PriceList,
           Price
         FROM ITM1
         WHERE ItemCode IN (${inList})
-      `);
+      `); */
+
+      const priceRes = await priceReq.query(`
+        WITH CAMBIO_BASE AS (
+        SELECT c.Code AS ItemCode, CAST(1 AS SMALLINT) AS PriceList,
+              CAST(c.U_Fecha AS DATETIME) AS EventDTLocal
+        FROM [@CAMBIO] c
+        WHERE c.U_Fecha IS NOT NULL
+
+        UNION ALL            -- T2 (clon del T1)
+        SELECT c.Code, CAST(2 AS SMALLINT),
+              CAST(c.U_Fecha AS DATETIME)
+        FROM [@CAMBIO] c
+        WHERE c.U_Fecha IS NOT NULL
+      ),
+      CAMBIOT3_BASE AS (     -- T3
+        SELECT c.Code AS ItemCode, CAST(3 AS SMALLINT) AS PriceList,
+              CASE WHEN c.U_Hora IS NOT NULL THEN DATEADD(SECOND,
+                    (CAST(SUBSTRING(c.U_Hora,1,2) AS INT) * 3600) +
+                    (CAST(SUBSTRING(c.U_Hora,4,2) AS INT) * 60) +
+                    CAST(SUBSTRING(c.U_Hora,7,2) AS INT),
+                    CAST(c.U_Fecha AS DATETIME))
+                ELSE CAST(c.U_Fecha AS DATETIME) END AS EventDTLocal
+        FROM [@CAMBIOT3] c
+        WHERE c.U_Fecha IS NOT NULL AND c.U_Lista = 'T3'
+      ),
+      CAMBIO_LAST AS (
+        SELECT ItemCode, PriceList, MAX(EventDTLocal) AS UpdatedSapLocal
+        FROM (
+          SELECT * FROM CAMBIO_BASE
+          UNION ALL
+          SELECT * FROM CAMBIOT3_BASE
+        ) X
+        GROUP BY ItemCode, PriceList
+      )
+      SELECT 
+        ItemCode = i.ItemCode COLLATE ${DEST_COLLATION},
+        i.PriceList,
+        i.Price,
+        UpdatedSapUTC = CAST(cl.UpdatedSapLocal AS DATETIME2)
+      FROM ITM1 i
+      LEFT JOIN CAMBIO_LAST cl
+        ON cl.ItemCode = i.ItemCode AND cl.PriceList = i.PriceList
+      WHERE i.ItemCode IN (${inList});
+      `)
       const fetchMs = performance.now() - tFetchB0;
       metrics.duration.batchesFetchMs += fetchMs;
 
       metrics.scannedPrices += priceRes.recordset.length;
+      const rows = priceRes.recordset.map(r => ({
+        ItemCode: r.ItemCode,
+        PriceList: r.PriceList,
+        Price: r.Price,
+        UpdatedSap: r.UpdatedSapUTC || null
+      }));
 
       const tMergeB0 = performance.now();
-      const { inserted, updated } = await bulkMergePricesTx(tx, priceRes.recordset);
+      const { inserted, updated } = await bulkMergePricesTx(tx, rows);
       const mergeMs = performance.now() - tMergeB0;
       metrics.duration.batchesMergeMs += mergeMs;
 
@@ -297,7 +399,8 @@ async function bulkMergePricesTx(tx, rows ) {
     CREATE TABLE #Delta (
       ItemCode NVARCHAR(50) COLLATE ${DEST_COLLATION},
       PriceList SMALLINT,
-      Price NUMERIC(19,6)
+      Price NUMERIC(19,6),
+      UpdatedSap DATETIME NULL
     );
   `);
 
@@ -308,7 +411,8 @@ async function bulkMergePricesTx(tx, rows ) {
     tvp.columns.add('ItemCode', sql.NVarChar(50), { nullable: true });
     tvp.columns.add('PriceList', sql.SmallInt, { nullable: true });
     tvp.columns.add('Price', sql.Numeric(19, 6), { nullable: true });
-    chunk.forEach(r => tvp.rows.add(r.ItemCode, r.PriceList, r.Price));
+    tvp.columns.add('UpdatedSap', sql.DateTime, { nullable: true });
+    chunk.forEach(r => tvp.rows.add(r.ItemCode, r.PriceList, r.Price, r.UpdatedSap || null));
     const bulkReq = new sql.Request(tx);
     await bulkReq.bulk(tvp);
   }
@@ -319,11 +423,16 @@ async function bulkMergePricesTx(tx, rows ) {
     USING #Delta AS S
       ON T.ItemCode COLLATE ${DEST_COLLATION} = S.ItemCode COLLATE ${DEST_COLLATION}
      AND T.PriceList = S.PriceList
-    WHEN MATCHED AND T.Price <> S.Price THEN
-      UPDATE SET T.Price = S.Price, T.UpdatedAt = GETUTCDATE()
+    WHEN MATCHED AND (T.Price <> S.Price OR (S.UpdatedSap IS NOT NULL AND (T.UpdatedSap IS NULL OR S.UpdatedSap > T.UpdatedSap))) THEN
+      UPDATE SET T.Price = S.Price,T.UpdatedSap = CASE
+                     WHEN S.UpdatedSap IS NOT NULL
+                          AND (T.UpdatedSap IS NULL OR S.UpdatedSap > T.UpdatedSap)
+                     THEN S.UpdatedSap
+                     ELSE T.UpdatedSap
+                   END, T.UpdatedAt = GETUTCDATE()
     WHEN NOT MATCHED THEN
-      INSERT (ItemCode, PriceList, Price, CreatedAt)
-      VALUES (S.ItemCode, S.PriceList, S.Price, GETUTCDATE())
+      INSERT (ItemCode, PriceList, Price,  UpdatedSap,CreatedAt)
+      VALUES (S.ItemCode, S.PriceList, S.Price, S.UpdatedSap, GETUTCDATE())
     OUTPUT $action AS MergeAction;
   `);
 
