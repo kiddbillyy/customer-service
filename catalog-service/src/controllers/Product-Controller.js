@@ -12,6 +12,7 @@ function normalizeQuery(qr) {
     name:     q.name ?? null,
     category: q.category ?? null,
     barcode:  q.barcode ?? null,
+    brand:    q.brand ?? null,
     sortBy:    q.sortby   || 'ItemCode',
     sortOrder: q.sortorder || 'ASC',
 

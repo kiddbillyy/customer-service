@@ -70,5 +70,5 @@ export default async function rbac(req, res, next) {
 
   return allowed
     ? next()
-    : res.status(403).json({ message: 'Sin permiso para este endpoint' });
+    : res.status(403).json({ message: 'Tu usuario no tiene permiso para esta ruta' });
 }
