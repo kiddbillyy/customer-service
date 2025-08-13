@@ -25,7 +25,7 @@ const VALID_SORT = [
   'ItemCode',
   'ItemName',
   'Category',
-  'U_Marca',
+  'Brand',
   'UpdateDate'
 ];
 
@@ -58,6 +58,19 @@ async function getProducts(opts) {
     where.push('P.CodeBars = @barcode');
     req.input('barcode', sql.NVarChar(254), opts.barcode);
   }
+  if (opts.brand) {
+    where.push(`
+      EXISTS (
+        SELECT 1
+        FROM dbo.MARCA MX
+        WHERE MX.Code = P.U_Marca
+          AND (MX.Code = @brandCode OR MX.Name LIKE @brandNameLike)
+      )
+    `);
+    req.input('brandCode', sql.NVarChar(50), opts.brand);
+    req.input('brandNameLike', sql.NVarChar(200), `%${opts.brand}%`);
+  }
+
 
   const whereSQL = 'WHERE ' + where.join(' AND ');
 
