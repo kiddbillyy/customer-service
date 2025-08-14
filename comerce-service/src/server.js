@@ -6,8 +6,6 @@ const apiRoutes = require('./routes/index')
 
 dotenv.config();
 
-
-
 const app = express();
 app.use(cors());
 app.use(express.json());
