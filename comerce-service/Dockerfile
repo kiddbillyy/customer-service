@@ -14,5 +14,5 @@ RUN npm install
 COPY . .
 
 # Exponer puerto y comando para iniciar
-EXPOSE 5005
+EXPOSE 5009
 CMD ["npm", "start"]

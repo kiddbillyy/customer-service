@@ -1,5 +1,5 @@
 {
-  "name": "id-service",
+  "name": "comerce-service",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -27,6 +27,7 @@
     "p-queue": "^8.1.0",
     "timezone": "^1.0.23",
     "tz-offset": "^0.0.2",
-    "utc": "^0.1.0"
+    "utc": "^0.1.0",
+    "wkx": "^0.5.0"
   }
 }
