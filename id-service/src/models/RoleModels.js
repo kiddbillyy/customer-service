@@ -5,7 +5,6 @@ async function getPlatformStructure(plataformaCod) {
   await IdServicePoolConnect;
 
   const req = IdServicePool.request();
-  console.log("Request pool: ", req)
 
   const { recordset } = await IdServicePool.request()
     .input('plat', sql.NVarChar(50), plataformaCod)
@@ -87,9 +86,9 @@ async function createRole({ nombre, descripcion, plataformaCod, permisos, usuari
       .input('d', sql.NVarChar(255), descripcion)
       .input('uId', sql.Int, usuarioId)
       .query(`
-        INSERT INTO ROLES (NOMBRE, DESCRIPCION, UsuarioCreador, UsuarioActualizador, ACTIVO)
+        INSERT INTO ROLES (NOMBRE, DESCRIPCION, UsuarioCreador, UsuarioActualizador, Fecha_Actualizacion, ACTIVO)
         OUTPUT INSERTED.ID
-        VALUES (@n, @d, @uId, @uId, 1);
+        VALUES (@n, @d, @uId, NULL, NULL, 1);
       `);
 
     const newRoleId = roleResult.recordset[0].ID;
