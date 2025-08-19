@@ -130,6 +130,77 @@ async function updateLocation({
   return { id: outId };
 }
 
+async function patchLocation({
+  id,
+  storeId,        // opcional
+  name,           // opcional
+  country,        // opcional
+  stateProvince,  // opcional
+  city,           // opcional
+  addressLine1,   // opcional
+  addressLine2,   // opcional
+  postalCode,     // opcional
+  status,         // opcional
+  user            // opcional
+}) {
+  if (!Number.isInteger(id)) throw new Error('LOCATION_NOT_FOUND');
+
+  await IdServicePoolConnect;
+
+  if (name !== undefined && !isNonEmptyString(name)) {
+    throw new Error('NAME_REQUIRED');
+  }
+  if (storeId !== undefined && !Number.isInteger(storeId)) {
+    throw new Error('STORE_ID_REQUIRED');
+  }
+
+  const columnDefs = {
+    StoreId:       { value: storeId,      type: sql.Int,          norm: v => v },
+    Name:          { value: name,         type: sql.NVarChar(200), norm: v => v?.trim() },
+    Country:       { value: country,      type: sql.NVarChar(100), norm: normOrNull },
+    StateProvince: { value: stateProvince,type: sql.NVarChar(100), norm: normOrNull },
+    City:          { value: city,         type: sql.NVarChar(100), norm: normOrNull },
+    AddressLine1:  { value: addressLine1, type: sql.NVarChar(200), norm: normOrNull },
+    AddressLine2:  { value: addressLine2, type: sql.NVarChar(200), norm: normOrNull },
+    PostalCode:    { value: postalCode,   type: sql.NVarChar(20),  norm: normOrNull },
+    Status:        { value: status,       type: sql.Bit,           norm: toBit },
+  };
+
+  const req = IdServicePool.request().input('Id', sql.Int, id);
+  const sets = [];
+
+  for (const [col, def] of Object.entries(columnDefs)) {
+    if (def.value !== undefined) {
+      sets.push(`${col} = @${col}`);
+      req.input(col, def.type, def.norm(def.value));
+    }
+  }
+
+  if (sets.length === 0) {
+    return { id, changed: false };
+  }
+  sets.push('UpdatedAt = SYSUTCDATETIME()');
+  sets.push('UserModified = @UserModified');
+  req.input('UserModified', sql.NVarChar(5), normUser(user));
+
+  const sqlUpdate = `
+    UPDATE dbo.Location
+    SET ${sets.join(', ')}
+    OUTPUT INSERTED.Id
+    WHERE Id = @Id;
+  `;
+
+  try {
+    const r = await req.query(sqlUpdate);
+    const updatedId = r.recordset?.[0]?.Id;
+    if (!updatedId) throw new Error('LOCATION_NOT_FOUND');
+    return { id: updatedId, changed: true };
+  } catch (e) {
+    if (e?.number === 547) throw new Error('STORE_NOT_FOUND');
+    throw e;
+  }
+}
+
 // GET BY ID
 async function getLocationById({ id }) {
   await IdServicePoolConnect;
@@ -231,6 +302,7 @@ async function listLocations({
 module.exports = {
   createLocation,
   updateLocation,
+  patchLocation,
   getLocationById,
   listLocations
 };

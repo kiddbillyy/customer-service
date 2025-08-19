@@ -89,6 +89,48 @@ async function updateLocation(req, res) {
     return res.status(map[err.message] || 500).json({ message: err.message || 'Error al actualizar location.' });
   }
 }
+const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+
+async function patchLocationHandler(req, res) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
+
+    const b = req.body;
+    const payload = { id };
+
+    if (has(b, 'storeId'))      payload.storeId = Number(b.storeId);
+    if (has(b, 'name'))         payload.name = b.name;
+    if (has(b, 'country'))      payload.country = b.country;
+    if (has(b, 'stateProvince'))payload.stateProvince = b.stateProvince;
+    if (has(b, 'city'))         payload.city = b.city;
+    if (has(b, 'addressLine1')) payload.addressLine1 = b.addressLine1;
+    if (has(b, 'addressLine2')) payload.addressLine2 = b.addressLine2;
+    if (has(b, 'postalCode'))   payload.postalCode = b.postalCode;
+    if (has(b, 'status'))       payload.status = b.status;
+    if (has(b, 'user'))         payload.user = b.user;
+
+    const out = await locationModel.patchLocation(payload);
+    return res.status(200).json({
+      id: String(out.id),
+      changed: !!out.changed,
+      message: out.changed ? 'Location actualizada.' : 'Sin cambios.'
+    });
+  } catch (err) {
+    console.error(err);
+    const map = {
+      LOCATION_NOT_FOUND: 404,
+      STORE_ID_REQUIRED: 400,
+      NAME_REQUIRED: 400,
+      STORE_NOT_FOUND: 404
+    };
+    return res.status(map[err.message] || 500)
+      .json({ message: err.message || 'Error al actualizar location.' });
+  }
+}
+
+
+
 
 async function getLocationById(req, res) {
   try {
@@ -123,6 +165,7 @@ async function listLocations(req, res) {
 module.exports = {
   createLocation,
   updateLocation,
+  patchLocationHandler,
   getLocationById,
   listLocations
 };

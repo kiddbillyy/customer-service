@@ -8,6 +8,9 @@ router.post('/', ctrl.createLocation);
 // Actualiza una Location
 router.put('/:id', ctrl.updateLocation);
 
+// patch de una Location
+router.patch('/:id',ctrl.patchLocationHandler)
+
 // Obtiene una Location por id
 router.get('/:id', ctrl.getLocationById);
 
