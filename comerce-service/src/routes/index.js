@@ -6,7 +6,10 @@ const companyRoutes = require('./Company.Routes');
 const storeRoutes = require('./Store.Routes');
 const locationRoutes = require('./Location.Routes') 
 const salesChannelRoutes = require('./SalesChanel.Routes');
+const locationGeoRoutes = require('./LocationGeo.Routes');
+const holidaysRoutes = require('./Holiday.Routes');
 const accountRoutes = require('./account.Routes');
+
 
 
 router.use('/geofences', geofencesRoutes);
@@ -14,6 +17,8 @@ router.use('/company', companyRoutes);
 router.use('/store', storeRoutes);
 router.use('/locations',locationRoutes)
 router.use('/sales-channel', salesChannelRoutes);
+router.use('/location-geo',locationGeoRoutes);
+router.use('/holidays',holidaysRoutes);
 router.use('/account', accountRoutes);
 
 
