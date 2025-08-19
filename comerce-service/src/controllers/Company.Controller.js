@@ -1,6 +1,7 @@
 // controllers/Company.Controller.js
 const { createCompany, getCompanyById, getCompanyByReferenceId, getAllCompanies, updateCompanyById } = require('../models/CompanyModels');
 const { nowSCLSql121 } = require('../utils/dates');
+const { publishCompanyEvent } = require('../utils/Kafka/companyEvents'); 
 
 async function postCompany(req, res) {
   try {
@@ -16,11 +17,26 @@ async function postCompany(req, res) {
       });
     }
 
+    const userId = body.UserCreated || req.user?.usuarioId || null;
+
     const created = await createCompany({
       ...body,
       CreatedAtStr: nowSCLSql121(), // hora local SCL como string
-      UserCreated: body.UserCreated || req.user?.usuarioId || null
+      UserCreated: userId
     });
+
+    // 🔔 Publicar evento a Kafka (fire-and-forget para no afectar el 201 si falla Kafka)
+    (async () => {
+      try {
+        await publishCompanyEvent({
+          action: 'company.created',
+          company: created,
+          userId
+        });
+      } catch (e) {
+        console.error('Kafka publish company.created failed:', e);
+      }
+    })();
 
     return res.status(201).json({ ok: true, data: created });
   } catch (err) {
@@ -139,13 +155,32 @@ async function putCompany(req, res) {
       'Status',
       'Industry'
     ];
+
+    // 👇 Para meta.changedFields en el evento
+    const changedFields = [];
     for (const k of updatable) {
       if (Object.prototype.hasOwnProperty.call(body, k)) {
         payload[k] = body[k];
+        changedFields.push(k);
       }
     }
 
     const updated = await updateCompanyById(id, payload);
+
+    // 🔔 Publicar evento a Kafka (fire-and-forget)
+    (async () => {
+      try {
+        await publishCompanyEvent({
+          action: 'company.updated',
+          company: updated,
+          userId: body.UserModified,
+          meta: { changedFields }
+        });
+      } catch (e) {
+        console.error('Kafka publish company.updated failed:', e);
+      }
+    })();
+
     return res.status(200).json({ ok: true, data: updated });
 
   } catch (err) {
@@ -176,4 +211,4 @@ async function putCompany(req, res) {
   }
 }
 
-module.exports = { postCompany, getCompany,listCompanies, putCompany  };
+module.exports = { postCompany, getCompany, listCompanies, putCompany };
