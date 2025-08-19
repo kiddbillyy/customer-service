@@ -1,8 +1,9 @@
-//server.js
+// server.js
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const apiRoutes = require('./routes/index')
+const apiRoutes = require('./routes/index');
+const { connectProducer } = require('./utils/kafkaProducer'); 
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ app.use('/api/comerce-service', apiRoutes);
 
 const PORT = process.env.PORT || 5009;
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await connectProducer(); 
   console.log(`🚀 Comerce Service running on port ${PORT}`);
 });

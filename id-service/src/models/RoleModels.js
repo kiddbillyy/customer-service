@@ -514,4 +514,4 @@ async function getRoles(opts) {
 }
 
 
-module.exports = { getPlatformStructure, createRole, getAllRoles,getRoleById , updateRole, addPermissionsToRole, getRoles  };
+module.exports = { getPlatformStructure, createRole, getAllRoles, getRoleById, updateRole, addPermissionsToRole, getRoles  };

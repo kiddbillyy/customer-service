@@ -8,6 +8,8 @@ const locationRoutes = require('./Location.Routes')
 const salesChannelRoutes = require('./SalesChanel.Routes');
 const locationGeoRoutes = require('./LocationGeo.Routes');
 const holidaysRoutes = require('./Holiday.Routes');
+const accountRoutes = require('./account.Routes');
+
 
 
 router.use('/geofences', geofencesRoutes);
@@ -17,6 +19,7 @@ router.use('/locations',locationRoutes)
 router.use('/sales-channel', salesChannelRoutes);
 router.use('/location-geo',locationGeoRoutes);
 router.use('/holidays',holidaysRoutes);
+router.use('/account', accountRoutes);
 
 
 module.exports = router;
