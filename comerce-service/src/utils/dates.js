@@ -1,12 +1,14 @@
 // utils/dates.js
 const { DateTime } = require('luxon');
 
-// Si ya tienes nowSCL() que devuelve Date, lo dejamos.
-// Agregamos una versión para SQL (estilo 121: yyyy-mm-dd hh:mi:ss.mmm)
-function nowSCLSql121() {
-  return DateTime.now()
-    .setZone('America/Santiago')
-    .toFormat('yyyy-LL-dd HH:mm:ss.SSS'); // compatible con CONVERT(..., 121)
+function nowSCLIso() {
+  // ISO con zona America/Santiago, incluye milisegundos y offset
+  return DateTime.now().setZone('America/Santiago').toISO({ suppressMilliseconds: false });
 }
 
-module.exports = { nowSCLSql121 };
+// Ya lo tienes:
+function nowSCLSql121() {
+  return DateTime.now().setZone('America/Santiago').toFormat("yyyy-LL-dd'T'HH:mm:ss.SSS");
+}
+
+module.exports = { nowSCLIso, nowSCLSql121 };
