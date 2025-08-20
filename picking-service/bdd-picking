@@ -1,0 +1,34 @@
+CREATE TABLE `picking_status` (
+  `pickingStatusID` int NOT NULL AUTO_INCREMENT,
+  `statusName` text NOT NULL,
+  PRIMARY KEY (`pickingStatusID`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE `order_product_picker` (
+  `orderProductPickerID` int NOT NULL AUTO_INCREMENT,
+  `orderProductID` int NOT NULL,
+  `pickerRUT` int NOT NULL,
+  `pickingStatusID` int NOT NULL DEFAULT '1',
+  `pickedQuantity` int DEFAULT '0',
+  `assignedAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`orderProductPickerID`),
+  KEY `orderProductID` (`orderProductID`),
+  KEY `pickingStatusID` (`pickingStatusID`),
+  CONSTRAINT `order_product_picker_ibfk_1` FOREIGN KEY (`orderProductID`) REFERENCES `order_product` (`orderProductID`),
+  CONSTRAINT `order_product_picker_ibfk_2` FOREIGN KEY (`pickingStatusID`) REFERENCES `picking_status` (`pickingStatusID`)
+) ENGINE=InnoDB AUTO_INCREMENT=61 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `order_product` (
+  `orderProductID` int NOT NULL AUTO_INCREMENT,
+  `orderID` int NOT NULL,
+  `itemcode` int NOT NULL,
+  `quantity` int NOT NULL,
+  `pickedQuantity` int DEFAULT '0',
+  `pickingStatusID` int NOT NULL DEFAULT '1',
+  PRIMARY KEY (`orderProductID`),
+  KEY `pickingStatusID` (`pickingStatusID`),
+  CONSTRAINT `order_product_ibfk_1` FOREIGN KEY (`pickingStatusID`) REFERENCES `picking_status` (`pickingStatusID`)
+) ENGINE=InnoDB AUTO_INCREMENT=19568 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+

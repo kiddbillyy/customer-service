@@ -1,0 +1,24 @@
+version: "3.8"
+
+networks:
+  orders-service_kafka_network:
+    external: true          # ya existía
+  kafka_network:            # 📌 añade esta línea
+    external: true          #   …y márcala externa
+
+services:
+  api-gateway:
+    build: .
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      # URLs internas para hablar con los otros microservicios
+      ORDERS_URL : http://orders-service:5000
+      PICKING_URL: http://picking-service:5001
+      KAFKA_BROKER: kafka:9092
+    networks:
+      - orders-service_kafka_network
+      - kafka_network        # ← ahora sí existe

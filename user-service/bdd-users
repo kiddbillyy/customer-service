@@ -1,0 +1,39 @@
+CREATE TABLE `users` (
+  `rut` int NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `roleID` int NOT NULL,
+  `statusID` int NOT NULL,
+  `createdAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`rut`),
+  UNIQUE KEY `email` (`email`),
+  KEY `roleID` (`roleID`),
+  KEY `statusID` (`statusID`),
+  CONSTRAINT `users_ibfk_1` FOREIGN KEY (`roleID`) REFERENCES `roles` (`roleID`) ON DELETE CASCADE,
+  CONSTRAINT `users_ibfk_2` FOREIGN KEY (`statusID`) REFERENCES `user_status` (`statusID`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE `user_status` (
+  `statusID` int NOT NULL AUTO_INCREMENT,
+  `statusName` varchar(50) NOT NULL,
+  PRIMARY KEY (`statusID`),
+  UNIQUE KEY `statusName` (`statusName`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+1	Activo
+2	Inactivo
+3	Suspendido
+	
+
+CREATE TABLE `roles` (
+  `roleID` int NOT NULL AUTO_INCREMENT,
+  `roleName` varchar(50) NOT NULL,
+  PRIMARY KEY (`roleID`),
+  UNIQUE KEY `roleName` (`roleName`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+1	Admin
+3	Assigner
+4	Driver
+2	Picker
+	
