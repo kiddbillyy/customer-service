@@ -70,8 +70,8 @@ async function createGeofence({ name, status = 'active', description = null, cov
     .input('User', sql.NVarChar(5), user)
     .execute('dbo.Geofence_Upsert_FromCoverage');
 
-  const id = r.recordset?.[0]?.Id;
-  return { id };
+  const row = r.recordset?.[0];
+  return mapRowToApi(row); 
 }
 
 // UPDATE
@@ -88,7 +88,7 @@ async function updateGeofence({ id, name, status = 'active', description = null,
   if (!exists) throw new Error('GEOFENCE_NOT_FOUND');
 
   const covJson = JSON.stringify({ coverage });
-  await IdServicePool.request()
+  const r = await IdServicePool.request()
     .input('Id', sql.Int, id)
     .input('Name', sql.NVarChar(200), name)
     .input('Description', sql.NVarChar(500), description)
@@ -97,7 +97,8 @@ async function updateGeofence({ id, name, status = 'active', description = null,
     .input('User', sql.NVarChar(5), user)
     .execute('dbo.Geofence_Upsert_FromCoverage');
 
-  return { id };
+  const row = r.recordset?.[0];
+  return mapRowToApi(row); 
 }
 
 // GET BY ID

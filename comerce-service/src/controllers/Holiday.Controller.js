@@ -1,10 +1,25 @@
 // controllers/Holidays.Controller.js
 const model = require('../models/HolidayModels');
-
+const { publishholidayEvent } = require('../utils/Kafka/HolidaysEvents')
 async function createHoliday(req, res) {
   try {
     const { name, day, status = 'active', target = {}, scope = null, description = null, user = 'API' } = req.body;
     const out = await model.createHoliday({ name, day, status, target, scope, description, user });
+    
+    (async () => {
+      try {
+        await publishholidayEvent({
+          action: 'holiday.created',
+          holiday: out,
+          userId: user
+        });
+      } catch (e) {
+        console.error('Kafka publish holiday.created failed:', e);
+      }
+    })();
+
+    
+    
     return res.status(201).json({ id: String(out.id), message: 'Holiday creada.' });
   } catch (err) {
     const map = { NAME_REQUIRED: 400, DAY_INVALID: 400 };
@@ -19,6 +34,19 @@ async function updateHoliday(req, res) {
 
     const { name, day, status, target, scope, description, user = 'API' } = req.body;
     const out = await model.updateHoliday({ id, name, day, status, target, scope, description, user });
+    
+    (async () => {
+      try {
+        await publishholidayEvent({
+          action: 'holiday.updated',
+          holiday: out,
+          userId: user
+        });
+      } catch (e) {
+        console.error('Kafka publish holiday.updated failed:', e);
+      }
+    })();
+
     return res.status(200).json({ id: String(out.id), message: 'Holiday actualizada.' });
   } catch (err) {
     const map = { HOLIDAY_NOT_FOUND: 404, DAY_INVALID: 400 };
@@ -58,6 +86,19 @@ async function deleteHoliday(req, res) {
     if (Number.isNaN(id)) return res.status(400).json({ message: 'id inválido' });
 
     await model.deleteHoliday({ id });
+
+    (async () => {
+      try {
+        await publishholidayEvent({
+          action: 'holiday.deleted',
+          holiday: { Id: id }, // mínimo para el evento
+          userId: req.body?.user || 'API'
+        });
+      } catch (e) {
+        console.error('Kafka publish holiday.deleted failed:', e);
+      }
+    })();
+
     return res.status(200).json({ id: String(id), message: 'Holiday eliminada.' });
   } catch (err) {
     const map = { HOLIDAY_NOT_FOUND: 404 };
