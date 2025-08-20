@@ -1,5 +1,6 @@
 // controllers/Geofences.Controller.js
 const geofenceModel = require('../models/Geofences.Model');
+const { publishGeofenceEvent } = require('../utils/Kafka/GeofenceEvents')
 
 // POST /geofences
 async function createGeofence(req, res) {
@@ -10,8 +11,22 @@ async function createGeofence(req, res) {
   }
 
   try {
-    const out = await geofenceModel.createGeofence({ name, status, description, coverage, user });
-    return res.status(201).json({ id: String(out.id), message: 'Geofence creada exitosamente.' });
+    const full = await geofenceModel.createGeofence({ name, status, description, coverage, user });
+    
+    (async () => {
+      try {
+        await publishGeofenceEvent({
+          action: 'geofence.created',
+          geofence: full ?? { id: full.id, name, status, description, coverage },
+          userId: user || 'API',
+        });
+      } catch (e) {
+        console.error('Kafka publish geofence.created failed:', e);
+      }
+    })();
+    
+    
+    return res.status(201).json({ id: String(full.id), message: 'Geofence creada exitosamente.' });
   } catch (err) {
     console.error(err);
     const map = {
@@ -32,7 +47,20 @@ async function updateGeofence(req, res) {
   }
 
   try {
-    await geofenceModel.updateGeofence({ id, name, status, description, coverage, user });
+    const full = await geofenceModel.updateGeofence({ id, name, status, description, coverage, user });
+      
+     (async () => {
+      try {
+        await publishGeofenceEvent({
+          action: 'geofence.updated',
+          geofence: full ?? { id, name, status, description, coverage },
+          userId: user || 'API',
+        });
+      } catch (e) {
+        console.error('Kafka publish geofence.updated failed:', e);
+      }
+    })();
+    
     return res.status(200).json({ id: String(id), message: 'Geofence actualizada.' });
   } catch (err) {
     console.error(err);

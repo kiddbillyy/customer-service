@@ -56,11 +56,12 @@ async function createHoliday({ name, day, status = 'active', target = {}, scope 
     .input('User', sql.NVarChar(5), normUser5(user))
     .query(`
       INSERT INTO dbo.Holiday (Name, Day, Status, Target, Scope, Description, CreatedAt, UserCreated)
-      OUTPUT INSERTED.Id
+      OUTPUT INSERTED.Id, INSERTED.Name, INSERTED.Day, INSERTED.Status, INSERTED.Target, INSERTED.Scope,
+             INSERTED.Description, INSERTED.CreatedAt, INSERTED.UpdatedAt, INSERTED.UserCreated, INSERTED.UserModified
       VALUES (@Name, @Day, @Status, @Target, @Scope, @Desc, SYSUTCDATETIME(), @User);
     `);
 
-  return { id: r.recordset[0].Id };
+  return rowToApi(r.recordset[0]); 
 }
 
 // UPDATE (reemplazo completo de target/scope con los enviados; si no se envían, no se tocan)
@@ -101,10 +102,13 @@ async function updateHoliday({ id, name, day, status, target, scope, description
           Description = COALESCE(@Desc, Description),
           UpdatedAt   = SYSUTCDATETIME(),
           UserModified= @User
+          OUTPUT INSERTED.Id, INSERTED.Name, INSERTED.Day, INSERTED.Status, INSERTED.Target, INSERTED.Scope,
+             INSERTED.Description, INSERTED.CreatedAt, INSERTED.UpdatedAt, INSERTED.UserCreated, INSERTED.UserModified
+
       WHERE Id = @Id;
     `);
 
-  return { id };
+  return rowToApi(r.recordset[0]);
 }
 
 // GET BY ID
