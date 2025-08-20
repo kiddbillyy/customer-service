@@ -40,6 +40,20 @@ exports.getAllProducts = async (req, res) => {
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
+exports.getBySku = async (req, res) => {
+  try {
+    const { sku } = req.params;
+    if (!sku) return res.status(400).json({ message: "Debe especificar un SKU" });
+
+    const result = await InventoryService.getBySku(sku);
+    if (!result) return res.status(404).json({ message: "Producto no encontrado" });
+
+    res.json(result);
+  } catch (error) {
+    console.error("❌ Error obteniendo detalle de producto:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
 
 exports.checkAvailability = async (req, res) => {
   try {

@@ -1,49 +1,50 @@
-const sql = require('mssql');
+// ────────────────────────────────────────────────────────────────
+// src/config/db.js
+// Conexión MSSQL (singleton) + helper query() estilo mysql2
+// ────────────────────────────────────────────────────────────────
 require('dotenv').config();
+const sql = require('mssql');
 
-const config = {
-  user: process.env.DB_USER,
+const dbConfig = {
+  user    : process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  server: process.env.DB_HOST,
+  server  : process.env.DB_HOST,
   database: process.env.DB_NAME,
-  port: parseInt(process.env.DB_PORT, 10),
-  options: {
-    encrypt: false,
-    trustServerCertificate: true,
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  },
+  port    : parseInt(process.env.DB_PORT, 10),
+  pool    : { max: 10, min: 0, idleTimeoutMillis: 30000 },
+  options : { encrypt: false, trustServerCertificate: true }
 };
 
-const pool = new sql.ConnectionPool(config);
+// ── poolPromise: se conecta una sola vez ────────────────────────
+const poolPromise = new sql.ConnectionPool(dbConfig)
+  .connect()
+  .then(pool => {
+    console.log('✅ MSSQL pool conectado');
+    return pool;                       // ← instancia ConnectionPool
+  })
+  .catch(err => {
+    console.error('❌ Error al conectar con SQL Server:', err);
+    throw err;
+  });
 
-pool.connect()
-  .then(() => console.log('✅ Conectado a SQL Server'))
-  .catch(err => console.error('❌ Error al conectar con SQL Server:', err));
-
-// Wrapper para mantener interfaz similar a mysql2
-pool.query = async (query, params) => {
+// ── query(text, params) equivalente a mysql2.query ─────────────
+async function query(text, params = []) {
+  const pool    = await poolPromise;   // garantiza conexión
   const request = pool.request();
 
-  if (params && Array.isArray(params)) {
-    let paramIndex = 1;
-    query = query.replace(/\?/g, () => `@param${paramIndex++}`);
-    params.forEach((param, i) => {
-      request.input(`param${i + 1}`, param);
-    });
+  // Sustituye cada ? por @paramN y enlaza valores
+  if (params.length) {
+    let idx = 1;
+    text = text.replace(/\?/g, () => `@param${idx++}`);
+    params.forEach((p, i) => request.input(`param${i + 1}`, p));
   }
 
-  const result = await request.query(query);
+  const result = await request.query(text);
+  return result.recordset !== undefined ? [result.recordset] : [result];
+}
 
-  // Si es SELECT, retorna el recordset
-  if (result.recordset !== undefined) {
-    return [result.recordset];
-  }
-
-  // Si es UPDATE / INSERT / DELETE, retorna el objeto completo
-  return [result];
+module.exports = {
+  sql,          // Tipos y helpers de mssql
+  poolPromise,  // Promesa que resuelve en ConnectionPool
+  query         // Helper para consultas rápidas
 };
-module.exports = pool;
