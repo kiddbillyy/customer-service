@@ -1,6 +1,7 @@
 // controllers/SalesChannel.Controller.js
 const { createSalesChannel, listSalesChannels, getSalesChannelById, updateSalesChannelById, createSalesChannelsBulk } = require('../models/SalesChanelModels'); 
 const { nowSCLSql121 } = require('../utils/dates');
+const { publishSalesChannelEvent } = require('../utils/Kafka/salesChannelEvents');
 
 function getSqlNumber(err) {
   return (
@@ -33,6 +34,19 @@ async function postSalesChannel(req, res) {
       CreatedAtStr:     nowSCLSql121(),
       UserCreated:      body.UserCreated ?? req.user?.usuarioId ?? null,
     });
+
+    // 🔔 Publicar evento a Kafka (fire-and-forget)
+    (async () => {
+      try {
+        await publishSalesChannelEvent({
+          action: 'saleschannel.created',
+          salesChannel: created,
+          userId: body.UserCreated ?? req.user?.usuarioId ?? null,
+        });
+      } catch (e) {
+        console.error('Kafka publish saleschannel.created failed:', e);
+      }
+    })();
 
     return res.status(201).json({ ok: true, data: created });
   } catch (err) {
@@ -96,6 +110,23 @@ async function postSalesChannelsBulk(req, res) {
 
     const { inserted, errors } = await createSalesChannelsBulk(prepared);
 
+    // 🔔 Publicar eventos a Kafka por cada canal creado
+    if (inserted.length > 0) {
+      (async () => {
+        try {
+          for (const sc of inserted) {
+            await publishSalesChannelEvent({
+              action: 'saleschannel.created',
+              salesChannel: sc,
+              userId: sc.UserCreated ?? req.user?.usuarioId ?? null,
+            });
+          }
+        } catch (e) {
+          console.error('Kafka publish saleschannel.created (bulk) failed:', e);
+        }
+      })();
+    }
+
     // Decide status code según resultado
     if (inserted.length === 0) {
       // todo falló
@@ -130,6 +161,7 @@ async function postSalesChannelsBulk(req, res) {
     return res.status(500).json({ ok: false, message: 'Error creando canales de venta masivos' });
   }
 }
+
 
 
 function parseIntOr(v, d) {
@@ -217,6 +249,19 @@ async function putSalesChannel(req, res) {
     if (!updated) {
       return res.status(404).json({ ok: false, message: 'Sales Channel no encontrado' });
     }
+
+    // 🔔 Publicar evento a Kafka (fire-and-forget)
+    (async () => {
+      try {
+        await publishSalesChannelEvent({
+          action: 'saleschannel.updated',
+          salesChannel: updated,
+          userId: Number(userId),
+        });
+      } catch (e) {
+        console.error('Kafka publish saleschannel.updated failed:', e);
+      }
+    })();
 
     return res.json({ ok: true, message: 'El canal de venta ha sido actualizado correctamente.' });
   } catch (err) {
