@@ -234,4 +234,3 @@ async function updateCompanyById(id, payload) {
 }
 
 module.exports = { createCompany, getCompanyById, getCompanyByReferenceId, getAllCompanies, updateCompanyById };
-Ñ
