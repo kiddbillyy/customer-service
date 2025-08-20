@@ -144,17 +144,7 @@ async function putCompany(req, res) {
       UserModified: body.UserModified
     };
 
-    const updatable = [
-      'LegalName',
-      'BusinessName',
-      'Tax',
-      'Email',
-      'PhoneNumber',
-      'DocumentType',
-      'DocumentNumber',
-      'Status',
-      'Industry'
-    ];
+    const updatable = [ 'LegalName', 'BusinessName', 'Tax', 'Email', 'PhoneNumber', 'DocumentType', 'DocumentNumber', 'Status', 'Industry'];
 
     // 👇 Para meta.changedFields en el evento
     const changedFields = [];

@@ -225,6 +225,7 @@ async function getSalesChannelById(id) {
   return rs.recordset[0] || null;
 }
 // UPDATE SALES CHANNEL
+// UPDATE SALES CHANNEL
 async function updateSalesChannelById(id, payload) {
   await IdServicePoolConnect;
 
@@ -244,15 +245,25 @@ async function updateSalesChannelById(id, payload) {
   const q = `
     UPDATE sc
     SET
-      sc.Name            = COALESCE(@Name, sc.Name),
-      sc.ExternalDelivery= COALESCE(@ExternalDelivery, sc.ExternalDelivery),
-      sc.IsActive        = COALESCE(@IsActive, sc.IsActive),
-      sc.UpdatedAt       = CONVERT(datetime2(3), @UpdatedAtStr, 121),
-      sc.UserModified    = @UserModified
+      sc.Name             = COALESCE(@Name, sc.Name),
+      sc.ExternalDelivery = COALESCE(@ExternalDelivery, sc.ExternalDelivery),
+      sc.IsActive         = COALESCE(@IsActive, sc.IsActive),
+      sc.UpdatedAt        = CONVERT(datetime2(3), @UpdatedAtStr, 121),
+      sc.UserModified     = @UserModified
     FROM Sales_Channel sc
     WHERE sc.Id = @Id;
 
-    SELECT sc.Id
+    SELECT
+      sc.Id,
+      sc.CompanyId,
+      sc.ReferenceId,
+      sc.Name,
+      sc.ExternalDelivery,
+      sc.IsActive,
+      sc.CreatedAt,
+      sc.UpdatedAt,
+      sc.UserCreated,
+      sc.UserModified
     FROM Sales_Channel sc
     WHERE sc.Id = @Id;
   `;
@@ -268,6 +279,7 @@ async function updateSalesChannelById(id, payload) {
   const rs = await r.query(q);
   return rs.recordset[0] || null;
 }
+
 
 
 

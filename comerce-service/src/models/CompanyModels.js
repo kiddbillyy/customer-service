@@ -1,33 +1,6 @@
+// models/CompanyModels.js
 const { sql, IdServicePool, IdServicePoolConnect } = require('../config/dbnew');
-
-// Limpia y arma prefijo de 3 letras a partir del LegalName
-function buildPrefix(legalName = '') {
-  const onlyLetters = legalName
-    .normalize('NFD')                    // separa acentos
-    .replace(/[\u0300-\u036f]/g, '')    // quita diacríticos
-    .replace(/[^a-zA-Z]/g, '');         // solo letras
-
-  const prefix = (onlyLetters.slice(0, 3).toUpperCase() || '').padEnd(3, 'X');
-  return prefix;
-}
-
-// Obtiene el correlativo siguiente para un prefijo, con locks para concurrencia
-async function getNextReferenceId(tx, prefix) {
-  const req = new sql.Request(tx);
-  req.input('prefix', sql.VarChar(10), prefix);
-
-  // UPDLOCK + HOLDLOCK serializa por prefijo y evita carreras
-  const q = `
-    SELECT MAX(TRY_CONVERT(int, PARSENAME(REPLACE(ReferenceId, '-', '.'), 1))) AS maxSeq
-    FROM Company WITH (UPDLOCK, HOLDLOCK)
-    WHERE ReferenceId LIKE @prefix + '-%';
-  `;
-  const rs = await req.query(q);
-  const maxSeq = rs.recordset[0]?.maxSeq || 0;
-  const nextSeq = maxSeq + 1;
-  const code = String(nextSeq).padStart(3, '0'); // 001, 002, ...
-  return `${prefix}-${code}`;
-}
+const { buildPrefix, getNextReferenceId } = require('../utils/referenceId');
 
 async function createCompany(payload) {
   await IdServicePoolConnect;
@@ -44,7 +17,7 @@ async function createCompany(payload) {
     WebsiteUrl,
     Industry,
     Status = 1,
-    CreatedAtStr,          // viene del controller (hora SCL en string)
+    CreatedAtStr,
     UserCreated = null
   } = payload;
 
@@ -58,7 +31,7 @@ async function createCompany(payload) {
 
   try {
     const prefix = buildPrefix(LegalName);
-    const ReferenceId = await getNextReferenceId(tx, prefix);
+    const ReferenceId = await getNextReferenceId(tx, 'Company', prefix); // 👈 util genérica
 
     const insertSql = `
       INSERT INTO Company (
@@ -212,11 +185,6 @@ const UPDATABLE_FIELDS = [
   'Industry'
 ];
 
-/**
- * Actualiza solo los campos presentes en payload (whitelist UPDATABLE_FIELDS),
- * además de UpdatedAt y UserModified.
- * Retorna el registro actualizado.
- */
 async function updateCompanyById(id, payload) {
   const pool = await IdServicePool;
 
@@ -247,7 +215,6 @@ async function updateCompanyById(id, payload) {
     if (f === 'Status') {
       req.input('Status', sql.Int, payload.Status);
     } else {
-      // usa NVARCHAR(MAX) por simplicidad; ajusta tamaños si lo prefieres
       req.input(f, sql.NVarChar, payload[f]);
     }
   }
@@ -265,4 +232,6 @@ async function updateCompanyById(id, payload) {
   }
   return updated;
 }
+
 module.exports = { createCompany, getCompanyById, getCompanyByReferenceId, getAllCompanies, updateCompanyById };
+Ñ
