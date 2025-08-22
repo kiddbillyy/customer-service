@@ -165,22 +165,6 @@ services:
 
 
 ```
-## Flujo de Company
-
-## Flujo de Store
-
-## Flujo de Sales Channel
-
-## Flujo de Account
-
-## Flujo de Location
-
-## Flujo de Geofence
-
-## Flujo de Holiday
-
-## Flujo de LocationGeo
-
 
 ## Diagrama de base de datos:
 <p align= "center">
@@ -810,7 +794,7 @@ Esto pasa porque los 4 canales ya han sido creados y no se pueden repetir, en el
 }
 ```
 
-**201 CRETED**
+**201 CREATED**
 ```json
 {
     "ok": true,
@@ -1544,6 +1528,104 @@ Esto pasa porque los 4 canales ya han sido creados y no se pueden repetir, en el
 >page
 >pagesize
 
+**200 OK**
+
+```json
+{
+    "total": 4,
+    "items": [
+        {
+            "id": "7",
+            "name": "Año Nuevo",
+            "day": "2025-01-01",
+            "status": "active",
+            "target": {
+                "delivery": true
+            },
+            "scope": {
+                "carrierIds": [
+                    "d555345345345aa67a342a00"
+                ],
+                "carrierReferenceIds": [
+                    "carr-001"
+                ]
+            },
+            "description": "Feriado nacional - sin entregas",
+            "dateCreated": "2025-08-19T20:13:21.000Z",
+            "dateModified": null,
+            "userCreated": "JCS01",
+            "userModified": null
+        },
+        {
+            "id": "6",
+            "name": "Año Nuevo",
+            "day": "2025-01-01",
+            "status": "active",
+            "target": {
+                "delivery": true
+            },
+            "scope": {
+                "carrierIds": [
+                    "d555345345345aa67a342a00"
+                ],
+                "carrierReferenceIds": [
+                    "carr-001"
+                ]
+            },
+            "description": "Feriado nacional - sin entregas",
+            "dateCreated": "2025-08-19T20:06:00.000Z",
+            "dateModified": null,
+            "userCreated": "JCS01",
+            "userModified": null
+        },
+        {
+            "id": "5",
+            "name": "Año Nuevo",
+            "day": "2025-01-01",
+            "status": "active",
+            "target": {
+                "delivery": true
+            },
+            "scope": {
+                "carrierIds": [
+                    "d555345345345aa67a342a00"
+                ],
+                "carrierReferenceIds": [
+                    "carr-001"
+                ]
+            },
+            "description": "Feriado nacional - sin entregas",
+            "dateCreated": "2025-08-19T19:56:53.000Z",
+            "dateModified": null,
+            "userCreated": "JCS01",
+            "userModified": null
+        },
+        {
+            "id": "4",
+            "name": "Año Nuevo",
+            "day": "2025-01-01",
+            "status": "active",
+            "target": {
+                "delivery": true
+            },
+            "scope": {
+                "carrierIds": [
+                    "d555345345345aa67a342a00"
+                ],
+                "carrierReferenceIds": [
+                    "carr-001"
+                ]
+            },
+            "description": "Feriado nacional - sin entregas",
+            "dateCreated": "2025-08-19T19:56:42.000Z",
+            "dateModified": null,
+            "userCreated": "JCS01",
+            "userModified": null
+        }
+    ]
+}
+```
+
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/holidays?active=active&dateFrom=2025-01-01&dateTo=2025-12-31&q=Año&page=1&pageSize=50`
 
 ---
@@ -1553,6 +1635,19 @@ Esto pasa porque los 4 canales ya han sido creados y no se pueden repetir, en el
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/holidays/1`
 
+**200 OK**
+```json
+{
+    "id": "7",
+    "message": "Holiday eliminada."
+}
+```
+**404 NOT_FOUND**
+```json
+{
+    "message": "HOLIDAY_NOT_FOUND"
+}
+```
 ---
 
 ## 🧩 LocationGeo (enlace Location ↔ Geofence)
@@ -1563,12 +1658,100 @@ Esto pasa porque los 4 canales ya han sido creados y no se pueden repetir, en el
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/location-geo/by-location/1?includeCoverage=true&active=true`
 
+**200 OK**
+```json
+{
+    "total": 1,
+    "items": [
+        {
+            "id": "3",
+            "name": "San javier",
+            "description": "Geocerca poligonal de San Javier, Región del Maule, Chile ",
+            "status": "active",
+            "dateCreated": "2025-08-14T12:56:46.370Z",
+            "dateModified": "2025-08-21T20:53:24.167Z",
+            "userCreated": "api",
+            "userModified": "2",
+            "coverage": [
+                [
+                    [
+                        [
+                            -71.74,
+                            -35.634
+                        ],
+                        [
+                            -71.715,
+                            -35.622
+                        ],
+                        [
+                            -71.705,
+                            -35.604
+                        ],
+                        [
+                            -71.715,
+                            -35.585
+                        ],
+                        [
+                            -71.7425,
+                            -35.5685
+                        ],
+                        [
+                            -71.773,
+                            -35.582
+                        ],
+                        [
+                            -71.78,
+                            -35.607
+                        ],
+                        [
+                            -71.765,
+                            -35.627
+                        ],
+                        [
+                            -71.74,
+                            -35.634
+                        ]
+                    ]
+                ]
+            ]
+        }
+    ]
+}
+```
+
 ---
+
+
 
 ### Obtener locations de una geofence
 **GET** `/location-geo/by-geofence/{geofenceId}?active=true`
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/location-geo/by-geofence/3?active=true`
+
+**200 OK**
+```json
+{
+    "total": 1,
+    "items": [
+        {
+            "id": "1",
+            "storeId": 1,
+            "name": "Sucursal San Javier Centro (Remodelada)",
+            "country": "Argentina",
+            "stateProvince": "Maule",
+            "city": "San Javier",
+            "addressLine1": "Av. Balmaceda 456",
+            "addressLine2": "Local 12 - Segundo piso",
+            "postalCode": "3660000",
+            "status": "active",
+            "dateCreated": "2025-08-14T21:37:56.187Z",
+            "dateModified": "2025-08-19T19:12:10.557Z",
+            "userCreated": "1",
+            "userModified": "1"
+        }
+    ]
+}
+```
 
 ---
 
@@ -1576,6 +1759,21 @@ Esto pasa porque los 4 canales ya han sido creados y no se pueden repetir, en el
 **GET** `/location-geo?locationId=1&geofenceId=3&page=1&pageSize=50`
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/location-geo?locationId=1&geofenceId=3&page=1&pageSize=50`
+
+**200 OK**
+
+```json
+{
+    "total": 1,
+    "items": [
+        {
+            "id": "3",
+            "locationId": 1,
+            "geofenceId": 3
+        }
+    ]
+}
+```
 
 ---
 
@@ -1586,7 +1784,50 @@ Esto pasa porque los 4 canales ya han sido creados y no se pueden repetir, en el
 ```json
 { "locationId": 1, "geofenceId": 3 }
 ```
+**200 Response: ya existe**
+```json
+{
+    "id": "3",
+    "message": "Vínculo ya existía."
+}
+```
+**201 CREATED**
+```json
+{
+    "id": "1002",
+    "message": "Vínculo creado exitosamente."
+}
+```
+**400 BAD REQUEST INVALID**
+```json
+{
+    "message": "INVALID_GEOFENCE_ID"
+}
+```
 
+**404 Geofence not found**
+**body**
+```json 
+{ "locationId": 1, "geofenceId": 50 }
+```
+**Response**
+```json
+{
+    "message": "GEOFENCE_NOT_FOUND"
+}
+```
+
+**404 Location not found**
+**body**
+```json 
+{ "locationId": 100, "geofenceId": 50 }
+```
+**Response**
+```json
+{
+    "message": "LOCATION_NOT_FOUND"
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/location-geo`
 
 ---
@@ -1596,10 +1837,41 @@ Esto pasa porque los 4 canales ya han sido creados y no se pueden repetir, en el
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/location-geo/2`
 
+**200 OK**
+```json
+{
+    "id": "3",
+    "message": "Vínculo eliminado."
+}
+```
+
+**404 NOT FOUND**
+```json
+{
+    "message": "LINK_NOT_FOUND"
+}
+```
 ---
 
 ### Eliminar enlace por par (query)
 **DELETE** `/location-geo?locationId=1&geofenceId=3`
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/location-geo?locationId=1&geofenceId=3`
+
+
+**200 OK**
+```json
+{
+    "locationId": 1,
+    "geofenceId": 3,
+    "message": "Vínculo eliminado."
+}
+```
+
+**404 NOT FOUND**
+```json
+{
+    "message": "LINK_NOT_FOUND"
+}
+```
 
