@@ -64,14 +64,14 @@ async function createHoliday({ name, day, status = 'active', target = {}, scope 
   return rowToApi(r.recordset[0]); 
 }
 
-// UPDATE (reemplazo completo de target/scope con los enviados; si no se envían, no se tocan)
+// UPDATE
 async function updateHoliday({ id, name, day, status, target, scope, description, user = 'API' }) {
   if (!Number.isInteger(id)) throw new Error('HOLIDAY_NOT_FOUND');
   if (day != null && !isIsoDate(day)) throw new Error('DAY_INVALID');
 
   await IdServicePoolConnect;
 
-  // valida existencia
+
   const exists = (await IdServicePool.request()
     .input('id', sql.Int, id)
     .query('SELECT 1 ok FROM dbo.Holiday WHERE Id = @id')).recordset[0];
@@ -83,33 +83,40 @@ async function updateHoliday({ id, name, day, status, target, scope, description
   const tgt = hasTarget ? buildTargetJson(target) : null;
   const scp = hasScope  ? buildScopeJson(scope)   : null;
 
-  await IdServicePool.request()
-    .input('Id', sql.Int, id)
-    .input('Name', sql.NVarChar(200), name ?? null)
-    .input('Day', sql.Date, day ?? null)
-    .input('Status', sql.NVarChar(8), status != null ? normStatus(status) : null)
-    .input('Target', sql.NVarChar(sql.MAX), tgt)
-    .input('Scope', sql.NVarChar(sql.MAX), scp)
-    .input('Desc', sql.NVarChar(sql.MAX), description ?? null)
-    .input('User', sql.NVarChar(5), normUser5(user))
-    .query(`
-      UPDATE dbo.Holiday
-      SET Name        = COALESCE(@Name, Name),
-          Day         = COALESCE(@Day,  Day),
-          Status      = COALESCE(@Status, Status),
-          ${hasTarget ? 'Target = @Target,' : ''}
-          ${hasScope  ? 'Scope  = @Scope,'  : ''}
-          Description = COALESCE(@Desc, Description),
-          UpdatedAt   = SYSUTCDATETIME(),
-          UserModified= @User
-          OUTPUT INSERTED.Id, INSERTED.Name, INSERTED.Day, INSERTED.Status, INSERTED.Target, INSERTED.Scope,
-             INSERTED.Description, INSERTED.CreatedAt, INSERTED.UpdatedAt, INSERTED.UserCreated, INSERTED.UserModified
 
-      WHERE Id = @Id;
-    `);
+  const setParts = [
+    'Name        = COALESCE(@Name, Name)',
+    'Day         = COALESCE(@Day, Day)',
+    'Status      = COALESCE(@Status, Status)',
+    hasTarget ? 'Target = @Target' : null,
+    hasScope  ? 'Scope  = @Scope'  : null,
+    'Description = COALESCE(@Desc, Description)',
+    'UpdatedAt   = SYSUTCDATETIME()',
+    'UserModified= @User',
+  ].filter(Boolean).join(',\n      ');
 
-  return rowToApi(r.recordset[0]);
+  const q = `
+    UPDATE dbo.Holiday
+    SET ${setParts}
+    OUTPUT INSERTED.Id, INSERTED.Name, INSERTED.Day, INSERTED.Status, INSERTED.Target, INSERTED.Scope,
+           INSERTED.Description, INSERTED.CreatedAt, INSERTED.UpdatedAt, INSERTED.UserCreated, INSERTED.UserModified
+    WHERE Id = @Id;
+  `;
+
+  const req = IdServicePool.request()
+    .input('Id',    sql.Int,            id)
+    .input('Name',  sql.NVarChar(200),  name ?? null)
+    .input('Day',   sql.Date,           day ?? null) 
+    .input('Status',sql.NVarChar(8),    status != null ? normStatus(status) : null)
+    .input('Target',sql.NVarChar(sql.MAX), tgt)
+    .input('Scope', sql.NVarChar(sql.MAX), scp) 
+    .input('Desc',  sql.NVarChar(sql.MAX), description ?? null)
+    .input('User',  sql.NVarChar(5),    normUser5(user));
+
+  const r = await req.query(q);           
+  return rowToApi(r.recordset[0]);        
 }
+
 
 // GET BY ID
 async function getHolidayById({ id }) {

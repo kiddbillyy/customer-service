@@ -18,7 +18,7 @@ export default {
   // Rutas Microservicio ID SERVICE
 
   idserviceLogin: { path: '/api/idservice/auth/login', target: 'http://id-service:5007' , requireAuth: false, prependBasePath: true },
-  idserviceBase: { path: '/api/idservice', target: 'http://id-service:5007', requireAuth: false, prependBasePath: true, requireRbac: false },
+  idserviceBase: { path: '/api/idservice', target: 'http://id-service:5007', requireAuth: true, prependBasePath: true, requireRbac: false },
   idserviceRecuperar: { method: 'PATCH', path: '/api/idservice/auth/recuperar', target: 'http://id-service:5007', requireAuth: false, prependBasePath: true },
   idserviceCambiarContrasena: { method: 'PATCH', path: '/api/idservice/auth/cambiar-contrasena', target: 'http://id-service:5007', requireAuth: false, prependBasePath: true },
   
