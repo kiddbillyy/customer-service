@@ -193,4 +193,22 @@ export const customerGroupsCreate = z.union([
   customerGroupUpsert
 ]).transform(v => Array.isArray(v) ? v : [v]);
 
+export const paymentTermsPatch = z.object({
+  pymntGroup: z.string().min(1).max(100).optional(),
+  extraDays: z.number().int().min(0).max(3650).optional(),
+  installments: z.number().int().min(1).max(60).nullable().optional(),
+  isActive: z.boolean().optional()
+}).refine(v => Object.keys(v).length > 0, { message: 'payload vacío' });
 
+export const customerGroupsPatch = z.object({
+  groupName: z.string().min(1).max(100).optional(),
+  partnerType: partnerType.optional(), // 'C'|'P'
+  isActive: z.boolean().optional()
+}).refine(v => Object.keys(v).length > 0, { message: 'payload vacío' });
+
+
+export const sapPriceListEvent = z.object({
+  listNum: z.number().int().min(1),
+  listName: z.string().min(1).max(100),
+  createDate: z.coerce.date().optional() // acepta string/Date; opcional
+});

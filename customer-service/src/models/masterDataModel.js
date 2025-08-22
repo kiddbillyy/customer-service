@@ -176,3 +176,166 @@ export async function createCustomerGroups(items, onConflict /* 'error'|'ignore'
     return { status: 500, payload: { error: 'INTERNAL_ERROR' } };
   }
 }
+
+export async function updatePaymentTerm(groupNum, patch) {
+  const pool = await getPool();
+  const r = pool.request()
+    .input('GroupNum', sql.Int, groupNum)
+    .input('UpdatedAt', sql.DateTime2(3), new Date());
+  const sets = [];
+
+  const map = {
+    pymntGroup: ['PymntGroup', sql.NVarChar(100)],
+    extraDays: ['ExtraDays', sql.Int],
+    installments: ['Installments', sql.Int],
+    isActive: ['IsActive', sql.Bit]
+  };
+  for (const [k, [col, typ]] of Object.entries(map)) {
+    if (k in patch) { sets.push(`${col}=@${col}`); r.input(col, typ, patch[k]); }
+  }
+  if (!sets.length) {
+    const { recordset } = await pool.request().input('GroupNum', sql.Int, groupNum)
+      .query(`SELECT * FROM dbo.PaymentTerms WITH (NOLOCK) WHERE GroupNum=@GroupNum;`);
+    return recordset[0] || null;
+  }
+
+  const { rowsAffected } = await r.query(`
+    UPDATE dbo.PaymentTerms
+       SET ${sets.join(', ')}, UpdatedAt=@UpdatedAt
+     WHERE GroupNum=@GroupNum;
+  `);
+  if (!rowsAffected[0]) return null;
+
+  const { recordset } = await pool.request().input('GroupNum', sql.Int, groupNum)
+    .query(`SELECT * FROM dbo.PaymentTerms WITH (NOLOCK) WHERE GroupNum=@GroupNum;`);
+  return recordset[0] || null;
+}
+
+export async function deletePaymentTerm(groupNum, hard = false) {
+  const pool = await getPool();
+
+  if (hard) {
+    try {
+      const { rowsAffected } = await pool.request()
+        .input('GroupNum', sql.Int, groupNum)
+        .query(`DELETE FROM dbo.PaymentTerms WHERE GroupNum=@GroupNum;`);
+      if (rowsAffected[0]) return { ok: true, hardDeleted: true, softDeactivated: false };
+      return { ok: false };
+    } catch (e) {
+      // FK (547) => cae a soft delete
+      const code = e?.number || e?.originalError?.info?.number;
+      if (code !== 547) throw e;
+    }
+  }
+
+  const { rowsAffected } = await pool.request()
+    .input('GroupNum', sql.Int, groupNum)
+    .query(`
+      UPDATE dbo.PaymentTerms
+         SET IsActive = 0, UpdatedAt = SYSUTCDATETIME()
+       WHERE GroupNum=@GroupNum;
+    `);
+  return rowsAffected[0]
+    ? { ok: true, hardDeleted: false, softDeactivated: true }
+    : { ok: false };
+}
+
+/* ===== Customer Groups ===== */
+export async function updateCustomerGroup(groupCode, patch) {
+  const pool = await getPool();
+  const r = pool.request()
+    .input('GroupCode', sql.Int, groupCode)
+    .input('UpdatedAt', sql.DateTime2(3), new Date());
+  const sets = [];
+
+  const map = {
+    groupName: ['GroupName', sql.NVarChar(100)],
+    partnerType: ['PartnerType', sql.Char(1)],
+    isActive: ['IsActive', sql.Bit]
+  };
+  for (const [k, [col, typ]] of Object.entries(map)) {
+    if (k in patch) { sets.push(`${col}=@${col}`); r.input(col, typ, patch[k]); }
+  }
+  if (!sets.length) {
+    const { recordset } = await pool.request().input('GroupCode', sql.Int, groupCode)
+      .query(`SELECT * FROM dbo.CustomerGroups WITH (NOLOCK) WHERE GroupCode=@GroupCode;`);
+    return recordset[0] || null;
+  }
+
+  try {
+    const { rowsAffected } = await r.query(`
+      UPDATE dbo.CustomerGroups
+         SET ${sets.join(', ')}, UpdatedAt=@UpdatedAt
+       WHERE GroupCode=@GroupCode;
+    `);
+    if (!rowsAffected[0]) return null;
+  } catch (e) {
+    const code = e?.number || e?.originalError?.info?.number;
+    if (code === 2627 || code === 2601) {
+      // por si tienes un índice único por (PartnerType, GroupName)
+      return { error: 'DUPLICATE_KEY', http: 409, details: 'Nombre ya existe para ese tipo' };
+    }
+    throw e;
+  }
+
+  const { recordset } = await pool.request().input('GroupCode', sql.Int, groupCode)
+    .query(`SELECT * FROM dbo.CustomerGroups WITH (NOLOCK) WHERE GroupCode=@GroupCode;`);
+  return recordset[0] || null;
+}
+
+export async function deleteCustomerGroup(groupCode, hard = false) {
+  const pool = await getPool();
+
+  if (hard) {
+    try {
+      const { rowsAffected } = await pool.request()
+        .input('GroupCode', sql.Int, groupCode)
+        .query(`DELETE FROM dbo.CustomerGroups WHERE GroupCode=@GroupCode;`);
+      if (rowsAffected[0]) return { ok: true, hardDeleted: true, softDeactivated: false };
+      return { ok: false };
+    } catch (e) {
+      const code = e?.number || e?.originalError?.info?.number;
+      if (code !== 547) throw e; // otras excepciones
+    }
+  }
+
+  const { rowsAffected } = await pool.request()
+    .input('GroupCode', sql.Int, groupCode)
+    .query(`
+      UPDATE dbo.CustomerGroups
+         SET IsActive = 0, UpdatedAt = SYSUTCDATETIME()
+       WHERE GroupCode=@GroupCode;
+    `);
+
+  return rowsAffected[0]
+    ? { ok: true, hardDeleted: false, softDeactivated: true }
+    : { ok: false };
+}
+
+export async function upsertPriceListFromSap({ listNum, listName, createDate }) {
+  const pool = await getPool();
+
+  await pool.request()
+    .input('ListNum',  sql.Int, listNum)
+    .input('ListName', sql.NVarChar(100), listName)
+    .input('CreateDate', sql.DateTime2(3), createDate ?? null)
+    .query(`
+      MERGE dbo.PriceLists AS t
+      USING (SELECT @ListNum AS ListNum) AS s
+        ON t.ListNum = s.ListNum
+      WHEN MATCHED THEN UPDATE SET
+        ListName = @ListName,
+        IsActive = 1,
+        UpdatedAt = SYSUTCDATETIME()
+      WHEN NOT MATCHED THEN INSERT
+        (ListNum, ListName, IsActive, CreatedAt, UpdatedAt)
+      VALUES
+        (@ListNum, @ListName, 1, COALESCE(@CreateDate, SYSUTCDATETIME()), SYSUTCDATETIME());
+    `);
+
+  const { recordset } = await pool.request()
+    .input('ListNum', sql.Int, listNum)
+    .query(`SELECT * FROM dbo.PriceLists WITH (NOLOCK) WHERE ListNum=@ListNum;`);
+
+  return recordset[0] || null;
+}
