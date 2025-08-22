@@ -1,6 +1,7 @@
 // controllers/Holidays.Controller.js
 const model = require('../models/HolidayModels');
 const { publishholidayEvent } = require('../utils/Kafka/HolidaysEvents')
+
 async function createHoliday(req, res) {
   try {
     const { name, day, status = 'active', target = {}, scope = null, description = null, user = 'API' } = req.body;

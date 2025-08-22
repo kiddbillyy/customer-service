@@ -8,7 +8,7 @@ function nowSCLIso() {
 
 // Ya lo tienes:
 function nowSCLSql121() {
-  return DateTime.now().setZone('America/Santiago').toFormat("yyyy-LL-dd'T'HH:mm:ss.SSS");
+  return DateTime.now().setZone('America/Santiago').toFormat("yyyy-LL-dd HH:mm:ss.SSS");
 }
 
 module.exports = { nowSCLIso, nowSCLSql121 };
