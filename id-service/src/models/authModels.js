@@ -1,4 +1,5 @@
 const { sql, IdServicePool } = require('../config/dbnew');
+const { NotFoundError, ForbiddenError, UnauthorizedError } = require('../utils/errors');
 const moment = require('moment-timezone'); 
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
@@ -56,25 +57,32 @@ const validarCredencialesParaRenovar = async (correo, password) => {
 
   const result = await pool.request()
     .input('correo', sql.NVarChar(255), correo)
-    .query('SELECT * FROM Usuarios WHERE CorreoElectronico = @correo');
+    .query(`
+      SELECT UsuarioID, CorreoElectronico, Activo, HashPassword
+      FROM Usuarios
+      WHERE CorreoElectronico = @correo
+    `);
 
   const usuario = result.recordset[0];
 
   if (!usuario) {
-    throw new Error('Usuario no encontrado.');
+    throw NotFoundError('Usuario no encontrado.');
   }
 
   if (!usuario.Activo) {
-    throw new Error('El usuario no está activo.');
+    throw ForbiddenError('El usuario no está activo.');
   }
 
   const esValida = bcrypt.compareSync(password, usuario.HashPassword);
   if (!esValida) {
-    throw new Error('Contraseña incorrecta.');
+    // mensaje neutro para no filtrar causa exacta
+    throw UnauthorizedError('Credenciales inválidas.');
   }
 
   return usuario;
 };
+
+
 
 const generarCodigoOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
