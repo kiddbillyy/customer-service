@@ -1,29 +1,30 @@
-const SapMovRepository  = require('../models/sapMovRepository');
-const { applyMovement } = require('../models/inventoryRepository');
+const SapMovRepository = require('../models/sapMovRepository');
+const RawRepo          = require('../models/rawEventsRepository');
 
-async function syncMovements() {
-  const movs = await SapMovRepository.getPending();
+/* Construimos la clave natural con ID (único) */
+const buildNaturalKey = (row) =>
+  `SAP-${row.ID}`;   // tu SP garantiza unicidad de ID
+
+async function syncMovements () {
+  const movs = await SapMovRepository.getPending();   // Estado='pendiente'
 
   for (const mov of movs) {
-    const { ID, ItemCode, Quantity, Movimiento: rawMov, WhsCode } = mov;
-    const movType  = rawMov.trim().toLowerCase();          // 'entrada' | 'salida' | 'entrega'
-    const qty      = parseFloat(Quantity);                 // aseguramos número
-    const almacenId= parseInt(WhsCode, 10);
-    const delta    = qty;                                  // siempre positivo aquí
+    const naturalKey = buildNaturalKey(mov);
+    const eventType  = mov.Movimiento.trim().toLowerCase();  // 'entrada' | 'salida' | 'entrega'
 
     try {
-      await applyMovement({
-        sku:       ItemCode.trim(),
-        almacenId,
-        delta,
-        movType
+      await RawRepo.insertIfNew({
+        source:    'SAP',
+        eventType,            // se guarda tal cual
+        naturalKey,
+        payload:   mov
       });
 
-      await SapMovRepository.markAsProcessed(ID, true);
-      console.log(`✔️  Movimiento ${ID} (${movType}) procesado`);
+      await SapMovRepository.markAsProcessed(mov.ID, true);
+      console.log(`➕ Evento SAP ${mov.ID} (${eventType}) registrado`);
     } catch (err) {
-      console.error(`❌ Movimiento ${ID} falló:`, err.message);
-      await SapMovRepository.markAsProcessed(ID, false, err.message);
+      console.error(`✖︎ SAP ${mov.ID}:`, err.message);
+      await SapMovRepository.markAsProcessed(mov.ID, false, err.message);
     }
   }
 }

@@ -237,26 +237,78 @@ commerce-service/
 **Body**
 ```json
 {
-  "LegalName": "MOmbralSDS ",
-  "BusinessName": "MimbralMTS",
-  "Tax": "76.123.456-7",
-  "Email": "contacto@acme.cl",
-  "PhoneNumber": "+56 2 2345 6789",
+  "LegalName": "Mimbral ",
+  "BusinessName": "Mimbral",
+  "Tax": "19%",
+  "Email": "example@mimbral.cl",
+  "PhoneNumber": "+56911111111",
   "DocumentType": "RUT",
-  "DocumentNumber": "7612469",
-  "WebsiteUrl": "https://www.acme.cl",
-  "Industry": "Manufactura",
+  "DocumentNumber": "11111111-1",
+  "WebsiteUrl": "https://www.mimbral.cl",
+  "Industry": "Ferreteria",
   "Status": 1,
   "UserCreated": 5
 }
 ```
+**201 CREATED**
+```json
+{
+    "ok": true,
+    "data": {
+    }
+}
+```
+**400 BAD REQUEST**
 
+```json
+{
+    "ok": false,
+    "message": "El LegalName ya está registrado."
+}
+```
+```json
+{
+    "ok": false,
+    "message": "El DocumentNumber ya está registrado."
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/company/Crear`
 
 ---
 
 ### Obtener compañía por ID
 **GET** `/company/{id}`
+
+**200 OK**
+```json
+{
+    "ok": true,
+    "data": {
+        "Id": 1,
+        "ReferenceId": "MIM-001",
+        "LegalName": "Mimbral.",
+        "BusinessName": "Mimbral",
+        "Tax": "19%",
+        "Email": "example@mimbral.cl",
+        "PhoneNumber": "+56 9 11111111",
+        "DocumentType": "RUT",
+        "DocumentNumber": "11.111.111-1",
+        "Status": true,
+        "Industry": "Ferretería",
+        "CreatedAt": "2025-08-13T21:55:43.203Z",
+        "UserCreated": "5",
+        "UpdatedAt": "2025-08-14T14:06:02.197Z",
+        "UserModified": "5"
+    }
+}
+```
+**404 NOT FOUND**
+```json
+{
+    "ok": false,
+    "message": "Compañía no encontrada"
+}
+```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/company/1`
 
@@ -265,28 +317,77 @@ commerce-service/
 ### Listar compañías
 **GET** `/company`
 
+**Parametros de busqueda**
+> NULL
+
+**200 OK**
+```json
+{
+    "ok": true,
+    "count": 10,
+    "data": [
+        {
+            "Id": 1,
+            "ReferenceId": "ACME-001",
+            "LegalName": "Mimbral Ltda.",
+            "BusinessName": "Mimbral",
+            "Tax": "19%",
+            "Email": "mimbral@mimbral.cl",
+            "PhoneNumber": "+56 9 1234 5678",
+            "DocumentType": "RUT",
+            "DocumentNumber": "12.345.678-9",
+            "Status": true,
+            "Industry": "Tecnología",
+            "CreatedAt": "2025-08-13T21:55:43.203Z",
+            "UserCreated": "5",
+            "UpdatedAt": "2025-08-14T14:06:02.197Z",
+            "UserModified": "5"
+        },
+        {
+            "Id": 17,
+            "ReferenceId": "MIM-001",
+            "LegalName": "Mimbral ",
+            "BusinessName": "Mimbral",
+            "Tax": "19%",
+            "Email": "mimbral@mimbral.cl",
+            "PhoneNumber": "+56 9 1234 5678",
+            "DocumentType": "RUT",
+            "DocumentNumber": "761234569",
+            "Status": true,
+            "Industry": "Tecnología",
+            "CreatedAt": "2025-08-14T10:04:16.760Z",
+            "UserCreated": "5",
+            "UpdatedAt": "2025-08-14T12:24:23.353Z",
+            "UserModified": "5"
+        }
+    ]
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/company`
 
 ---
 
 ### Editar compañía
+
 **PUT** `/company/{id}`
 
 **Body**
 ```json
 {
-  "LegalName": "Comercial Yoni Ltda.",
-  "BusinessName": "Yoni Corp",
+  "LegalName": "Mimbral Ltda.",
+  "BusinessName": "Mimbral",
   "Tax": "19%",
-  "Email": "ventas@yonicorp.cl",
+  "Email": "mimbral@mimbral.cl",
   "PhoneNumber": "+56 9 1234 5678",
   "DocumentType": "RUT",
-  "DocumentNumber": "12.345.678-9",
-  "Status": 1,
+  "DocumentNumber": "11.111.111-1",
+  "Status": 0,
   "Industry": "Tecnología",
   "UserModified": 5
 }
 ```
+**Consideraciones**
+> Solo se actualiza los campos pasados en el body
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/company/1`
 
@@ -296,6 +397,9 @@ commerce-service/
 
 ### Crear store
 **POST** `/store/Crear`
+
+***Consideraciones**
+>Name, Email, Status, UserCreated son obligatorios
 
 **Body**
 ```json
@@ -309,6 +413,24 @@ commerce-service/
 }
 ```
 
+**409 CONFLICT**
+```json
+{
+    "ok": false,
+    "code": "UNIQUE_NAME",
+    "message": "Ya existe una tienda con ese Nombre."
+}
+```
+**201 CREATED**
+```json
+{
+    "ok": true,
+    "data": {
+    }
+}
+
+```
+
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/store/Crear`
 
 ---
@@ -316,12 +438,73 @@ commerce-service/
 ### Obtener store por ID
 **GET** `/store/{id}`
 
+**200 OK**
+
+```json
+{
+    "ok": true,
+    "data": {
+        "Id": 10,
+        "CompanyId": 19,
+        "Name": "Sucursal Chorrillo",
+        "Email": "Chorrillo@mimbral.cl",
+        "PhoneNumber": "+56911111111",
+        "Status": true,
+        "CreatedAt": "2025-08-14T17:00:38.237Z",
+        "UpdatedAt": null,
+        "UserCreated": "5",
+        "UserModified": null,
+        "CompanyName": "MimbralSDS "
+    }
+}
+```
+
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/store/6`
 
 ---
 
 ### Listar stores (filtros)
-**GET** `/store?search={texto}&status={1|0}`
+**GET** `/store`
+**Filtros**
+>search(Busca por nombre.companyname)
+>status(puede ser 1 o 0)
+
+```json
+{
+    "ok": true,
+    "page": 1,
+    "pageSize": 10,
+    "total": 3,
+    "data": [
+        {
+            "Id": 10,
+            "CompanyId": 19,
+            "CompanyName": "Mimbral ",
+            "Name": "Sucursal Chorrillo",
+            "Email": "Chorrillo@mimbral.cl",
+            "PhoneNumber": "+56911111111",
+            "Status": true,
+            "CreatedAt": "2025-08-14T17:00:38.237Z",
+            "UpdatedAt": null,
+            "UserCreated": "5",
+            "UserModified": null
+        },
+        {
+            "Id": 6,
+            "CompanyId": 1,
+            "CompanyName": "Mimbral",
+            "Name": "Sucursal Balmaceda",
+            "Email": "balmaceda@mimbral.cl",
+            "PhoneNumber": "+56911111111",
+            "Status": true,
+            "CreatedAt": "2025-08-14T14:40:03.853Z",
+            "UpdatedAt": "2025-08-14T17:29:10.247Z",
+            "UserCreated": "5",
+            "UserModified": "5"
+        }
+    ]
+}
+```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/store?search=Mimbral&status=1`
 
@@ -338,6 +521,15 @@ commerce-service/
   "PhoneNumber": "+56911111111",
   "Status": 1,
   "UserModified": 5
+}
+```
+
+**200 OK**
+
+```json
+{
+    "ok": true,
+    "message": "La tienda ha sido actualizada correctamente"
 }
 ```
 
@@ -360,6 +552,31 @@ commerce-service/
   "UserCreated": 5
 }
 ```
+**201 CREATED**
+```json
+{
+    "ok": true,
+    "data": {
+    }
+}
+```
+**400 BAD REQUEST**
+```json
+{
+    "ok": false,
+    "code": "FK_VIOLATION",
+    "message": "CompanyId no existe o viola la restricción de la base de datos."
+}
+```
+
+**409 CONFLICT**
+```json
+{
+    "ok": false,
+    "code": "UNIQUE_NAME",
+    "message": "Ya existe un canal de venta registrado con este nombre para la compañía."
+}
+```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/sales-channel/Crear`
 
@@ -368,6 +585,48 @@ commerce-service/
 ### Listar sales channels (filtros)
 **GET** `/sales-channel/Listar?search=&companyId=&isActive=1&externalDelivery=`
 
+**Filtros**
+>search(Busca por nombre companyname, name)
+>companyId
+>isActive(1 o 0)
+>externalDelivery(1 o 0)
+
+```json
+{
+    "ok": true,
+    "page": 1,
+    "pageSize": 10,
+    "total": 21,
+    "data": [
+        {
+            "Id": 33,
+            "CompanyId": 1,
+            "CompanyName": "MIMBRAL",
+            "ReferenceId": "MIM-001",
+            "Name": "MIMBRAL",
+            "ExternalDelivery": true,
+            "IsActive": true,
+            "CreatedAt": "2025-08-21T15:17:27.637Z",
+            "UpdatedAt": null,
+            "UserCreated": "80",
+            "UserModified": null
+        },
+        {
+            "Id": 29,
+            "CompanyId": 1,
+            "CompanyName": "MIMBRAL.",
+            "ReferenceId": "MIM-002",
+            "Name": "MIMBRAL S",
+            "ExternalDelivery": true,
+            "IsActive": true,
+            "CreatedAt": "2025-08-21T15:15:04.217Z",
+            "UpdatedAt": null,
+            "UserCreated": "5",
+            "UserModified": null
+        }
+    ]
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/sales-channel/Listar?search=&companyId=&isActive=1&externalDelivery=`
 
 ---
@@ -375,6 +634,25 @@ commerce-service/
 ### Obtener sales channel por ID
 **GET** `/sales-channel/{id}`
 
+**200 OK**
+```json
+{
+    "ok": true,
+    "data": {
+        "Id": 2,
+        "CompanyId": 1,
+        "CompanyName": "Mimbral",
+        "ReferenceId": "MAR-001",
+        "Name": "Falabella",
+        "ExternalDelivery": false,
+        "IsActive": true,
+        "CreatedAt": "2025-08-14T18:27:22.130Z",
+        "UpdatedAt": "2025-08-18T11:22:24.470Z",
+        "UserCreated": "5",
+        "UserModified": "5"
+    }
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/sales-channel/5`
 
 ---
@@ -389,6 +667,29 @@ commerce-service/
   "ExternalDelivery": 1,
   "IsActive": 1,
   "UserModified": 5
+}
+```
+
+**200 OK**
+```json
+{
+    "ok": true,
+    "message": "El canal de venta ha sido actualizado correctamente."
+}
+```
+**404 NOT FOUND**
+```json
+{
+    "ok": false,
+    "message": "Sales Channel no encontrado"
+}
+```
+**409 CONFLICT**
+```json
+{
+    "ok": false,
+    "code": "UNIQUE_NAME",
+    "message": "Ya existe un canal de venta registrado con este nombre para la compañía."
 }
 ```
 
@@ -410,6 +711,79 @@ commerce-service/
   ]
 }
 ```
+**201 CREATED**
+```json
+{
+    "ok": true,
+    "message": "1 canales de venta creados correctamente.",
+    "summary": {
+        "total": 1,
+        "inserted": 1,
+        "failed": 0
+    },
+    "data": [
+        {
+            "Id": 38,
+            "CompanyId": 1,
+            "ReferenceId": "PRU-016",
+            "Name": "Prueba",
+            "ExternalDelivery": true,
+            "IsActive": true,
+            "CreatedAt": "2025-08-21T15:38:43.613Z",
+            "UpdatedAt": null,
+            "UserCreated": "5",
+            "UserModified": null
+        }
+    ]
+}
+```
+**400 BAD REQUEST**
+```json
+{
+    "ok": false,
+    "message": "Ningún canal de venta fue creado.",
+    "summary": {
+        "total": 4,
+        "inserted": 0,
+        "failed": 4
+    },
+    "errors": [
+        {
+            "index": 0,
+            "CompanyId": 1,
+            "Name": "Falabella",
+            "code": "UNIQUE_NAME",
+            "number": 2601,
+            "message": "Ya existe un canal de venta registrado con este nombre para la compañía."
+        },
+        {
+            "index": 1,
+            "CompanyId": 1,
+            "Name": "Marketplace B2B",
+            "code": "UNIQUE_NAME",
+            "number": 2601,
+            "message": "Ya existe un canal de venta registrado con este nombre para la compañía."
+        },
+        {
+            "index": 2,
+            "CompanyId": 1,
+            "Name": "Tienda Online",
+            "code": "UNIQUE_NAME",
+            "number": 2601,
+            "message": "Ya existe un canal de venta registrado con este nombre para la compañía."
+        },
+        {
+            "index": 3,
+            "CompanyId": 1,
+            "Name": "Canal Desconocido",
+            "code": "UNIQUE_NAME",
+            "number": 2601,
+            "message": "Ya existe un canal de venta registrado con este nombre para la compañía."
+        }
+    ]
+}
+```
+Esto pasa porque los 4 canales ya han sido creados y no se pueden repetir, en el caso que en la carga masiva 1 canal ya exista y se estan insertando 10 canales, se insertan todos excepto el que no cumple con la condición, informando el error
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/sales-channel/massive`
 
@@ -419,6 +793,9 @@ commerce-service/
 
 ### Crear account
 **POST** `/account/Crear`
+
+**Consideraciones**
+>SalesChannelId, Name, Platform son obligatorios
 
 **Body**
 ```json
@@ -433,6 +810,37 @@ commerce-service/
 }
 ```
 
+**201 CRETED**
+```json
+{
+    "ok": true,
+    "message": "Cuenta creada exitosamente",
+    "data": {
+    }
+}
+```
+
+**400 bad request**
+```json
+{
+    "ok": false,
+    "message": "Name es obligatorio"
+}
+```
+```json
+{
+    "ok": false,
+    "message": "Platform es obligatorio"
+}
+```
+
+```json
+{
+    "ok": false,
+    "message": "SalesChannelId es obligatorio"
+}
+```
+
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/account/Crear`
 
 ---
@@ -440,12 +848,87 @@ commerce-service/
 ### Obtener account por ID
 **GET** `/account/{id}`
 
+
+**200 OK**
+
+```json
+{
+    "ok": true,
+    "data": {
+        "Id": 2,
+        "SalesChannelId": 5,
+        "SalesChannelName": "Vtex",
+        "ReferenceId": "VTE-001",
+        "Name": "Cuenta Oficial Chile",
+        "Platform": "vtex",
+        "EcommerceName": "tienda-chile",
+        "Features": "{\"multiWarehouseeeee\":false}",
+        "Status": true,
+        "DateCreated": "2025-08-18T17:34:58.827Z",
+        "DateModified": "2025-08-18T18:05:40.773Z",
+        "UserCreated": 5,
+        "UserModified": 5
+    }
+}
+```
+
+**404 NOT FOUND**
+```json
+{
+    "ok": false,
+    "message": "Account no encontrada"
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/account/2`
 
 ---
 
 ### Listar accounts (filtros/paginación)
 **GET** `/account/Listar?page=1&pagesize=10&name=&platform=&ecommerceName=&salesChannelName=&status=1`
+
+**Filtros**
+>*page*, *pagesize*, *name*, *platform*, *ecommerceName*, *salesChannelName*, *status*
+
+```json
+{
+    "ok": true,
+    "page": 1,
+    "pageSize": 10,
+    "total": 6,
+    "data": [
+        {
+            "Id": 11,
+            "SalesChannelId": 5,
+            "SalesChannelName": "Vtex",
+            "ReferenceId": "VTE-006",
+            "Name": "VTEX Chile Ofi",
+            "Platform": "VTEX",
+            "EcommerceName": "vtexcAl",
+            "Features": "{\"smartcheckout\":true,\"inventorySync\":\"push\"}",
+            "Status": true,
+            "DateCreated": "2025-08-21T15:56:07.010Z",
+            "DateModified": null,
+            "UserCreated": 5,
+            "UserModified": null
+        },
+        {
+            "Id": 10,
+            "SalesChannelId": 5,
+            "SalesChannelName": "Vtex",
+            "ReferenceId": "VTE-005",
+            "Name": "VTEX Chile Ofi",
+            "Platform": "VTEX",
+            "EcommerceName": "vtexcAl",
+            "Features": "{\"smartcheckout\":true,\"inventorySync\":\"push\"}",
+            "Status": true,
+            "DateCreated": "2025-08-21T15:55:58.533Z",
+            "DateModified": null,
+            "UserCreated": 5,
+            "UserModified": null
+        }
+    ]
+}
+```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/account/Listar?page=1&pagesize=10&name=&platform=&ecommerceName=&salesChannelName=&status=1`
 
@@ -466,6 +949,34 @@ commerce-service/
 }
 ```
 
+**200 OK**
+```json
+{
+    "ok": true,
+    "message": "Account actualizada correctamente",
+    "data": {
+        "Id": 2,
+        "SalesChannelId": 5,
+        "ReferenceId": "VTE-001",
+        "Name": "Cuenta Oficial Chile",
+        "Platform": "vtex",
+        "EcommerceName": "tienda-chile",
+        "Features": "{\"multiWarehouseeeee\":false}",
+        "Status": true,
+        "DateCreated": "2025-08-18T17:34:58.827Z",
+        "DateModified": "2025-08-21T16:06:13.990Z",
+        "UserCreated": 5,
+        "UserModified": 5
+    }
+}
+```
+**404 NOT FOUND**
+```json
+{
+    "ok": false,
+    "message": "Account no encontrada"
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/account/2`
 
 ---
@@ -498,6 +1009,49 @@ commerce-service/
 }
 ```
 
+**201 Created**
+```json
+{
+    "ok": true,
+    "message": "2 accounts creados correctamente.",
+    "summary": {
+        "total": 2,
+        "inserted": 2,
+        "failed": 0
+    },
+    "data": [
+        {
+            "Id": 12,
+            "SalesChannelId": 2,
+            "ReferenceId": "VTE-007",
+            "Name": "VTEX CHILE OFICIAL",
+            "Platform": "VTEX",
+            "EcommerceName": "vtex-cl",
+            "Features": "{\"smartcheckout\":true,\"inventorySync\":\"push\"}",
+            "Status": true,
+            "DateCreated": "2025-08-21T16:07:52.373Z",
+            "DateModified": null,
+            "UserCreated": 5,
+            "UserModified": null
+        },
+        {
+            "Id": 13,
+            "SalesChannelId": 2,
+            "ReferenceId": "VTE-008",
+            "Name": "VTEX CHILE SECUNDARIA",
+            "Platform": "VTEX",
+            "EcommerceName": "vtex-cl-2",
+            "Features": null,
+            "Status": true,
+            "DateCreated": "2025-08-21T16:07:52.377Z",
+            "DateModified": null,
+            "UserCreated": 5,
+            "UserModified": null
+        }
+    ]
+}
+```
+
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/account/massive`
 
 ---
@@ -505,15 +1059,47 @@ commerce-service/
 ### Obtener configuración (features) por ID
 **GET** `/account/features/{id}`
 
+**200 OK**
+
+```json
+{
+    "ok": true,
+    "data": {
+        "features": {
+            "smartcheckout": true,
+            "inventorySync": "push"
+        },
+        "isJson": true
+    }
+}
+```
+
+**404 NOT FOUND**
+
+```json
+{
+    "ok": false,
+    "message": "Account no encontrada"
+}
+```
+
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/account/features/3`
 
 ---
 
 ## 📍 Location
-> **Nota:** En la colección, las rutas de Location están sirviendo en `localhost:5009`.
+
 
 ### Listar locations
 **GET** `/locations`
+
+**200 OK**
+```json
+{
+    "total": 0,
+    "items": []
+}
+```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/locations`
 
@@ -522,6 +1108,18 @@ commerce-service/
 ### Obtener location por ID
 **GET** `/locations/{id}`
 
+**200 OK**
+```json
+{
+    "items": []
+}
+```
+**404 NOT FOUND**
+```json
+{
+    "message": "Location no encontrada."
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/locations/1`
 
 ---
@@ -529,8 +1127,34 @@ commerce-service/
 ### Crear location
 **POST** `/locations`
 
-**Body** *(defínelo según tu modelo; no hay ejemplo de creación en la colección)*
+**Body**
+```json 
+{
+  "storeId": 6,
+  "name": "Sucursal San Javier Centro",
+  "country": "Chile",
+  "stateProvince": "Maule",
+  "city": "San Javier",
+  "addressLine1": "Av. Chorrillos 2137",
+  "postalCode": "3660000",
+  "status": "active",
+  "user": "1"
+}
+```
 
+**201 CREATED**
+```json 
+{
+    "id": "1",
+    "message": "Location creada exitosamente."
+}
+```
+**404 NOT FOUND**
+```json 
+{
+    "message": "STORE_NOT_FOUND"
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/locations`
 
 ---
@@ -551,6 +1175,14 @@ commerce-service/
   "postalCode": "3660000",
   "status": "active",
   "user": "1"
+}
+```
+
+**200 OK**
+```json
+{
+    "id": "1",
+    "message": "Location actualizada."
 }
 ```
 
@@ -575,18 +1207,62 @@ commerce-service/
   "user": "1"
 }
 ```
+**200 OK**
+```json
+{
+    "id": "1",
+    "changed": true,
+    "message": "Location actualizada."
+}
+```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/locations/1`
 
 ---
 
 ## 🗺️ Geofence
-> **Nota:** también en `localhost:5009`.
 
 ### Insertar geofence
 **POST** `/geofences`
 
-**Body** *(no hay ejemplo en la colección)*
+**Body** 
+```json
+{  
+  "name":"San javier",
+  "status": "active",
+  "description": "Geocerca poligonal de San Javier, Región del Maule, Chile (aproximación urbana)",
+  "user": "1",
+  "coverage": [
+    [
+      [
+        [-71.773000, -35.582000],
+        [-71.742500, -35.568500],
+        [-71.715000, -35.585000],
+        [-71.705000, -35.604000],
+        [-71.715000, -35.622000],
+        [-71.740000, -35.634000],
+        [-71.765000, -35.627000],
+        [-71.780000, -35.607000],
+        [-71.773000, -35.582000]
+      ]
+    ]
+  ]
+}
+```
+
+**201 CREATED**
+```json
+{
+    "id": "1",
+    "message": "Geofence creada exitosamente."
+}
+```
+**500 INTERNAL SERVER ERROR**
+```json
+{
+    "message": "Could not find stored procedure 'dbo.Geofence_Upsert_FromCoverage'."
+}
+```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/geofences`
 
@@ -595,14 +1271,160 @@ commerce-service/
 ### Actualizar geofence
 **PUT** `/geofences/{id}`
 
-**Body** *(no hay ejemplo en la colección)*
+**Body**
 
+```json
+{  
+  "name": "San javier",
+  "status": "active",
+  "description": "Geocerca poligonal de San Javier, Región del Maule, Chile ",
+  "user": "5",
+  "coverage": [
+    [
+      [
+        [-71.773000, -35.582000],
+        [-71.742500, -35.568500],
+        [-71.715000, -35.585000],
+        [-71.705000, -35.604000],
+        [-71.715000, -35.622000],
+        [-71.740000, -35.634000],
+        [-71.765000, -35.627000],
+        [-71.780000, -35.607000],
+        [-71.773000, -35.582000]
+      ]
+    ]
+  ]
+}
+```
+**200 OK**
+```json
+{
+    "id": "1",
+    "message": "Geofence actualizada."
+}
+```
+**404**
+```json
+{
+    "message": "GEOFENCE_NOT_FOUND"
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/geofences/3`
 
 ---
 
 ### Listar geofences
 **GET** `/geofences`
+
+**200 OK**
+```json
+[
+    {
+        "id": "2",
+        "name": "San javier",
+        "status": "active",
+        "dateCreated": "2025-08-21T20:35:36.153Z",
+        "userCreated": "1",
+        "dateModified": "2025-08-21T20:35:36.153Z",
+        "userModified": "1",
+        "description": "Geocerca poligonal de San Javier, Región del Maule, Chile (aproximación urbana)",
+        "coverage": [
+            [
+                [
+                    [
+                        -71.74,
+                        -35.634
+                    ],
+                    [
+                        -71.715,
+                        -35.622
+                    ],
+                    [
+                        -71.705,
+                        -35.604
+                    ],
+                    [
+                        -71.715,
+                        -35.585
+                    ],
+                    [
+                        -71.7425,
+                        -35.5685
+                    ],
+                    [
+                        -71.773,
+                        -35.582
+                    ],
+                    [
+                        -71.78,
+                        -35.607
+                    ],
+                    [
+                        -71.765,
+                        -35.627
+                    ],
+                    [
+                        -71.74,
+                        -35.634
+                    ]
+                ]
+            ]
+        ]
+    },
+    {
+        "id": "1",
+        "name": "San javier",
+        "status": "active",
+        "dateCreated": "2025-08-21T20:35:26.573Z",
+        "userCreated": "1",
+        "dateModified": "2025-08-21T20:37:44.670Z",
+        "userModified": "5",
+        "description": "Geocerca poligonal de San Javier, Región del Maule, Chile ",
+        "coverage": [
+            [
+                [
+                    [
+                        -71.74,
+                        -35.634
+                    ],
+                    [
+                        -71.715,
+                        -35.622
+                    ],
+                    [
+                        -71.705,
+                        -35.604
+                    ],
+                    [
+                        -71.715,
+                        -35.585
+                    ],
+                    [
+                        -71.7425,
+                        -35.5685
+                    ],
+                    [
+                        -71.773,
+                        -35.582
+                    ],
+                    [
+                        -71.78,
+                        -35.607
+                    ],
+                    [
+                        -71.765,
+                        -35.627
+                    ],
+                    [
+                        -71.74,
+                        -35.634
+                    ]
+                ]
+            ]
+        ]
+    }
+]
+```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/geofences`
 
@@ -629,6 +1451,13 @@ commerce-service/
   "user": "JCS01"
 }
 ```
+**201 CREATED**
+```json
+{
+    "id": "1",
+    "message": "Holiday creada."
+}
+```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/holidays`
 
@@ -649,6 +1478,19 @@ commerce-service/
   "user": "JCS01"
 }
 ```
+**200 OK**
+```json
+{
+    "id": "1",
+    "message": "Holiday actualizada."
+}
+```
+**500**
+```json
+{
+    "message": "Erro interno"
+}
+```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/holidays/1`
 
@@ -657,12 +1499,50 @@ commerce-service/
 ### Obtener holiday por ID
 **GET** `/holidays/{id}`
 
+**200 OK**
+```json
+{
+    "id": "1",
+    "name": "Año Nuevo (ajuste)",
+    "day": "2025-01-01",
+    "status": "inactive",
+    "target": {
+        "delivery": true
+    },
+    "scope": {
+        "carrierIds": [
+            6
+        ],
+        "carrierReferenceIds": [
+            6
+        ]
+    },
+    "description": "Reabre entregas",
+    "dateCreated": "2025-08-21T20:39:45.000Z",
+    "dateModified": "2025-08-21T21:04:28.000Z",
+    "userCreated": "JCS01",
+    "userModified": "5"
+}
+```
+
+**404 NOT FOUND**
+```json
+{
+    "message": "Holiday no encontrada."
+}
+```
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/holidays/{{id}}`
 
 ---
 
 ### Listar holidays (filtros)
 **GET** `/holidays?active=active&dateFrom=2025-01-01&dateTo=2025-12-31&q=Año&page=1&pageSize=50`
+**FILTROS**
+>active=active
+>dateFrom, dateTo
+>q
+>page
+>pagesize
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/holidays?active=active&dateFrom=2025-01-01&dateTo=2025-12-31&q=Año&page=1&pageSize=50`
 
