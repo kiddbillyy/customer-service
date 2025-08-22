@@ -3,10 +3,14 @@ const bcrypt = require('bcryptjs');
 const { sql, IdServicePool } = require('../config/dbnew');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
+const { DateTime } = require('luxon');
 const timezone = require('dayjs/plugin/timezone');
 const { cerrarSesion, validarCredencialesParaRenovar, crearOtpYEnviar, validarOtp, actualizarContraseña, marcarOtpComoUsado, validarSoloOtp } = require('../models/authModels');
+const { ValidationError, UnauthorizedError, sendError } = require('../utils/errors');
+const {  nowSCLIso, nowSCLSql121,toSCLSql121 } = require('../utils/dates');
 const { sendOtpEvent } = require('../utils/kafkaUtils')
 require('dotenv').config();
+
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -97,8 +101,9 @@ const login = async (req, res) => {
 
   const nowFormatted = nowSantiago.format('YYYY-MM-DD HH:mm:ss');
   const expiracionFormatted = expiracionSantiago.format('YYYY-MM-DD HH:mm:ss');
+  console.log("Fecha de expiracion",expiracionFormatted)
 
-  await pool.request()
+  await pool.request() 
     .input('UsuarioID', sql.Int, usuario.UsuarioID)
     .input('PlataformaID', sql.Int, plataformaId)
     .input('Token', sql.NVarChar, token)
@@ -205,58 +210,82 @@ const renovarSesion = async (req, res) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Token no proporcionado o inválido.' });
+      throw UnauthorizedError('Token no proporcionado o inválido.');
     }
-
     if (!password) {
-      return res.status(400).json({ error: 'La contraseña es requerida.' });
+      throw ValidationError('La contraseña es requerida.', { field: 'password' });
     }
 
     const tokenAnterior = authHeader.slice(7);
-    let payload;
 
+    // 1) Verificar firma/exp del token anterior
+    let payload;
     try {
       payload = jwt.verify(tokenAnterior, process.env.JWT_SECRET);
-    } catch (err) {
-      return res.status(401).json({ error: 'Token inválido o expirado.' });
+    } catch {
+      throw UnauthorizedError('Token inválido o expirado.');
     }
 
-    const { correo, plataformaId } = payload;
-
+    const { correo, plataformaId } = payload || {};
     if (!correo || !plataformaId) {
-      return res.status(400).json({ error: 'El token no contiene los datos necesarios.' });
+      throw ValidationError('El token no contiene los datos necesarios.', { missing: ['correo', 'plataformaId'] });
     }
 
+    // 2) Validar credenciales (correo activo + password)
     const usuario = await validarCredencialesParaRenovar(correo, password);
-    if (!usuario) {
-      return res.status(401).json({ error: 'Credenciales inválidas.' });
-    }
-
     const usuarioId = usuario.UsuarioID;
+
+    // Fechas en America/Santiago usando tus utils (strings SQL-121)
+    const fechaCreacion = toSCLSql121(); // ahora
+    const fechaExpiracion = toSCLSql121(
+  DateTime.now().setZone("America/Santiago").plus({ hours: 3 })
+);
+
+    const fechaCierre = fechaCreacion; 
+    console.log("Fecha de cierre", fechaCierre);
+    const fechaInicio = fechaCreacion; 
+
     const pool = await IdServicePool.connect();
-    const nowSantiago = dayjs().tz('America/Santiago');
-    const expiracionSantiago = nowSantiago.add(3, 'hour');
-
     const transaction = new sql.Transaction(pool);
-    await transaction.begin();
 
+    let txBegun = false; 
     try {
-      // 1. Invalidar tokens anteriores
-      const invalidateReq = transaction.request();
-      await invalidateReq
+      await transaction.begin();
+      txBegun = true;
+      // 0) Verificar que el token anterior esté ACTIVO en BD (evita renovar revocados)
+      const check = await transaction.request()
+        .input('tokenAnterior', sql.NVarChar(sql.MAX), tokenAnterior)
+        .input('usuarioId', sql.Int, usuarioId)
+        .input('plataformaId', sql.Int, plataformaId)
+        .query(`
+          SELECT TOP 1 1 AS ok
+          FROM TOKENS_ACTIVOS WITH (UPDLOCK, HOLDLOCK)
+          WHERE TOKEN = @tokenAnterior
+            AND USUARIO_ID = @usuarioId
+            AND PLATAFORMA_ID = @plataformaId
+            AND VALIDO = 1;
+        `);
+
+      if (check.recordset.length === 0) {
+        throw UnauthorizedError('Token inválido o expirado.');
+      }
+
+      // 1) Invalidar tokens anteriores (incluye el tokenAnterior)
+      await transaction.request()
         .input('usuarioId', sql.Int, usuarioId)
         .input('plataformaId', sql.Int, plataformaId)
         .query(`
           UPDATE TOKENS_ACTIVOS
           SET VALIDO = 0
-          WHERE USUARIO_ID = @usuarioId AND PLATAFORMA_ID = @plataformaId AND VALIDO = 1;
+          WHERE USUARIO_ID = @usuarioId
+            AND PLATAFORMA_ID = @plataformaId
+            AND VALIDO = 1;
         `);
 
-      // 2. Marcar cierre en historial para el token anterior
-      const cerrarHistorialReq = transaction.request();
-      await cerrarHistorialReq
-        .input('tokenAnterior', sql.NVarChar, tokenAnterior)
-        .input('fechaCierre', sql.DateTime, nowSantiago.toDate())
+      // 2) Cerrar historial del token anterior (usa string SQL-121 para mantener hora local)
+      await transaction.request()
+        .input('tokenAnterior', sql.NVarChar(sql.MAX), tokenAnterior)
+        .input('fechaCierre', sql.VarChar(23), fechaCierre)
         .query(`
           UPDATE HISTORIAL_SESIONES
           SET FECHA_CIERRE = @fechaCierre,
@@ -264,45 +293,41 @@ const renovarSesion = async (req, res) => {
           WHERE TOKEN = @tokenAnterior;
         `);
 
-      // 3. Generar nuevo token
+      // 3) Generar nuevo token (3h)
       const nuevoPayload = { usuarioId, correo, plataformaId };
       const nuevoToken = jwt.sign(nuevoPayload, process.env.JWT_SECRET, { expiresIn: '3h' });
 
-      // 4. Insertar nuevo token en TOKENS_ACTIVOS
-      const insertarTokenReq = transaction.request();
-      await insertarTokenReq
+      // 4) Insertar nuevo token en TOKENS_ACTIVOS (fechas como strings locales)
+      await transaction.request()
         .input('UsuarioID', sql.Int, usuarioId)
         .input('PlataformaID', sql.Int, plataformaId)
-        .input('Token', sql.NVarChar, nuevoToken)
+        .input('Token', sql.NVarChar(sql.MAX), nuevoToken)
         .input('Valido', sql.Bit, 1)
         .input('IP', sql.NVarChar(50), req.ip ?? null)
-        .input('Dispositivo', sql.NVarChar(100), req.headers['user-agent'] ?? null)
-        .input('FechaCreacion', sql.DateTime, nowSantiago.toDate())
-        .input('FechaExpiracion', sql.DateTime, expiracionSantiago.toDate())
+        .input('FechaCreacion', sql.VarChar(23), fechaCreacion)
+        .input('FechaExpiracion', sql.VarChar(23), fechaExpiracion)
         .query(`
           INSERT INTO TOKENS_ACTIVOS (
-            USUARIO_ID, PLATAFORMA_ID, TOKEN, VALIDO, IP, DISPOSITIVO, FECHA_CREACION, FECHA_EXPIRACION
+            USUARIO_ID, PLATAFORMA_ID, TOKEN, VALIDO, IP, FECHA_CREACION, FECHA_EXPIRACION
           )
           VALUES (
-            @UsuarioID, @PlataformaID, @Token, @Valido, @IP, @Dispositivo, @FechaCreacion, @FechaExpiracion
+            @UsuarioID, @PlataformaID, @Token, @Valido, @IP, @FechaCreacion, @FechaExpiracion
           );
         `);
 
-      // 5. Registrar en HISTORIAL_SESIONES
-      const historialReq = transaction.request();
-      await historialReq
+      // 5) Registrar en HISTORIAL_SESIONES (también con string local)
+      await transaction.request()
         .input('UsuarioID', sql.Int, usuarioId)
         .input('PlataformaID', sql.Int, plataformaId)
-        .input('FechaInicio', sql.DateTime, nowSantiago.toDate())
-        .input('Token', sql.NVarChar, nuevoToken)
+        .input('FechaInicio', sql.VarChar(23), fechaInicio)
+        .input('Token', sql.NVarChar(sql.MAX), nuevoToken)
         .input('IP', sql.NVarChar(50), req.ip ?? null)
-        .input('Dispositivo', sql.NVarChar(100), req.headers['user-agent'] ?? null)
         .query(`
           INSERT INTO HISTORIAL_SESIONES (
-            USUARIO_ID, PLATAFORMA_ID, FECHA_INICIO, TOKEN, IP, DISPOSITIVO
+            USUARIO_ID, PLATAFORMA_ID, FECHA_INICIO, TOKEN, IP
           )
           VALUES (
-            @UsuarioID, @PlataformaID, @FechaInicio, @Token, @IP, @Dispositivo
+            @UsuarioID, @PlataformaID, @FechaInicio, @Token, @IP
           );
         `);
 
@@ -310,16 +335,20 @@ const renovarSesion = async (req, res) => {
 
       return res.status(200).json({
         message: 'Sesión renovada correctamente.',
-        token: nuevoToken,
-        expiracion: expiracionSantiago.toISOString()
+        token: nuevoToken
       });
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
+    } catch (txErr) {
+      if (txBegun) {
+        try {
+          await transaction.rollback();
+        } catch (rbErr) {
+          console.error('Error al hacer rollback:', rbErr);
+        }
+      }
+      throw txErr;
     }
-  } catch (error) {
-    console.error('Error al renovar sesión:', error);
-    return res.status(500).json({ error: 'Error al renovar sesión.' });
+  } catch (err) {
+    return sendError(res, err);
   }
 };
 
