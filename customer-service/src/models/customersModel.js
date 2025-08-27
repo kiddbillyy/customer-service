@@ -56,6 +56,7 @@ export async function createCustomer(payload) {
     .input('FirstName', sql.NVarChar(100), payload.firstName)
     .input('LastName', sql.NVarChar(100), payload.lastName)
     .input('Email', sql.NVarChar(255), payload.email)
+    .input('Notes', sql.NVarChar(254), payload.notes ?? null)
     .input('Phone', sql.NVarChar(40), payload.phone ?? null)
     .input('Address', sql.NVarChar(255), payload.address ?? null)
     .input('City', sql.NVarChar(100), payload.city ?? null)
@@ -74,14 +75,13 @@ export async function createCustomer(payload) {
     .input('UpdatedAt', sql.DateTime2(3), now)
     .query(`
       INSERT INTO dbo.Customers
-      (Id, PartnerType, RUT, FirstName, LastName, Email, Phone, Address, City, Region, Country,
-       GroupCode, GroupNum, ListNum, Currency, CreditLimit, DiscountPercent,
-       DefaultBillToCode, DefaultShipToCode, DefaultContactCode,
-       CreatedAt, UpdatedAt)
-      VALUES (@Id,@PartnerType,@RUT,@FirstName,@LastName,@Email,@Phone,@Address,@City,@Region,@Country,
-              @GroupCode,@GroupNum,@ListNum,@Currency,@CreditLimit,@DiscountPercent,
-              @DefaultBillToCode,@DefaultShipToCode,@DefaultContactCode,
-              @CreatedAt,@UpdatedAt);
+  (Id, PartnerType, RUT, FirstName, LastName, Email, Notes, Phone, Address, City, Region, Country,
+   GroupCode, GroupNum, ListNum, Currency, CreditLimit, DiscountPercent,
+   DefaultBillToCode, DefaultShipToCode, DefaultContactCode, CreatedAt, UpdatedAt)
+VALUES
+  (@Id,@PartnerType,@RUT,@FirstName,@LastName,@Email,@Notes,@Phone,@Address,@City,@Region,@Country,
+   @GroupCode,@GroupNum,@ListNum,@Currency,@CreditLimit,@DiscountPercent,
+   @DefaultBillToCode,@DefaultShipToCode,@DefaultContactCode,@CreatedAt,@UpdatedAt);
     `);
   return await getCustomer(payload.id);
 }
@@ -97,6 +97,7 @@ export async function updateCustomer(id, patch) {
     firstName: ['FirstName', sql.NVarChar(100)],
     lastName: ['LastName', sql.NVarChar(100)],
     email: ['Email', sql.NVarChar(255)],
+    notes: ['Notes', sql.NVarChar(255)],
     phone: ['Phone', sql.NVarChar(40)],
     address: ['Address', sql.NVarChar(255)],
     city: ['City', sql.NVarChar(100)],

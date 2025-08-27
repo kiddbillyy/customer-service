@@ -56,7 +56,8 @@ const customerBase = z.object({
   address: z.string().max(255).optional().nullable(),
   city: z.string().max(100).optional().nullable(),
   region: z.string().max(100).optional().nullable(),
-  country: z.string().max(100).optional().nullable(),
+  country: z.string().max(3).optional().nullable(),
+  notes: z.string().max(255).optional().nullable(),
   groupCode: z.number().int().optional().nullable(),
   groupNum: z.number().int().optional().nullable(),
   listNum: z.number().int().optional().nullable(),
@@ -145,6 +146,28 @@ const normalizeContact = (raw) => {
   }
   return raw;
 };
+
+export const addressesWithBillTo = addressesCreate.refine(
+  arr => arr.some(a => a.addressType === 'B'),
+  { message: 'Se requiere al menos una dirección de facturación (addressType="B")' }
+);
+
+// 🚑 CORRECTO: extender el *OBJETO BASE*, NO el effects
+export const customerCreateWithAddrs = customerBase
+  .extend({
+    // si no quieres forzar B, puedes usar: addresses: addressesCreate.optional()
+    addresses: addressesWithBillTo.optional()
+  })
+  .superRefine((v, ctx) => {
+    const expected = `${v.rut.split('-')[0]}${v.partnerType}`;
+    if (v.id !== expected) {
+      ctx.addIssue({
+        path: ['id'],
+        code: z.ZodIssueCode.custom,
+        message: `id debe ser ${expected} (cuerpo RUT + 'C'/'P')`
+      });
+    }
+  });
 
 // --- schema de 1 contacto (upsert) ---
 export const contactUpsert = z.preprocess(
