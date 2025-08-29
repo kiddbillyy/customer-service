@@ -18,8 +18,6 @@ async function createHoliday(req, res) {
         console.error('Kafka publish holiday.created failed:', e);
       }
     })();
-
-    
     
     return res.status(201).json({ id: String(out.id), message: 'Holiday creada.' });
   } catch (err) {
