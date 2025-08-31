@@ -1,9 +1,9 @@
-# 📄 PEDIDO RECIBIDO
+### 📄 PEDIDO RECIBIDO
 Origen del pedido:
  * Retail Pro (bajo demanda, con número de folio)
  * SAP (carga automática cada 10 minutos)
    Estado inicial: Pedido Recibido (estado = 1)
-# 🙋 ASIGNACIÓN A PICKERS
+### 🙋 ASIGNACIÓN A PICKERS
  * Un usuario con rol ASIGNER revisa qué pedidos necesitan ser surtidos y asigna productos a los pickers.
  * Condiciones para asignar:
    * El pedido existe y está en Pedido Recibido.
@@ -13,7 +13,7 @@ Origen del pedido:
  * Resultado:
    * Se cambia a un estado de “Asignación de Picking”.
    * Queda listo para que el picker comience la búsqueda.
-# 🏷️ PROCESO DE PICKING
+### 🏷️ PROCESO DE PICKING
 El picker ve qué productos le asignaron y procede a localizarlos:
  * Ver productos y buscar stock: El picker localiza físicamente los productos requeridos.
  * Asignar a bultos: El picker decide cómo agrupar productos en bultos o contenedores. Registra cantidades efectivamente encontradas.
@@ -24,7 +24,7 @@ El picker ve qué productos le asignaron y procede a localizarlos:
  * Estados resultantes:
    * Picking Completo (si todo se encontró).
    * Picking Incompleto (si hubo faltantes).
-# 🔎 AUDITORÍA
+### 🔎 AUDITORÍA
 En este paso entra el rol Auditor, quien revisa los pedidos en Picking Completo o Picking Incompleto:
  * Revisión de productos y cantidades: El auditor verifica que lo reportado por el picker coincida con el pedido original. Revisa bultos, documentación, cantidades y posibles errores.
  * ¿Hay faltantes?
@@ -33,22 +33,22 @@ En este paso entra el rol Auditor, quien revisa los pedidos en Picking Completo 
      * 📆 Reabastecer / Backorder: Dejar la línea en un estado “Pendiente de Reabastecer”. Se podría esperar a nuevo stock o coordinar con compras.
      * 📦 Envío Parcial: Se hace el embarque con lo disponible. La parte faltante se cancela o se pasa a backorder.
      * ❌ Cancelación Parcial o Total: Si el cliente no quiere espera o no hay más stock, se cancela esa parte o todo el pedido. El auditor actualiza las cantidades canceladas en el sistema.
-# Estados resultantes:
+### Estados resultantes:
    * Pedido Aprobado para Empaque (todo surtido o se asume parcial confirmado).
    * Pedido Pendiente de Reabastecer (si el auditor elige esperar stock).
    * Pedido Cancelado Parcial/Total (si el auditor decide no surtir).
-# 📦 EMPAQUE
+### 📦 EMPAQUE
 Se procede a embalar los productos según las directrices del auditor y la naturaleza del pedido. Si había faltantes pero el auditor aprobó “envío parcial”, se empacan solo los productos disponibles.
 Resultado: El pedido queda listo para despacho.
-# 🚚 DESPACHO / ENVÍO
+### 🚚 DESPACHO / ENVÍO
 Se genera la guía de transporte o el documento de salida. Se hace el embarque físico de la mercancía.
-# ✅ CIERRE DE PEDIDO
+### ✅ CIERRE DE PEDIDO
 Tras el envío (o la decisión de cancelación), el pedido pasa a Cerrado. Se registran las cantidades definitivas enviadas y/o canceladas.
 El sistema puede:
  * Notificar al cliente.
  * Actualizar el estado en SAP o Retail Pro.
    Estado final: Pedido Cerrado / Completado.m
-# FLUJO
+### FLUJO
 
     |
     v 🙋 ASIGNACIÓN A PICKERS
