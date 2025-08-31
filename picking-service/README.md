@@ -1,5 +1,5 @@
 # 📄 PEDIDO RECIBIDO
-Origen del pedido:
+*Origen del pedido:*
 Retail Pro (bajo demanda, con número de folio).
 SAP (carga automática cada 10 minutos).
 Estado inicial: Pedido Recibido (estado = 1).
