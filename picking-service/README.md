@@ -51,17 +51,14 @@ El sistema puede:
 # FLUJO
 
     |
-    v
-🙋 ASIGNACIÓN A PICKERS
+    v 🙋 ASIGNACIÓN A PICKERS
     |
-    v
-🏷️ PROCESO DE PICKING
+    v 🏷️ PROCESO DE PICKING
     |--- (a) El picker busca productos
     |--- (b) Si encuentra todo -> "Picking Completo"
     |--- (c) Si faltan productos -> "Picking Incompleto"
     |
-    v
-🔎 AUDITORÍA
+    v 🔎 AUDITORÍA
     |--- (a) Verifica cantidades y faltantes
     |--- (b) Si todo coincide -> pasa a Empaque
     |--- (c) Si hay faltantes -> El auditor decide:
@@ -69,12 +66,9 @@ El sistema puede:
             2) 📦 Envío Parcial
             3) ❌ Cancelación Parcial/Total
     |
-    v
-📦 EMPAQUE
+    v 📦 EMPAQUE
     |
-    v
-🚚 DESPACHO / ENVÍO
+    v 🚚 DESPACHO / ENVÍO
     |
-    v
-✅ CIERRE DE PEDIDO
+    v ✅ CIERRE DE PEDIDO
 
