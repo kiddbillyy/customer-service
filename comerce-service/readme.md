@@ -1,4 +1,4 @@
-# 🛒 Commerce Service - Mimbral
+## 🛒 Commerce Service - Mimbral
 
 El **Commerce Service** es un microservicio encargado de la **gestión de entidades comerciales como compañías, tiendas, canales de venta, cuentas, localizaciones y reglas de negocio (geofences, holidays, etc.)**. Forma parte del ecosistema de microservicios de Mimbral y está diseñado para centralizar la administración de información comercial y logística.
 
