@@ -11,3 +11,6 @@ async function vtexIntegrations(req, res) {
 }
 
 module.exports = vtexIntegrations;
+
+
+
