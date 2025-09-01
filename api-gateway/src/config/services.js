@@ -18,10 +18,13 @@ export default {
   // Rutas Microservicio ID SERVICE
 
   idserviceLogin: { path: '/api/idservice/auth/login', target: 'http://id-service:5007' , requireAuth: false, prependBasePath: true },
+  idserviceRecuperar: { path: '/api/idservice/auth/recuperar', target: 'http://id-service:5007', requireAuth: false, prependBasePath: true },
+  idserviceVerificar: { path: '/api/idservice/auth/verificar-otp', target: 'http://id-service:5007', requireAuth: false, prependBasePath: true },
+  idserviceCambiarContrasena: { path: '/api/idservice/auth/cambiar-contrasena', target: 'http://id-service:5007', requireAuth: false, prependBasePath: true },
   idserviceBase: { path: '/api/idservice', target: 'http://id-service:5007', requireAuth: true, prependBasePath: true, requireRbac: false },
-  idserviceRecuperar: { method: 'PATCH', path: '/api/idservice/auth/recuperar', target: 'http://id-service:5007', requireAuth: false, prependBasePath: true },
-  idserviceCambiarContrasena: { method: 'PATCH', path: '/api/idservice/auth/cambiar-contrasena', target: 'http://id-service:5007', requireAuth: false, prependBasePath: true },
   
+  
+
   // Rutas Microservicio Email Service
   email:  { path: '/api/email',  target: 'http://email-service:5008', requireAuth: false },
 
