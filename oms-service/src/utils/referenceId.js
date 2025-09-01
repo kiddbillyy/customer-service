@@ -1,5 +1,5 @@
 // utils/referenceId.js
-const { sql } = require('../config/dbnew');
+const { sql } = require('../config/dbnew')
 
 // Por seguridad, solo permitimos tablas conocidas:
 const ALLOWED_TABLES = new Set(['Company', 'Sales_Channel']);
