@@ -246,8 +246,8 @@ const renovarSesion = async (req, res) => {
     // Fechas en America/Santiago usando tus utils (strings SQL-121)
     const fechaCreacion = toSCLSql121(); // ahora
     const fechaExpiracion = toSCLSql121(
-  DateTime.now().setZone("America/Santiago").plus({ hours: 3 })
-);
+      DateTime.now().setZone("America/Santiago").plus({ hours: 3 })
+    );
 
     const fechaCierre = fechaCreacion; 
     console.log("Fecha de cierre", fechaCierre);

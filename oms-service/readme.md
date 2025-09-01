@@ -1,4 +1,4 @@
-## 🛒 Commerce Service - Mimbral
+# 🛒 Commerce Service - Mimbral
 
 El **Commerce Service** es un microservicio encargado de la **gestión de entidades comerciales como compañías, tiendas, canales de venta, cuentas, localizaciones y reglas de negocio (geofences, holidays, etc.)**. Forma parte del ecosistema de microservicios de Mimbral y está diseñado para centralizar la administración de información comercial y logística.
 
@@ -1875,68 +1875,3 @@ Esto pasa porque los 4 canales ya han sido creados y no se pueden repetir, en el
 }
 ```
 
-## 📡 Eventos Kafka en Commerce Service
-
-El **Commerce Service** publica eventos en **Apache Kafka** cada vez que se crean, actualizan o eliminan entidades relevantes. Estos eventos permiten que otros microservicios del ecosistema Mimbral se mantengan sincronizados y reaccionen en tiempo real a cambios en la información comercial.
-
-A continuación se describen los eventos disponibles:
-
----
-
-### 🏢 `commerce.company.events`
-
-- **Acciones soportadas**: `company.created`, `company.updated`
-- **Contenido**:
-  - `ReferenceId`, `LegalName`, `BusinessName`, `Tax`, `PhoneNumber`, `Email`, `DocumentNumber`, `Status`.
-  - Fechas de creación y modificación (`CreatedAt`, `UpdatedAt`).
-- **Uso**: Informa a otros servicios cuando se **crea o modifica una compañía**. Esto permite mantener consistencia en catálogos, reportes o integraciones externas.
-- **Ejemplo de aplicación**: Notificar a un microservicio de facturación para que habilite a la nueva compañía en su sistema contable.
-
----
-
-### 🛒 `commerce.saleschannel.events`
-
-- **Acciones soportadas**: `saleschannel.created`, `saleschannel.updated`
-- **Contenido**:
-  - `ReferenceId`, `CompanyId`, `Name`, `ExternalDelivery`, `IsActive`.
-  - Fechas de creación y modificación.
-- **Uso**: Se dispara al **crear o actualizar un canal de venta**, para que servicios dependientes (ej. catálogos, órdenes) adapten su comportamiento.
-- **Ejemplo de aplicación**: Un microservicio de pedidos puede activar la lógica de integración hacia un marketplace (como VTEX o Falabella) en cuanto se reciba el evento.
-
----
-
-### 🎌 `commerce.holiday.events`
-
-- **Acciones soportadas**: `holiday.created`, `holiday.updated`
-- **Contenido**:
-  - `ReferenceId`, `Name`, `Day`, `Status`, `Description`, `Target`, `Scope`.
-  - Fechas de creación y modificación.
-- **Uso**: Permite que otros servicios estén al tanto de **feriados y días no laborables** que impactan la logística y planificación de entregas.
-- **Ejemplo de aplicación**: Un microservicio de ruteo puede excluir automáticamente días feriados de la planificación de despachos.
-
----
-
-### 🗺️ `commerce.geofence.events`
-
-- **Acciones soportadas**: `geofence.created`, `geofence.updated`
-- **Contenido**:
-  - `Id`, `Name`, `Description`, `GeographyArea` (en formato WKT), `IsActive`.
-  - Fechas de creación y modificación.
-- **Uso**: Comunica la creación o modificación de **zonas geográficas de cobertura (geofences)**.
-- **Ejemplo de aplicación**: Un servicio de asignación de pedidos puede usar este evento para decidir qué sucursal atiende una orden según la ubicación del cliente.
-
----
-
-### 🔑 Consideraciones Generales
-
-- Todos los eventos incluyen:
-  - `eventId`: identificador único del evento (UUID).
-  - `action`: tipo de acción realizada (ej. `company.created`).
-  - `occurred-at`: fecha y hora del suceso en formato ISO.
-  - `user-id`: usuario responsable de la acción.
-- El envío se realiza con **reintentos y backoff exponencial** para tolerar problemas temporales en el clúster de Kafka.
-- Los mensajes incluyen `headers` estandarizados (`content-type`, `event-source`, etc.) para facilitar trazabilidad.
-
----
-
-✅ De esta forma, **Commerce Service** actúa como **productor de eventos** que propagan cambios clave hacia todo el ecosistema, permitiendo **integración desacoplada y en tiempo real**.
