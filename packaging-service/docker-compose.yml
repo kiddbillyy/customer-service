@@ -1,7 +1,7 @@
 version: '3.8'
 
 networks:
-  orders-service_kafka_network:
+  kafka_network:
     external: true  # 📌 Usa la misma red de `orders-service`
 
 services:
@@ -21,7 +21,7 @@ services:
       KAFKA_BROKER: kafka:9092
       KAFKA_CLIENT_ID: packaging-service
     networks:
-      - orders-service_kafka_network
+      - kafka_network
 
 
       

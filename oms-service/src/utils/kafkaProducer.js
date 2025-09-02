@@ -8,7 +8,7 @@ const connectProducer = async () => {
   if (!producer._isConnected) {
     await producer.connect();
     producer._isConnected = true;
-    console.log(' Kafka Producer conectado (commerce-service)');
+    console.log(' Kafka Producer conectado (oms-service)');
   }
   return producer;
 };

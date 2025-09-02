@@ -86,18 +86,26 @@ const login = async (req, res) => {
       `);
   }
 
+  // Construcción del payload
   const payload = {
     usuarioId: usuario.UsuarioID,
     correo: usuario.CorreoElectronico,
     plataformaId: plataformaId
   };
 
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7h' });
+  //  Duración condicional del token
+  let duracionSegundos;
+  if (usuario.UsuarioID === 4 || usuario.CorreoElectronico === "fpino@mimbral.cl") {
+    duracionSegundos = 60 * 5; // 5 minutos
+  } else {
+    duracionSegundos = 60 * 60 * 7; // 7 horas
+  }
 
+  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: duracionSegundos });
 
-  // Hora de Santiago como string plano para SQL Server
+  // Hora local de Santiago
   const nowSantiago = dayjs().tz('America/Santiago');
-  const expiracionSantiago = nowSantiago.add(7, 'hour');
+  const expiracionSantiago = nowSantiago.add(duracionSegundos, 'second');
 
   const nowFormatted = nowSantiago.format('YYYY-MM-DD HH:mm:ss');
   const expiracionFormatted = expiracionSantiago.format('YYYY-MM-DD HH:mm:ss');

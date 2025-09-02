@@ -1,7 +1,7 @@
 version: "3.8"
 
 networks:
-  orders-service_kafka_network:
+  kafka_network:
     external: true
 
 services:
@@ -23,4 +23,4 @@ services:
       JWT_SECRET: mysupersecretkey
       TZ: America/Santiago
     networks:
-      - orders-service_kafka_network
+      - kafka_network
