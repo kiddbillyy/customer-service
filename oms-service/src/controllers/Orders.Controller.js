@@ -1,5 +1,5 @@
 // controllers/Orders.Controller.js
-const model = require('../models/Orders.Model');
+const model = require('../models/Orders.Models');
 let publishOrderEvent = null;
 try {
   ({ publishOrderEvent } = require('../utils/Kafka/OrdersEvents'));
