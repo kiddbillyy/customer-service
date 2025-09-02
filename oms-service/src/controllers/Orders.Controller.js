@@ -2,7 +2,7 @@
 const model = require('../models/Orders.Models');
 let publishOrderEvent = null;
 try {
-  ({ publishOrderEvent } = require('../utils/Kafka/OrdersEvents'));
+  ({ publishOrderEvent } = require('../utils/Kafka/OrderEvents'));
 } catch { /* opcional */ }
 
 // POST /orders  -> crea nueva orden (409 si ya existe por (salesChannelReferenceId,u_ref1))

@@ -216,10 +216,8 @@ async function createOrderWithItems(body) {
 
     const orderID = ins.recordset[0].orderID;
 
-    // historial inicial
     await insertStatusHistory(tx, { orderID, newStatusID: statusId, previousStatusID: null });
 
-    // items
     const items = Array.isArray(body.items) ? body.items : [];
     const { inserted } = await insertItems(tx, {
       orderID,
