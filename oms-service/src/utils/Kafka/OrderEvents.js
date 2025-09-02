@@ -3,8 +3,8 @@ const { v4: uuidv4 } = require('uuid');
 const { sendBatch } = require('../kafkaProducer');
 const { nowSCLIso } = require('../dates');
 
-const TOPIC = process.env.KAFKA_TOPIC_ORDER || 'commerce.order.events';
-const MAX_ITEMS_IN_PAYLOAD = parseInt(process.env.KAFKA_ORDER_ITEMS_LIMIT || '50', 10);
+const TOPIC = process.env.KAFKA_TOPIC_ORDER;
+const MAX_ITEMS_IN_PAYLOAD = parseInt(process.env.KAFKA_ORDER_ITEMS_LIMIT, 10);
 
 function ensureHeaders(obj = {}) {
   const out = {};
