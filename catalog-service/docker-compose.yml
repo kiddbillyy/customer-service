@@ -1,7 +1,7 @@
 version: '3.8'
 
 networks:
-  orders-service_kafka_network:
+  kafka_network:
     external: true
 
 services:
@@ -36,5 +36,5 @@ services:
       SAP_USERNAME: ${SAP_USERNAME}
       SAP_PASSWORD: ${SAP_PASSWORD}
     networks:
-      - orders-service_kafka_network
+      - kafka_network
 
