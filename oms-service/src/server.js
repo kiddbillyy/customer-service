@@ -13,7 +13,7 @@ app.use(express.json());
 
 app.use('/api/oms-service', apiRoutes);
 
-const PORT = process.env.PORT || 5009;
+const PORT = process.env.PORT || 5010;
 
 app.listen(PORT, async () => {
   await connectProducer(); 
