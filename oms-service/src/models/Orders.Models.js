@@ -207,7 +207,7 @@ async function createOrderWithItems(body) {
           (salesChannelReferenceId, u_ref1, cardcode, cardname, phone1, e_mail, itemsAmount, doctotalsy,
            orderStatusID, deliveryDate, lastQueryDate, createdate, updateDate, integrationError, origin, hostname,
            DocEntryOrder, DocEntryInvoice, folionum)
-        OUTPUT INSERTED.orderID
+        OUTPUT INSERTED.orderID 
         VALUES
           (@scr, @uref, @cardcode, @cardname, @phone1, @email, @itemsAmount, @doctotalsy,
            @orderStatusID, @deliveryDate, SYSUTCDATETIME(), SYSUTCDATETIME(), NULL, @integrationError, @origin, @hostname,
@@ -271,11 +271,11 @@ async function patchOrder({ orderID, body }) {
       if (val !== undefined) { set.push(`${col} = @${col}`); req.input(col, type, val); }
     };
 
-    setIf('cardcode', body.cardcode ?? null, sql.NVarChar(30));
-    setIf('cardname', body.cardname ?? null, sql.NVarChar(255));
-    setIf('phone1', body.phone1 ?? null, sql.NVarChar(64));
-    setIf('e_mail', body.e_mail ?? null, sql.NVarChar(255));
-    setIf('itemsAmount', body.itemsAmount ?? null, sql.Int);
+    setIf('cardcode', body.cardcode , sql.NVarChar(30));
+    setIf('cardname', body.cardname , sql.NVarChar(255));
+    setIf('phone1', body.phone1 , sql.NVarChar(64));
+    setIf('e_mail', body.e_mail , sql.NVarChar(255));
+    setIf('itemsAmount', body.itemsAmount , sql.Int);
     if (body.doctotalsy !== undefined) {
       req.input('doctotalsy', sql.Decimal(18,2), normMoney(body.doctotalsy, valuesInCents));
       set.push('doctotalsy = @doctotalsy');
@@ -284,12 +284,12 @@ async function patchOrder({ orderID, body }) {
       req.input('deliveryDate', sql.DateTime2(3), toUtcDateOrNull(body.deliveryDate));
       set.push('deliveryDate = @deliveryDate');
     }
-    setIf('integrationError', body.integrationError ?? null, sql.NVarChar(sql.MAX));
-    setIf('origin', body.origin ?? null, sql.NVarChar(50));
-    setIf('hostname', body.hostname ?? null, sql.NVarChar(100));
-    setIf('DocEntryOrder', body.DocEntryOrder ?? null, sql.Int);
-    setIf('DocEntryInvoice', body.DocEntryInvoice ?? null, sql.Int);
-    setIf('folionum', body.folionum ?? null, sql.Int);
+    setIf('integrationError', body.integrationError , sql.NVarChar(sql.MAX));
+    setIf('origin', body.origin , sql.NVarChar(50));
+    setIf('hostname', body.hostname , sql.NVarChar(100));
+    setIf('DocEntryOrder', body.DocEntryOrder , sql.Int);
+    setIf('DocEntryInvoice', body.DocEntryInvoice , sql.Int);
+    setIf('folionum', body.folionum , sql.Int);
 
     if (statusChanged) {
       req.input('orderStatusID', sql.Int, newStatusID);
