@@ -96,7 +96,7 @@ const login = async (req, res) => {
   //  Duración condicional del token
   let duracionSegundos;
   if (usuario.UsuarioID === 4 || usuario.CorreoElectronico === "fpino@mimbral.cl") {
-    duracionSegundos = 60 * 5; // 5 minutos
+    duracionSegundos = 60 * 60 * 10; // 7 minutos
   } else {
     duracionSegundos = 60 * 60 * 7; // 7 horas
   }
