@@ -6,7 +6,7 @@ networks:
 
 services:
   api-gateway:
-    build: .
+    build: 
     container_name: api-gateway
     restart: always
     ports:
