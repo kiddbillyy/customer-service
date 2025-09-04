@@ -16,7 +16,7 @@ async function createOrder(req, res) {
         if (publishOrderEvent) {
           await publishOrderEvent({
             action: 'order.created',
-            order: /* { orderID: out.orderID, itemsInserted: out.itemsInserted } */out,
+            order: { orderID: out.orderID, itemsInserted: out.itemsInserted },
             userId: user,
           });
         }
