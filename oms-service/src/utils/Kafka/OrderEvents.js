@@ -41,10 +41,6 @@ function pickOrderFields(o = {}) {
     OrderID:                 pick(o, 'orderID', 'OrderID', 'id', 'Id'),
     SalesChannelReferenceId: pick(o, 'salesChannelReferenceId', 'SalesChannelReferenceId'),
     URef1:                   pick(o, 'u_ref1', 'URef1', 'uRef1', 'orderId', 'OrderId'),
-    Cardcode:                pick(o, 'cardcode', 'Cardcode'),
-    Cardname:                pick(o, 'cardname', 'Cardname'),
-    Phone1:                  pick(o, 'phone1', 'Phone1'),
-    Email:                   pick(o, 'e_mail', 'email', 'Email'),
     ItemsAmount:             pick(o, 'itemsAmount', 'ItemsAmount'),
     DocTotalSy:              pick(o, 'doctotalsy', 'DocTotalSy', 'docTotalSy', 'total'),
     OrderStatusID:           pick(o, 'orderStatusID', 'OrderStatusID'),
@@ -58,8 +54,34 @@ function pickOrderFields(o = {}) {
     DocEntryInvoice:         pick(o, 'DocEntryInvoice', 'docEntryInvoice'),
     FolioNum:                pick(o, 'folionum', 'FolioNum'),
     IntegrationError:        pick(o, 'integrationError', 'IntegrationError'),
+    ShippingEstimate:        pick(o, 'shippingEstimate', 'ShippingEstimate'),
+    DeliveryCompany:         pick(o, 'deliveryCompany', 'DeliveryCompany'),
   };
 }
+function pickOrderFillments(o = {}) {
+  return {
+    FirstName:        pick(o, 'firstName', 'FirstName'),
+    LastName:         pick(o, 'lastName', 'LastName'),
+    Email:            pick(o, 'email', 'Email'),
+    Phone:            pick(o, 'phone', 'Phone'),
+    IsCorporate:      pick(o, 'isCorporate', 'IsCorporate'),
+    CurrencyCode:     pick(o, 'currencyCode', 'CurrencyCode'),
+    DocumentType:     pick(o, 'documentType', 'DocumentType'),
+    Document:         pick(o, 'document', 'Document'),
+    AddressType:      pick(o, 'addressType', 'AddressType'),
+    ReceiverName:     pick(o, 'receiverName', 'ReceiverName'),
+    Street:           pick(o, 'street', 'Street'),
+    Number:           pick(o, 'number', 'Number'),
+    Neighborhood:     pick(o, 'neighborhood', 'Neighborhood'),
+    City:             pick(o, 'city', 'City'),
+    State:            pick(o, 'state', 'State'),
+    Country:          pick(o, 'country', 'Country'),
+    PostalCode:       pick(o, 'postalCode', 'PostalCode'),
+    ReferenceAddress: pick(o, 'referenceAddress', 'ReferenceAddress'),
+    Notes:            pick(o, 'notes', 'Notes'),
+  };
+}
+
 
 // --------- publisher ----------
 async function publishOrderEvent({ action, order = {}, userId }) {
@@ -80,10 +102,27 @@ async function publishOrderEvent({ action, order = {}, userId }) {
     ReplaceItems:   pick(order, 'replaceItems', 'ReplaceItems'),
   };
 
+  // ---- Items (con límite) ----
   let Items = undefined;
   const rawItems = pick(order, 'items', 'Items');
   if (Array.isArray(rawItems) && rawItems.length) {
     Items = rawItems.slice(0, MAX_ITEMS_IN_PAYLOAD).map(pickItemFields);
+  }
+
+  
+  let Fulfillment = undefined;
+  let Fulfillments = undefined;
+  let FulfillmentsCount = undefined;
+
+  const rawFulfillment =
+    pick(order, 'fulfillment', 'Fulfillment', 'shippingAddress', 'ShippingAddress');
+
+  if (Array.isArray(rawFulfillment) && rawFulfillment.length) {
+    Fulfillments = rawFulfillment.map(pickOrderFillments);
+    FulfillmentsCount = rawFulfillment.length;
+  } else if (rawFulfillment && typeof rawFulfillment === 'object') {
+    Fulfillment = pickOrderFillments(rawFulfillment);
+    FulfillmentsCount = 1;
   }
 
   const payload = {
@@ -92,7 +131,11 @@ async function publishOrderEvent({ action, order = {}, userId }) {
     occurredAt,
     ...fields,
     ...meta,
-    ...(Items ? { Items, ItemsCount: rawItems.length } : { ItemsCount: pick(order, 'itemsAmount', 'ItemsAmount') }),
+    ...(Items
+      ? { Items, ItemsCount: rawItems.length }
+      : { ItemsCount: pick(order, 'itemsAmount', 'ItemsAmount') }),
+    ...(Fulfillment ? { Fulfillment } : {}),
+    ...(Fulfillments ? { Fulfillments, FulfillmentsCount } : {}),
   };
 
   await sendBatch(TOPIC, [

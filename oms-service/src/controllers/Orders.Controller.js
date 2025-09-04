@@ -11,16 +11,24 @@ async function createOrder(req, res) {
     const user = req.body?.user || 'API';
     const out = await model.createOrderWithItems(req.body);
 
+    const orderPayload = {
+      ...out,
+      fulfillment: req.body?.fulfillment ?? out?.fulfillment ?? out?.Fulfillment,
+      items: Array.isArray(req.body?.items) ? req.body.items : (out?.items || out?.Items)
+    };
+
     (async () => {
       try {
         if (publishOrderEvent) {
           await publishOrderEvent({
             action: 'order.created',
-            order: /* { orderID: out.orderID, itemsInserted: out.itemsInserted } */out,
+            order: orderPayload,
             userId: user,
           });
         }
-      } catch (e) { console.error('Kafka publish order.created failed:', e); }
+      } catch (e) {
+        console.error('Kafka publish order.created failed:', e);
+      }
     })();
 
     return res.status(201).json({
@@ -40,6 +48,7 @@ async function createOrder(req, res) {
     return res.status(map[err.message] || 500).json({ message: err.message || 'Error al crear la orden.' });
   }
 }
+
 
 // PATCH /orders/:id  -> actualiza parcial (header/estado/items)
 async function patchOrder(req, res) {
