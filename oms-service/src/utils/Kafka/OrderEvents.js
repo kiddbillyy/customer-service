@@ -4,7 +4,11 @@ const { sendBatch } = require('../kafkaProducer');
 const { nowSCLIso } = require('../dates');
 
 const TOPIC = process.env.KAFKA_TOPIC_ORDER;
-const MAX_ITEMS_IN_PAYLOAD = parseInt(process.env.KAFKA_ORDER_ITEMS_LIMIT, 10);
+const TOPIC_CUSTOMER = process.env.KAFKA_TOPIC_CUSTOMER_VALIDATE || 'customer.validations';
+
+// Default seguro si la env no está o es inválida
+const _RAW_MAX = parseInt(process.env.KAFKA_ORDER_ITEMS_LIMIT, 10);
+const MAX_ITEMS_IN_PAYLOAD = Number.isFinite(_RAW_MAX) ? _RAW_MAX : 100;
 
 function ensureHeaders(obj = {}) {
   const out = {};
@@ -36,6 +40,7 @@ function pickItemFields(i = {}) {
     CategoryPathNames:pick(i, 'categoryPathNames', 'CategoryPathNames'),
   };
 }
+
 function pickOrderFields(o = {}) {
   return {
     OrderID:                 pick(o, 'orderID', 'OrderID', 'id', 'Id'),
@@ -58,6 +63,15 @@ function pickOrderFields(o = {}) {
     DeliveryCompany:         pick(o, 'deliveryCompany', 'DeliveryCompany'),
   };
 }
+
+function pickOrderKeys(o = {}) {
+  return {
+    OrderID:                 pick(o, 'orderID', 'OrderID', 'id', 'Id'),
+    SalesChannelReferenceId: pick(o, 'salesChannelReferenceId', 'SalesChannelReferenceId'),
+    URef1:                   pick(o, 'u_ref1', 'URef1', 'uRef1', 'orderId', 'OrderId'),
+  };
+}
+
 function pickOrderFillments(o = {}) {
   return {
     FirstName:        pick(o, 'firstName', 'FirstName'),
@@ -82,8 +96,7 @@ function pickOrderFillments(o = {}) {
   };
 }
 
-
-// --------- publisher ----------
+// --------- publisher: ORDER events ----------
 async function publishOrderEvent({ action, order = {}, userId }) {
   const eventId = uuidv4();
   const occurredAt = nowSCLIso();
@@ -109,7 +122,7 @@ async function publishOrderEvent({ action, order = {}, userId }) {
     Items = rawItems.slice(0, MAX_ITEMS_IN_PAYLOAD).map(pickItemFields);
   }
 
-  
+  // ---- Fulfillment ----
   let Fulfillment = undefined;
   let Fulfillments = undefined;
   let FulfillmentsCount = undefined;
@@ -126,6 +139,7 @@ async function publishOrderEvent({ action, order = {}, userId }) {
   }
 
   const payload = {
+    schemaVersion: 1,
     eventId,
     action,
     occurredAt,
@@ -148,9 +162,56 @@ async function publishOrderEvent({ action, order = {}, userId }) {
         'content-type': 'application/json',
         'occurred-at': occurredAt,
         'user-id': userId ?? '',
+        'source-ms': 'orders',
       }),
     },
   ]);
 }
 
-module.exports = { publishOrderEvent };
+// --------- publisher: CUSTOMER validation ----------
+async function publishValidCustomerEvent({ order = {}, userId }) {
+  const eventId = uuidv4();
+  const occurredAt = nowSCLIso();
+
+  const { OrderID, SalesChannelReferenceId, URef1 } = pickOrderKeys(order);
+
+  const rawFulfillment =
+    pick(order, 'fulfillment', 'Fulfillment', 'shippingAddress', 'ShippingAddress');
+
+  // key estable: document || email || SCR:URef1 || OrderID || eventId
+  const f = rawFulfillment || {};
+  const key =
+    (f.document || f.Document) ||
+    (f.email || f.Email) ||
+    (SalesChannelReferenceId && URef1 && `${SalesChannelReferenceId}:${URef1}`) ||
+    (OrderID != null && String(OrderID)) ||
+    eventId;
+
+  const payload = {
+    schemaVersion: 1,
+    eventId,
+    action: 'valid-customer',
+    occurredAt,
+    OrderID,
+    SalesChannelReferenceId,
+    URef1,
+    Fulfillment: rawFulfillment ? pickOrderFillments(rawFulfillment) : undefined,
+  };
+
+  await sendBatch(TOPIC_CUSTOMER, [
+    {
+      key: String(key),
+      value: JSON.stringify(payload),
+      headers: ensureHeaders({
+        action: 'valid-customer',
+        eventId,
+        'content-type': 'application/json',
+        'occurred-at': occurredAt,
+        'user-id': userId ?? '',
+        'source-ms': 'orders',
+      }),
+    },
+  ]);
+}
+
+module.exports = { publishOrderEvent, publishValidCustomerEvent};
