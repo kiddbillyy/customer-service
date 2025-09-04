@@ -100,6 +100,45 @@ async function insertItems(tx, { orderID, items = [], valuesInCents = true }) {
   }
   return { inserted };
 }
+const toBit = (v) => {
+  if (v == null) return null;
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  const s = String(v).trim().toLowerCase();
+  return (s === '1' || s === 'true' || s === 'sí' || s === 'si' || s === 'y') ? 1 : 0;
+};
+
+async function insertOrderFulfillment(tx, orderID, f = {}) {
+  await new sql.Request(tx)
+    .input('orderID',         sql.Int,           orderID)
+    .input('firstName',       sql.NVarChar(150), f.firstName ?? null)
+    .input('lastName',        sql.NVarChar(150), f.lastName ?? null)
+    .input('email',           sql.NVarChar(254), f.email ?? null)
+    .input('currencyCode',    sql.Char(3),       f.currencyCode ? String(f.currencyCode).toUpperCase() : null)
+    .input('documentType',    sql.VarChar(20),   f.documentType ?? null)
+    .input('document',        sql.NVarChar(40),  f.document ?? null)
+    .input('phone',           sql.NVarChar(30),  f.phone ?? null)
+    .input('isCorporate',     sql.Bit,           toBit(f.isCorporate))
+    .input('notes',           sql.NVarChar(400), f.notes ?? null)
+    .input('addressType',     sql.VarChar(30),   f.addressType ?? null) // 'delivery' | 'store' | 'pickup'
+    .input('receiverName',    sql.NVarChar(150), f.receiverName ?? null)
+    .input('postalCode',      sql.NVarChar(20),  f.postalCode ?? null)
+    .input('city',            sql.NVarChar(100), f.city ?? null)
+    .input('country',         sql.Char(2),       f.country ? String(f.country).toUpperCase() : null)
+    .input('state',           sql.NVarChar(100), f.state ?? null)
+    .input('street',          sql.NVarChar(200), f.street ?? null)
+    .input('number',          sql.NVarChar(20),  f.number ?? null)
+    .input('neighborhood',    sql.NVarChar(100), f.neighborhood ?? null)
+    .input('referenceAddress',sql.NVarChar(400), f.referenceAddress ?? null)
+    .query(`
+      INSERT INTO dbo.order_fulfillment (
+        orderID, firstName, lastName, email, currencyCode, documentType, [document], phone, isCorporate,
+        notes, addressType, receiverName, postalCode, city, country, [state], street, [number], neighborhood, referenceAddress
+      ) VALUES (
+        @orderID, @firstName, @lastName, @email, @currencyCode, @documentType, @document, @phone, @isCorporate,
+        @notes, @addressType, @receiverName, @postalCode, @city, @country, @state, @street, @number, @neighborhood, @referenceAddress
+      );
+    `);
+}
 
 async function upsertItems(tx, { orderID, items = [], valuesInCents = true }) {
   if (!Array.isArray(items) || items.length === 0) return { upserted: 0 };
@@ -161,6 +200,77 @@ async function upsertItems(tx, { orderID, items = [], valuesInCents = true }) {
 }
 
 // ---------- CREATE (POST) ----------
+/* async function createOrderWithItems(body) {
+  await IdServicePoolConnect;
+  const tx = new sql.Transaction(IdServicePool);
+  const valuesInCents = body.valuesInCents === false ? false : true;
+
+  if (!body?.salesChannelReferenceId) throw new Error('salesChannelReferenceId es requerido');
+  if (!body?.u_ref1)                   throw new Error('u_ref1 es requerido');
+
+  try {
+    await tx.begin();
+
+    const exists = await new sql.Request(tx)
+      .input('scr',  sql.NVarChar(128), body.salesChannelReferenceId)
+      .input('uref', sql.NVarChar(255), body.u_ref1)
+      .query('SELECT 1 FROM dbo.Orders WHERE salesChannelReferenceId=@scr AND u_ref1=@uref');
+    if (exists.recordset[0]) throw new Error('ORDER_EXISTS');
+
+    const statusId = await getOrCreateStatusId(tx, {
+      orderStatusID:  body.orderStatusID  ?? null,
+      orderStatusCode: body.orderStatusCode ?? null
+    });
+
+    // Insert header (nuevas columnas shippingEstimate / deliveryCompany)
+    const ins = await new sql.Request(tx)
+      .input('scr',             sql.NVarChar(128), body.salesChannelReferenceId)
+      .input('uref',            sql.NVarChar(255), body.u_ref1)
+      .input('itemsAmount',     sql.Int,           body.itemsAmount ?? (Array.isArray(body.items) ? body.items.length : null))
+      .input('doctotalsy',      sql.Decimal(18,2), normMoney(body.doctotalsy, valuesInCents))
+      .input('orderStatusID',   sql.Int,           statusId)
+      .input('deliveryDate',    sql.DateTime2(3),  toUtcDateOrNull(body.deliveryDate))
+      .input('origin',          sql.NVarChar(50),  body.origin ?? null)
+      .input('hostname',        sql.NVarChar(100), body.hostname ?? null)
+      .input('DocEntryOrder',   sql.Int,           body.DocEntryOrder ?? null)
+      .input('DocEntryInvoice', sql.Int,           body.DocEntryInvoice ?? null)
+      .input('folionum',        sql.Int,           body.folionum ?? null)
+      .input('integrationError',sql.NVarChar(sql.MAX), body.integrationError ?? null)
+      .input('shippingEstimate',sql.NVarChar(50),  body.shippingEstimate ?? null)
+      .input('deliveryCompany', sql.NVarChar(100), body.deliveryCompany ?? null)
+      .query(`
+        INSERT INTO dbo.Orders
+          (salesChannelReferenceId, u_ref1, itemsAmount, doctotalsy,
+           orderStatusID, deliveryDate, lastQueryDate, createdate, updateDate,
+           integrationError, origin, hostname, DocEntryOrder, DocEntryInvoice, folionum,
+           shippingEstimate, deliveryCompany)
+        OUTPUT INSERTED.orderID
+        VALUES
+          (@scr, @uref, @itemsAmount, @doctotalsy,
+           @orderStatusID, @deliveryDate, SYSUTCDATETIME(), SYSUTCDATETIME(), NULL,
+           @integrationError, @origin, @hostname, @DocEntryOrder, @DocEntryInvoice, @folionum,
+           @shippingEstimate, @deliveryCompany);
+      `);
+
+    const orderID = ins.recordset[0].orderID;
+
+    await insertStatusHistory(tx, { orderID, newStatusID: statusId, previousStatusID: null });
+
+    const items = Array.isArray(body.items) ? body.items : [];
+    const { inserted } = await insertItems(tx, { orderID, items, valuesInCents });
+
+    await tx.commit();
+    return { orderID, itemsInserted: inserted };
+  } catch (err) {
+    try { await tx.rollback(); } catch {}
+    if (err && (err.number === 2627 || err.number === 2601)) {
+      if ((err.message || '').includes('UQ_OrderItems_Order_ItemIndex')) err = new Error('DUPLICATE_ITEM_INDEX');
+      if ((err.message || '').includes('UQ_Orders_Source_u_ref1'))       err = new Error('ORDER_EXISTS');
+    }
+    throw err;
+  }
+} */
+
 async function createOrderWithItems(body) {
   await IdServicePoolConnect;
   const tx = new sql.Transaction(IdServicePool);
@@ -172,58 +282,59 @@ async function createOrderWithItems(body) {
   try {
     await tx.begin();
 
-    // existe?
     const exists = await new sql.Request(tx)
-      .input('scr', sql.NVarChar(128), body.salesChannelReferenceId)
+      .input('scr',  sql.NVarChar(128), body.salesChannelReferenceId)
       .input('uref', sql.NVarChar(255), body.u_ref1)
       .query('SELECT 1 FROM dbo.Orders WHERE salesChannelReferenceId=@scr AND u_ref1=@uref');
     if (exists.recordset[0]) throw new Error('ORDER_EXISTS');
 
     const statusId = await getOrCreateStatusId(tx, {
-      orderStatusID: body.orderStatusID ?? null,
+      orderStatusID:  body.orderStatusID  ?? null,
       orderStatusCode: body.orderStatusCode ?? null
     });
 
-    // Insert header
+    // Insert header (nuevas columnas shippingEstimate / deliveryCompany)
     const ins = await new sql.Request(tx)
-      .input('scr', sql.NVarChar(128), body.salesChannelReferenceId)
-      .input('uref', sql.NVarChar(255), body.u_ref1)
-      .input('cardcode', sql.NVarChar(30),  body.cardcode ?? null)
-      .input('cardname', sql.NVarChar(255), body.cardname ?? null)
-      .input('phone1', sql.NVarChar(64),    body.phone1 ?? null)
-      .input('email', sql.NVarChar(255),    body.e_mail ?? null)
-      .input('itemsAmount', sql.Int,        body.itemsAmount ?? (Array.isArray(body.items) ? body.items.length : null))
-      .input('doctotalsy', sql.Decimal(18,2), normMoney(body.doctotalsy, valuesInCents))
-      .input('orderStatusID', sql.Int,      statusId)
-      .input('deliveryDate', sql.DateTime2(3), toUtcDateOrNull(body.deliveryDate))
-      .input('origin', sql.NVarChar(50),    body.origin ?? null)
-      .input('hostname', sql.NVarChar(100), body.hostname ?? null)
-      .input('DocEntryOrder', sql.Int,      body.DocEntryOrder ?? null)
-      .input('DocEntryInvoice', sql.Int,    body.DocEntryInvoice ?? null)
-      .input('folionum', sql.Int,           body.folionum ?? null)
-      .input('integrationError', sql.NVarChar(sql.MAX), body.integrationError ?? null)
+      .input('scr',             sql.NVarChar(128), body.salesChannelReferenceId)
+      .input('uref',            sql.NVarChar(255), body.u_ref1)
+      .input('itemsAmount',     sql.Int,           body.itemsAmount ?? (Array.isArray(body.items) ? body.items.length : null))
+      .input('doctotalsy',      sql.Decimal(18,2), normMoney(body.doctotalsy, valuesInCents))
+      .input('orderStatusID',   sql.Int,           statusId)
+      .input('deliveryDate',    sql.DateTime2(3),  toUtcDateOrNull(body.deliveryDate))
+      .input('origin',          sql.NVarChar(50),  body.origin ?? null)
+      .input('hostname',        sql.NVarChar(100), body.hostname ?? null)
+      .input('DocEntryOrder',   sql.Int,           body.DocEntryOrder ?? null)
+      .input('DocEntryInvoice', sql.Int,           body.DocEntryInvoice ?? null)
+      .input('folionum',        sql.Int,           body.folionum ?? null)
+      .input('integrationError',sql.NVarChar(sql.MAX), body.integrationError ?? null)
+      .input('shippingEstimate',sql.NVarChar(50),  body.shippingEstimate ?? null)
+      .input('deliveryCompany', sql.NVarChar(100), body.deliveryCompany ?? null)
       .query(`
         INSERT INTO dbo.Orders
-          (salesChannelReferenceId, u_ref1, cardcode, cardname, phone1, e_mail, itemsAmount, doctotalsy,
-           orderStatusID, deliveryDate, lastQueryDate, createdate, updateDate, integrationError, origin, hostname,
-           DocEntryOrder, DocEntryInvoice, folionum)
-        OUTPUT INSERTED.orderID 
+          (salesChannelReferenceId, u_ref1, itemsAmount, doctotalsy,
+           orderStatusID, deliveryDate, lastQueryDate, createdate, updateDate,
+           integrationError, origin, hostname, DocEntryOrder, DocEntryInvoice, folionum,
+           shippingEstimate, deliveryCompany)
+        OUTPUT INSERTED.orderID
         VALUES
-          (@scr, @uref, @cardcode, @cardname, @phone1, @email, @itemsAmount, @doctotalsy,
-           @orderStatusID, @deliveryDate, SYSUTCDATETIME(), SYSUTCDATETIME(), NULL, @integrationError, @origin, @hostname,
-           @DocEntryOrder, @DocEntryInvoice, @folionum);
+          (@scr, @uref, @itemsAmount, @doctotalsy,
+           @orderStatusID, @deliveryDate, SYSUTCDATETIME(), SYSUTCDATETIME(), NULL,
+           @integrationError, @origin, @hostname, @DocEntryOrder, @DocEntryInvoice, @folionum,
+           @shippingEstimate, @deliveryCompany);
       `);
 
     const orderID = ins.recordset[0].orderID;
 
+    // ✅ Insert fulfillment usando el MISMO orderID (si viene en el payload)
+    if (body.fulfillment) {
+      // no exigimos 'mode'; addressType indica el tipo (delivery/store/pickup)
+      await insertOrderFulfillment(tx, orderID, body.fulfillment);
+    }
+
     await insertStatusHistory(tx, { orderID, newStatusID: statusId, previousStatusID: null });
 
     const items = Array.isArray(body.items) ? body.items : [];
-    const { inserted } = await insertItems(tx, {
-      orderID,
-      items,
-      valuesInCents
-    });
+    const { inserted } = await insertItems(tx, { orderID, items, valuesInCents });
 
     await tx.commit();
     return { orderID, itemsInserted: inserted };
@@ -231,7 +342,7 @@ async function createOrderWithItems(body) {
     try { await tx.rollback(); } catch {}
     if (err && (err.number === 2627 || err.number === 2601)) {
       if ((err.message || '').includes('UQ_OrderItems_Order_ItemIndex')) err = new Error('DUPLICATE_ITEM_INDEX');
-      if ((err.message || '').includes('UQ_Orders_Source_u_ref1')) err = new Error('ORDER_EXISTS');
+      if ((err.message || '').includes('UQ_Orders_Source_u_ref1'))       err = new Error('ORDER_EXISTS');
     }
     throw err;
   }
@@ -270,12 +381,8 @@ async function patchOrder({ orderID, body }) {
     const setIf = (col, val, type) => {
       if (val !== undefined) { set.push(`${col} = @${col}`); req.input(col, type, val); }
     };
-
-    setIf('cardcode', body.cardcode , sql.NVarChar(30));
-    setIf('cardname', body.cardname , sql.NVarChar(255));
-    setIf('phone1', body.phone1 , sql.NVarChar(64));
-    setIf('e_mail', body.e_mail , sql.NVarChar(255));
     setIf('itemsAmount', body.itemsAmount , sql.Int);
+
     if (body.doctotalsy !== undefined) {
       req.input('doctotalsy', sql.Decimal(18,2), normMoney(body.doctotalsy, valuesInCents));
       set.push('doctotalsy = @doctotalsy');
@@ -284,12 +391,15 @@ async function patchOrder({ orderID, body }) {
       req.input('deliveryDate', sql.DateTime2(3), toUtcDateOrNull(body.deliveryDate));
       set.push('deliveryDate = @deliveryDate');
     }
+
     setIf('integrationError', body.integrationError , sql.NVarChar(sql.MAX));
     setIf('origin', body.origin , sql.NVarChar(50));
     setIf('hostname', body.hostname , sql.NVarChar(100));
     setIf('DocEntryOrder', body.DocEntryOrder , sql.Int);
     setIf('DocEntryInvoice', body.DocEntryInvoice , sql.Int);
     setIf('folionum', body.folionum , sql.Int);
+    setIf('shippingEstimate', body.shippingEstimate , sql.NVarChar(50));
+    setIf('deliveryCompany',  body.deliveryCompany  , sql.NVarChar(100));
 
     if (statusChanged) {
       req.input('orderStatusID', sql.Int, newStatusID);
@@ -341,6 +451,7 @@ async function patchOrder({ orderID, body }) {
     throw err;
   }
 }
+
 
 module.exports = {
   createOrderWithItems,
