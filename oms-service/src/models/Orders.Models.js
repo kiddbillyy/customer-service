@@ -140,6 +140,50 @@ async function insertOrderFulfillment(tx, orderID, f = {}) {
     `);
 }
 
+async function updateOrderFulfillmentPartial(tx, orderID, f = {}) {
+  // Si no vino nada para actualizar, no hacemos nada
+  if (!f || typeof f !== 'object') return { updated: 0 };
+
+  const req = new sql.Request(tx).input('orderID', sql.Int, orderID);
+  const set = [];
+
+  const setIf = (col, val, type, transform = (x) => x) => {
+    if (val !== undefined) {
+      set.push(`${col} = @${col}`);
+      req.input(col, type, transform(val));
+    }
+  };
+  setIf('firstName',        f.firstName,        sql.NVarChar(150));
+  setIf('lastName',         f.lastName,         sql.NVarChar(150));
+  setIf('email',            f.email,            sql.NVarChar(254));
+  setIf('currencyCode',     f.currencyCode,     sql.Char(3),   (v) => v ? String(v).toUpperCase() : null);
+  setIf('documentType',     f.documentType,     sql.VarChar(20));
+  setIf('document',         f.document,         sql.NVarChar(40));
+  setIf('phone',            f.phone,            sql.NVarChar(30));
+  if (f.isCorporate !== undefined) {
+    set.push('isCorporate = @isCorporate');
+    req.input('isCorporate', sql.Bit, toBit(f.isCorporate));
+  }
+  setIf('notes',            f.notes,            sql.NVarChar(400));
+  setIf('addressType',      f.addressType,      sql.VarChar(30));
+  setIf('receiverName',     f.receiverName,     sql.NVarChar(150));
+  setIf('postalCode',       f.postalCode,       sql.NVarChar(20));
+  setIf('city',             f.city,             sql.NVarChar(100));
+  setIf('country',          f.country,          sql.Char(2),   (v) => v ? String(v).toUpperCase() : null);
+  setIf('state',            f.state,            sql.NVarChar(100));
+  setIf('street',           f.street,           sql.NVarChar(200));
+  setIf('[number]',         f.number,           sql.NVarChar(20));         
+  setIf('neighborhood',     f.neighborhood,     sql.NVarChar(100));
+  setIf('referenceAddress', f.referenceAddress, sql.NVarChar(400));
+
+  if (set.length === 0) return { updated: 0 };
+
+  const q = `UPDATE dbo.order_fulfillment SET ${set.join(', ')} WHERE orderID = @orderID;`;
+  const r = await req.query(q);
+  return { updated: r.rowsAffected?.[0] || 0 };
+}
+
+
 async function upsertItems(tx, { orderID, items = [], valuesInCents = true }) {
   if (!Array.isArray(items) || items.length === 0) return { upserted: 0 };
 
@@ -198,78 +242,6 @@ async function upsertItems(tx, { orderID, items = [], valuesInCents = true }) {
   }
   return { upserted };
 }
-
-// ---------- CREATE (POST) ----------
-/* async function createOrderWithItems(body) {
-  await IdServicePoolConnect;
-  const tx = new sql.Transaction(IdServicePool);
-  const valuesInCents = body.valuesInCents === false ? false : true;
-
-  if (!body?.salesChannelReferenceId) throw new Error('salesChannelReferenceId es requerido');
-  if (!body?.u_ref1)                   throw new Error('u_ref1 es requerido');
-
-  try {
-    await tx.begin();
-
-    const exists = await new sql.Request(tx)
-      .input('scr',  sql.NVarChar(128), body.salesChannelReferenceId)
-      .input('uref', sql.NVarChar(255), body.u_ref1)
-      .query('SELECT 1 FROM dbo.Orders WHERE salesChannelReferenceId=@scr AND u_ref1=@uref');
-    if (exists.recordset[0]) throw new Error('ORDER_EXISTS');
-
-    const statusId = await getOrCreateStatusId(tx, {
-      orderStatusID:  body.orderStatusID  ?? null,
-      orderStatusCode: body.orderStatusCode ?? null
-    });
-
-    // Insert header (nuevas columnas shippingEstimate / deliveryCompany)
-    const ins = await new sql.Request(tx)
-      .input('scr',             sql.NVarChar(128), body.salesChannelReferenceId)
-      .input('uref',            sql.NVarChar(255), body.u_ref1)
-      .input('itemsAmount',     sql.Int,           body.itemsAmount ?? (Array.isArray(body.items) ? body.items.length : null))
-      .input('doctotalsy',      sql.Decimal(18,2), normMoney(body.doctotalsy, valuesInCents))
-      .input('orderStatusID',   sql.Int,           statusId)
-      .input('deliveryDate',    sql.DateTime2(3),  toUtcDateOrNull(body.deliveryDate))
-      .input('origin',          sql.NVarChar(50),  body.origin ?? null)
-      .input('hostname',        sql.NVarChar(100), body.hostname ?? null)
-      .input('DocEntryOrder',   sql.Int,           body.DocEntryOrder ?? null)
-      .input('DocEntryInvoice', sql.Int,           body.DocEntryInvoice ?? null)
-      .input('folionum',        sql.Int,           body.folionum ?? null)
-      .input('integrationError',sql.NVarChar(sql.MAX), body.integrationError ?? null)
-      .input('shippingEstimate',sql.NVarChar(50),  body.shippingEstimate ?? null)
-      .input('deliveryCompany', sql.NVarChar(100), body.deliveryCompany ?? null)
-      .query(`
-        INSERT INTO dbo.Orders
-          (salesChannelReferenceId, u_ref1, itemsAmount, doctotalsy,
-           orderStatusID, deliveryDate, lastQueryDate, createdate, updateDate,
-           integrationError, origin, hostname, DocEntryOrder, DocEntryInvoice, folionum,
-           shippingEstimate, deliveryCompany)
-        OUTPUT INSERTED.orderID
-        VALUES
-          (@scr, @uref, @itemsAmount, @doctotalsy,
-           @orderStatusID, @deliveryDate, SYSUTCDATETIME(), SYSUTCDATETIME(), NULL,
-           @integrationError, @origin, @hostname, @DocEntryOrder, @DocEntryInvoice, @folionum,
-           @shippingEstimate, @deliveryCompany);
-      `);
-
-    const orderID = ins.recordset[0].orderID;
-
-    await insertStatusHistory(tx, { orderID, newStatusID: statusId, previousStatusID: null });
-
-    const items = Array.isArray(body.items) ? body.items : [];
-    const { inserted } = await insertItems(tx, { orderID, items, valuesInCents });
-
-    await tx.commit();
-    return { orderID, itemsInserted: inserted };
-  } catch (err) {
-    try { await tx.rollback(); } catch {}
-    if (err && (err.number === 2627 || err.number === 2601)) {
-      if ((err.message || '').includes('UQ_OrderItems_Order_ItemIndex')) err = new Error('DUPLICATE_ITEM_INDEX');
-      if ((err.message || '').includes('UQ_Orders_Source_u_ref1'))       err = new Error('ORDER_EXISTS');
-    }
-    throw err;
-  }
-} */
 
 async function createOrderWithItems(body) {
   await IdServicePoolConnect;
@@ -357,7 +329,7 @@ async function patchOrder({ orderID, body }) {
   try {
     await tx.begin();
 
-    // obtener estado actual y existencia
+    // existencia y estado actual
     const cur = (await new sql.Request(tx)
       .input('id', sql.Int, orderID)
       .query('SELECT orderID, orderStatusID FROM dbo.Orders WHERE orderID=@id')).recordset[0];
@@ -374,10 +346,9 @@ async function patchOrder({ orderID, body }) {
       statusChanged = (newStatusID !== cur.orderStatusID);
     }
 
-    // construir UPDATE parcial
+    // UPDATE parcial del header
     const set = [];
     const req = new sql.Request(tx).input('id', sql.Int, orderID);
-
     const setIf = (col, val, type) => {
       if (val !== undefined) { set.push(`${col} = @${col}`); req.input(col, type, val); }
     };
@@ -419,7 +390,23 @@ async function patchOrder({ orderID, body }) {
       });
     }
 
-    // items: patch (upsert) o reemplazo completo
+    // ------ Fulfillment: upsert parcial ------
+    let fulfillmentChanged = false;
+    if (body.fulfillment && typeof body.fulfillment === 'object') {
+      const exists = await new sql.Request(tx)
+        .input('id', sql.Int, orderID)
+        .query('SELECT 1 FROM dbo.order_fulfillment WHERE orderID = @id');
+
+      if (exists.recordset[0]) {
+        const { updated } = await updateOrderFulfillmentPartial(tx, orderID, body.fulfillment);
+        fulfillmentChanged = updated > 0;
+      } else {
+        await insertOrderFulfillment(tx, orderID, body.fulfillment);
+        fulfillmentChanged = true;
+      }
+    }
+
+    // ------ Items ------
     let itemsUpserted = 0;
     if (Array.isArray(body.items) && body.items.length) {
       if (body.replaceItems === true) {
@@ -442,7 +429,7 @@ async function patchOrder({ orderID, body }) {
     }
 
     await tx.commit();
-    return { statusChanged, itemsUpserted };
+    return { statusChanged, itemsUpserted, fulfillmentChanged };
   } catch (err) {
     try { await tx.rollback(); } catch {}
     if (err && (err.number === 2627 || err.number === 2601)) {
