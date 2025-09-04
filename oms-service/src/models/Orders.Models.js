@@ -140,6 +140,50 @@ async function insertOrderFulfillment(tx, orderID, f = {}) {
     `);
 }
 
+async function updateOrderFulfillmentPartial(tx, orderID, f = {}) {
+  // Si no vino nada para actualizar, no hacemos nada
+  if (!f || typeof f !== 'object') return { updated: 0 };
+
+  const req = new sql.Request(tx).input('orderID', sql.Int, orderID);
+  const set = [];
+
+  const setIf = (col, val, type, transform = (x) => x) => {
+    if (val !== undefined) {
+      set.push(`${col} = @${col}`);
+      req.input(col, type, transform(val));
+    }
+  };
+  setIf('firstName',        f.firstName,        sql.NVarChar(150));
+  setIf('lastName',         f.lastName,         sql.NVarChar(150));
+  setIf('email',            f.email,            sql.NVarChar(254));
+  setIf('currencyCode',     f.currencyCode,     sql.Char(3),   (v) => v ? String(v).toUpperCase() : null);
+  setIf('documentType',     f.documentType,     sql.VarChar(20));
+  setIf('document',         f.document,         sql.NVarChar(40));
+  setIf('phone',            f.phone,            sql.NVarChar(30));
+  if (f.isCorporate !== undefined) {
+    set.push('isCorporate = @isCorporate');
+    req.input('isCorporate', sql.Bit, toBit(f.isCorporate));
+  }
+  setIf('notes',            f.notes,            sql.NVarChar(400));
+  setIf('addressType',      f.addressType,      sql.VarChar(30));
+  setIf('receiverName',     f.receiverName,     sql.NVarChar(150));
+  setIf('postalCode',       f.postalCode,       sql.NVarChar(20));
+  setIf('city',             f.city,             sql.NVarChar(100));
+  setIf('country',          f.country,          sql.Char(2),   (v) => v ? String(v).toUpperCase() : null);
+  setIf('state',            f.state,            sql.NVarChar(100));
+  setIf('street',           f.street,           sql.NVarChar(200));
+  setIf('[number]',         f.number,           sql.NVarChar(20));         
+  setIf('neighborhood',     f.neighborhood,     sql.NVarChar(100));
+  setIf('referenceAddress', f.referenceAddress, sql.NVarChar(400));
+
+  if (set.length === 0) return { updated: 0 };
+
+  const q = `UPDATE dbo.order_fulfillment SET ${set.join(', ')} WHERE orderID = @orderID;`;
+  const r = await req.query(q);
+  return { updated: r.rowsAffected?.[0] || 0 };
+}
+
+
 async function upsertItems(tx, { orderID, items = [], valuesInCents = true }) {
   if (!Array.isArray(items) || items.length === 0) return { upserted: 0 };
 
@@ -285,7 +329,7 @@ async function patchOrder({ orderID, body }) {
   try {
     await tx.begin();
 
-    // obtener estado actual y existencia
+    // existencia y estado actual
     const cur = (await new sql.Request(tx)
       .input('id', sql.Int, orderID)
       .query('SELECT orderID, orderStatusID FROM dbo.Orders WHERE orderID=@id')).recordset[0];
@@ -302,10 +346,9 @@ async function patchOrder({ orderID, body }) {
       statusChanged = (newStatusID !== cur.orderStatusID);
     }
 
-    // construir UPDATE parcial
+    // UPDATE parcial del header
     const set = [];
     const req = new sql.Request(tx).input('id', sql.Int, orderID);
-
     const setIf = (col, val, type) => {
       if (val !== undefined) { set.push(`${col} = @${col}`); req.input(col, type, val); }
     };
@@ -347,7 +390,23 @@ async function patchOrder({ orderID, body }) {
       });
     }
 
-    // items: patch (upsert) o reemplazo completo
+    // ------ Fulfillment: upsert parcial ------
+    let fulfillmentChanged = false;
+    if (body.fulfillment && typeof body.fulfillment === 'object') {
+      const exists = await new sql.Request(tx)
+        .input('id', sql.Int, orderID)
+        .query('SELECT 1 FROM dbo.order_fulfillment WHERE orderID = @id');
+
+      if (exists.recordset[0]) {
+        const { updated } = await updateOrderFulfillmentPartial(tx, orderID, body.fulfillment);
+        fulfillmentChanged = updated > 0;
+      } else {
+        await insertOrderFulfillment(tx, orderID, body.fulfillment);
+        fulfillmentChanged = true;
+      }
+    }
+
+    // ------ Items ------
     let itemsUpserted = 0;
     if (Array.isArray(body.items) && body.items.length) {
       if (body.replaceItems === true) {
@@ -370,7 +429,7 @@ async function patchOrder({ orderID, body }) {
     }
 
     await tx.commit();
-    return { statusChanged, itemsUpserted };
+    return { statusChanged, itemsUpserted, fulfillmentChanged };
   } catch (err) {
     try { await tx.rollback(); } catch {}
     if (err && (err.number === 2627 || err.number === 2601)) {
