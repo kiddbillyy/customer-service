@@ -14,7 +14,7 @@ El **OMS Service** (Order Management System) es el microservicio encargado de **
 
 ---
 
-## Diagrama de base de datos:
+## Diagrama de flujo :
 <p align="center">
   <img src="DIAGRAMA_KAFKA_1.jpg" alt="Diagrama ER" width="600">
 </p>
