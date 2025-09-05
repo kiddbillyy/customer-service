@@ -1,10 +1,10 @@
-# 🚚 OMS Service – Mimbral
+# OMS Service – Mimbral
 
 El **OMS Service** (Order Management System) es el microservicio encargado de **recibir, consultar y actualizar órdenes**, además de **publicar eventos** hacia Kafka para la orquestación con otros sistemas (integración de clientes, facturación, logística, etc.). Forma parte del ecosistema de microservicios de Mimbral y expone endpoints REST para **crear**, **listar**, **obtener detalle** y **actualizar** órdenes.
 
 ---
 
-## 🚀 Tecnologías Utilizadas
+## Tecnologías Utilizadas
 
 - **Node.js** + **Express** – API REST.
 - **Microsoft SQL Server (MSSQL)** – Persistencia de órdenes e histórico.
@@ -41,7 +41,7 @@ El **OMS Service** (Order Management System) es el microservicio encargado de **
 
 ---
 
-## 🔌 Base URL
+## Base URL
 
 - **Prod/Dev** (según entorno): `https://catalogomimbral.loclx.io`
 - **Prefijo del MS**: `/api/oms-service`
@@ -50,7 +50,7 @@ Ej.: `https://catalogomimbral.loclx.io/api/oms-service/orders`
 
 ---
 
-## 📦 Estructura del Proyecto (sugerida)
+## Estructura del Proyecto (sugerida)
 
 ```
 oms-service/
@@ -79,7 +79,7 @@ oms-service/
 > - **Formato**: JSON
 > - **valuesInCents**: cuando `true`, los montos se manejan en **centavos**.
 
-## 🧾 Orders
+## Orders
 
 ### Crear Orden
 
@@ -397,7 +397,7 @@ await p.send({ topic, messages, acks: 1, timeout: 30000, compression: Compressio
 
 ---
 
-## 🐳 Ejecutar con Docker
+## Ejecutar con Docker
 
 ### Dockerfile
 
@@ -447,7 +447,7 @@ services:
 
 ---
 
-## ✅ Buenas Prácticas y Consideraciones
+## Buenas Prácticas y Consideraciones
 
 - **Idempotencia** en POST: usar `salesChannelReferenceId + u_ref1` como llave natural cuando corresponda.
 - **Historial**: cada cambio de `orderStatusCode` debe registrarse en `history` con fecha/hora y usuario/origen.
@@ -457,7 +457,7 @@ services:
 
 ---
 
-## 🔐 Headers de Ejemplo
+## Headers de Ejemplo
 
 ```
 Authorization: Bearer <token>
