@@ -440,7 +440,588 @@ async function patchOrder({ orderID, body }) {
 }
 
 
+/* async function getOrder(query = {}, options = {}) {
+  const {
+    includeItems = true,
+    includeFulfillment = true,
+    includeHistory = true,
+    valuesInCents = true,
+  } = options;
+
+  await IdServicePoolConnect;
+
+  // WHERE dinámico
+  let where = [];
+  const req = new sql.Request(IdServicePool);
+
+  if (isPosInt(query.orderID)) {
+    where.push('o.orderID = @id');
+    req.input('id', sql.Int, query.orderID);
+  } else if (query.salesChannelReferenceId && query.u_ref1) {
+    where.push('o.salesChannelReferenceId = @scr AND o.u_ref1 = @uref');
+    req.input('scr', sql.NVarChar(128), String(query.salesChannelReferenceId));
+    req.input('uref', sql.NVarChar(255), String(query.u_ref1));
+  } else {
+    throw new Error('QUERY_REQUIRED');
+  }
+
+  // Header + status
+  const headerRs = await req.query(`
+    SELECT
+      o.orderID,
+      o.salesChannelReferenceId,
+      o.u_ref1,
+      o.itemsAmount,
+      o.doctotalsy,
+      o.orderStatusID,
+      s.statusCode,
+      s.[description] AS statusDescription,
+      o.deliveryDate,
+      o.lastQueryDate,
+      o.createdate,
+      o.updateDate,
+      o.integrationError,
+      o.origin,
+      o.hostname,
+      o.DocEntryOrder,
+      o.DocEntryInvoice,
+      o.folionum,
+      o.shippingEstimate,
+      o.deliveryCompany
+    FROM dbo.Orders AS o
+    INNER JOIN dbo.order_status AS s ON s.orderStatusID = o.orderStatusID
+    WHERE ${where.join(' AND ')}
+  `);
+
+  const head = headerRs.recordset[0];
+  if (!head) throw new Error('ORDER_NOT_FOUND');
+
+  const orderID = head.orderID;
+  const out = {
+    orderID,
+    salesChannelReferenceId: head.salesChannelReferenceId,
+    u_ref1: head.u_ref1,
+    itemsAmount: head.itemsAmount,
+    doctotalsy: moneyOut(head.doctotalsy, valuesInCents),
+    status: {
+      orderStatusID: head.orderStatusID,
+      statusCode: head.statusCode,
+      description: head.statusDescription ?? null,
+    },
+    deliveryDate: head.deliveryDate,
+    lastQueryDate: head.lastQueryDate,
+    createdate: head.createdate,
+    updateDate: head.updateDate,
+    integrationError: head.integrationError ?? null,
+    origin: head.origin ?? null,
+    hostname: head.hostname ?? null,
+    DocEntryOrder: head.DocEntryOrder ?? null,
+    DocEntryInvoice: head.DocEntryInvoice ?? null,
+    folionum: head.folionum ?? null,
+    shippingEstimate: head.shippingEstimate ?? null,
+    deliveryCompany: head.deliveryCompany ?? null,
+  };
+
+  // Fulfillment
+  if (includeFulfillment) {
+    const frs = await new sql.Request(IdServicePool)
+      .input('id', sql.Int, orderID)
+      .query(`
+        SELECT
+          orderID, firstName, lastName, email, currencyCode, documentType, [document], phone,
+          isCorporate, notes, addressType, receiverName, postalCode, city, country, [state],
+          street, [number], neighborhood, referenceAddress
+        FROM dbo.order_fulfillment
+        WHERE orderID = @id
+      `);
+    out.fulfillment = frs.recordset[0] || null;
+  }
+
+  // Items
+  if (includeItems) {
+    const irs = await new sql.Request(IdServicePool)
+      .input('id', sql.Int, orderID)
+      .query(`
+        SELECT
+          id, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity,
+          priceAfterVAT, codebars, imageUrl, whscode,
+          categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames
+        FROM dbo.Order_Items
+        WHERE orderID = @id
+        ORDER BY itemIndex ASC, id ASC
+      `);
+    out.items = irs.recordset.map(r => ({
+      id: r.id,
+      itemIndex: r.itemIndex,
+      uniqueId: r.uniqueId ?? null,
+      lineNum: r.lineNum ?? null,
+      itemcode: r.itemcode,
+      dscription: r.dscription,
+      quantity: r.quantity,
+      priceAfterVAT: moneyOut(r.priceAfterVAT, valuesInCents),
+      codebars: r.codebars ?? null,
+      imageUrl: r.imageUrl ?? null,
+      whscode: r.whscode ?? null,
+      categoryLeafId: r.categoryLeafId ?? null,
+      categoryLeafName: r.categoryLeafName ?? null,
+      categoryPathIds: r.categoryPathIds ?? null,
+      categoryPathNames: r.categoryPathNames ?? null,
+    }));
+  }
+
+  // Historial de estatus
+  if (includeHistory) {
+    const hrs = await new sql.Request(IdServicePool)
+      .input('id', sql.Int, orderID)
+      .query(`
+        SELECT
+          h.historyID,
+          h.orderStatusID,
+          cs.statusCode AS statusCode,
+          cs.[description] AS statusDescription,
+          h.previousStatusID,
+          ps.statusCode AS previousStatusCode,
+          ps.[description] AS previousStatusDescription,
+          h.changeDate
+        FROM dbo.order_status_history AS h
+        LEFT JOIN dbo.order_status AS cs ON cs.orderStatusID = h.orderStatusID
+        LEFT JOIN dbo.order_status AS ps ON ps.orderStatusID = h.previousStatusID
+        WHERE h.orderID = @id
+        ORDER BY h.changeDate DESC, h.historyID DESC
+      `);
+    out.statusHistory = hrs.recordset.map(r => ({
+      historyID: r.historyID,
+      orderStatusID: r.orderStatusID,
+      statusCode: r.statusCode,
+      statusDescription: r.statusDescription ?? null,
+      previousStatusID: r.previousStatusID ?? null,
+      previousStatusCode: r.previousStatusCode ?? null,
+      previousStatusDescription: r.previousStatusDescription ?? null,
+      changeDate: r.changeDate,
+    }));
+  }
+
+  return out;
+}
+ */
+
+const moneyOut = (v, valuesInCents) => {
+  if (v == null) return null;
+  const num = Number(v);
+  if (!Number.isFinite(num)) return null;
+  return valuesInCents ? Math.round(num * 100) : +num;
+};
+
+function toIntOrNull(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function bindIdList(req, ids, prefix = 'id') {
+  const names = [];
+  ids.forEach((id, i) => {
+    const name = `${prefix}${i}`;
+    req.input(name, sql.Int, id);
+    names.push(`@${name}`);
+  });
+  return names.length ? names.join(',') : null;
+}
+
+async function getOrder(query = {}, options = {}) {
+  const {
+    includeItems = true,
+    includeFulfillment = true,
+    includeHistory = true,
+    valuesInCents = true,
+  } = options;
+
+  await IdServicePoolConnect;
+
+  // -------------------------
+  // MODO DETALLE (id o par)
+  // -------------------------
+  const hasId   = isPosInt(query.orderID);
+  const hasPair = !!(query.salesChannelReferenceId && query.u_ref1);
+
+  if (hasId || hasPair) {
+    let where = [];
+    const req = new sql.Request(IdServicePool);
+
+    if (hasId) {
+      where.push('o.orderID = @id');
+      req.input('id', sql.Int, query.orderID);
+    } else {
+      where.push('o.salesChannelReferenceId = @scr AND o.u_ref1 = @uref');
+      req.input('scr', sql.NVarChar(128), String(query.salesChannelReferenceId));
+      req.input('uref', sql.NVarChar(255), String(query.u_ref1));
+    }
+
+    // Header + status
+    const headerRs = await req.query(`
+      SELECT
+        o.orderID,
+        o.salesChannelReferenceId,
+        o.u_ref1,
+        o.itemsAmount,
+        o.doctotalsy,
+        o.orderStatusID,
+        s.statusCode,
+        s.[description] AS statusDescription,
+        o.deliveryDate,
+        o.lastQueryDate,
+        o.createdate,
+        o.updateDate,
+        o.integrationError,
+        o.origin,
+        o.hostname,
+        o.DocEntryOrder,
+        o.DocEntryInvoice,
+        o.folionum,
+        o.shippingEstimate,
+        o.deliveryCompany,
+        o.customerIntegrated,
+        o.customerIntegratedAt,
+        o.customerCardCode
+      FROM dbo.Orders AS o
+      INNER JOIN dbo.order_status AS s ON s.orderStatusID = o.orderStatusID
+      WHERE ${where.join(' AND ')}
+    `);
+
+    const head = headerRs.recordset[0];
+    if (!head) throw new Error('ORDER_NOT_FOUND');
+
+    const orderID = head.orderID;
+    const out = {
+      mode: 'detail',
+      orderID,
+      salesChannelReferenceId: head.salesChannelReferenceId,
+      u_ref1: head.u_ref1,
+      itemsAmount: head.itemsAmount,
+      doctotalsy: moneyOut(head.doctotalsy, valuesInCents),
+      status: {
+        orderStatusID: head.orderStatusID,
+        statusCode: head.statusCode,
+        description: head.statusDescription ?? null,
+      },
+      deliveryDate: head.deliveryDate,
+      lastQueryDate: head.lastQueryDate,
+      createdate: head.createdate,
+      updateDate: head.updateDate,
+      integrationError: head.integrationError ?? null,
+      origin: head.origin ?? null,
+      hostname: head.hostname ?? null,
+      DocEntryOrder: head.DocEntryOrder ?? null,
+      DocEntryInvoice: head.DocEntryInvoice ?? null,
+      folionum: head.folionum ?? null,
+      shippingEstimate: head.shippingEstimate ?? null,
+      deliveryCompany: head.deliveryCompany ?? null,
+      customerIntegrated: head.customerIntegrated ?? null,
+      customerIntegratedAt: head.customerIntegratedAt ?? null,
+      customerCardCode: head.customerCardCode ?? null
+    };
+
+    // Fulfillment
+    if (includeFulfillment) {
+      const frs = await new sql.Request(IdServicePool)
+        .input('id', sql.Int, orderID)
+        .query(`
+          SELECT
+            orderID, firstName, lastName, email, currencyCode, documentType, [document], phone,
+            isCorporate, notes, addressType, receiverName, postalCode, city, country, [state],
+            street, [number], neighborhood, referenceAddress
+          FROM dbo.order_fulfillment
+          WHERE orderID = @id
+        `);
+      out.fulfillment = frs.recordset[0] || null;
+    }
+
+    // Items
+    if (includeItems) {
+      const irs = await new sql.Request(IdServicePool)
+        .input('id', sql.Int, orderID)
+        .query(`
+          SELECT
+            id, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity,
+            priceAfterVAT, codebars, imageUrl, whscode,
+            categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames
+          FROM dbo.Order_Items
+          WHERE orderID = @id
+          ORDER BY itemIndex ASC, id ASC
+        `);
+      out.items = irs.recordset.map(r => ({
+        id: r.id,
+        itemIndex: r.itemIndex,
+        uniqueId: r.uniqueId ?? null,
+        lineNum: r.lineNum ?? null,
+        itemcode: r.itemcode,
+        dscription: r.dscription,
+        quantity: r.quantity,
+        priceAfterVAT: moneyOut(r.priceAfterVAT, valuesInCents),
+        codebars: r.codebars ?? null,
+        imageUrl: r.imageUrl ?? null,
+        whscode: r.whscode ?? null,
+        categoryLeafId: r.categoryLeafId ?? null,
+        categoryLeafName: r.categoryLeafName ?? null,
+        categoryPathIds: r.categoryPathIds ?? null,
+        categoryPathNames: r.categoryPathNames ?? null,
+      }));
+    }
+
+    // Historial de estatus
+    if (includeHistory) {
+      const hrs = await new sql.Request(IdServicePool)
+        .input('id', sql.Int, orderID)
+        .query(`
+          SELECT
+            h.historyID,
+            h.orderStatusID,
+            cs.statusCode AS statusCode,
+            cs.[description] AS statusDescription,
+            h.previousStatusID,
+            ps.statusCode AS previousStatusCode,
+            ps.[description] AS previousStatusDescription,
+            h.changeDate
+          FROM dbo.order_status_history AS h
+          LEFT JOIN dbo.order_status AS cs ON cs.orderStatusID = h.orderStatusID
+          LEFT JOIN dbo.order_status AS ps ON ps.orderStatusID = h.previousStatusID
+          WHERE h.orderID = @id
+          ORDER BY h.changeDate DESC, h.historyID DESC
+        `);
+      out.statusHistory = hrs.recordset.map(r => ({
+        historyID: r.historyID,
+        orderStatusID: r.orderStatusID,
+        statusCode: r.statusCode,
+        statusDescription: r.statusDescription ?? null,
+        previousStatusID: r.previousStatusID ?? null,
+        previousStatusCode: r.previousStatusCode ?? null,
+        previousStatusDescription: r.previousStatusDescription ?? null,
+        changeDate: r.changeDate,
+      }));
+    }
+
+    return out;
+  }
+
+  const {
+    salesChannelReferenceId,
+    u_ref1,
+    statusCode,
+    statusId,
+    createdFrom,
+    createdTo,
+    search,
+    page: qPage,
+    pageSize: qPageSize,
+  } = query;
+
+  // Lee los opts también para la lista (por defecto: no expandir si no lo piden)
+  const wantItems        = includeItems === true;
+  const wantFulfillment  = includeFulfillment === true;
+  const wantHistory      = includeHistory === true;
+  const valuesInCentsOut = valuesInCents !== false; // default true
+
+  let page = Math.max(1, toIntOrNull(qPage) ?? 1);
+  let pageSize = Math.min(200, Math.max(1, toIntOrNull(qPageSize) ?? 50));
+  const offset = (page - 1) * pageSize;
+
+  const baseReq = new sql.Request(IdServicePool);
+  const where = ['1=1'];
+
+  if (salesChannelReferenceId) {
+    where.push('o.salesChannelReferenceId = @scr');
+    baseReq.input('scr', sql.NVarChar(128), String(salesChannelReferenceId));
+  }
+  if (u_ref1) {
+    where.push('o.u_ref1 = @uref');
+    baseReq.input('uref', sql.NVarChar(255), String(u_ref1));
+  }
+  if (statusId != null) {
+    where.push('o.orderStatusID = @sid');
+    baseReq.input('sid', sql.Int, Number(statusId));
+  }
+  if (statusCode) {
+    where.push('s.statusCode = @scode');
+    baseReq.input('scode', sql.NVarChar(32), String(statusCode));
+  }
+  if (createdFrom) {
+    where.push('o.createdate >= @cfrom');
+    baseReq.input('cfrom', sql.DateTime2(3), new Date(createdFrom));
+  }
+  if (createdTo) {
+    where.push('o.createdate < @cto');
+    baseReq.input('cto', sql.DateTime2(3), new Date(createdTo));
+  }
+  if (search) {
+    where.push('o.u_ref1 LIKE @search');
+    baseReq.input('search', sql.NVarChar(255), `%${String(search)}%`);
+  }
+
+  // total
+  const totalRs = await baseReq.query(`
+    SELECT COUNT(1) AS total
+    FROM dbo.Orders o
+    INNER JOIN dbo.order_status s ON s.orderStatusID = o.orderStatusID
+    WHERE ${where.join(' AND ')}
+  `);
+  const total = totalRs.recordset[0]?.total ?? 0;
+
+  // página
+  const pageReq = new sql.Request(IdServicePool);
+  for (const p of baseReq.parameters ? Object.values(baseReq.parameters) : []) {
+    pageReq.input(p.name, p.type, p.value);
+  }
+  pageReq.input('limit', sql.Int, pageSize);
+  pageReq.input('offset', sql.Int, offset);
+
+  const rs = await pageReq.query(`
+    SELECT
+      o.orderID,
+      o.salesChannelReferenceId,
+      o.u_ref1,
+      o.itemsAmount,
+      o.doctotalsy,
+      o.orderStatusID,
+      s.statusCode,
+      s.[description] AS statusDescription,
+      o.deliveryDate,
+      o.createdate,
+      o.updateDate
+    FROM dbo.Orders o
+    INNER JOIN dbo.order_status s ON s.orderStatusID = o.orderStatusID
+    WHERE ${where.join(' AND ')}
+    ORDER BY o.createdate DESC, o.orderID DESC
+    OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
+  `);
+
+  const rows = rs.recordset.map(r => ({
+    orderID: r.orderID,
+    salesChannelReferenceId: r.salesChannelReferenceId,
+    u_ref1: r.u_ref1,
+    itemsAmount: r.itemsAmount,
+    doctotalsy: moneyOut(r.doctotalsy, valuesInCentsOut),
+    status: {
+      orderStatusID: r.orderStatusID,
+      statusCode: r.statusCode,
+      description: r.statusDescription,
+    },
+    deliveryDate: r.deliveryDate,
+    createdate: r.createdate,
+    updateDate: r.updateDate,
+  }));
+
+  // Batch expand
+  const pageOrderIds = rows.map(r => r.orderID);
+  if (pageOrderIds.length && (wantItems || wantFulfillment || wantHistory)) {
+    // Fulfillment
+    if (wantFulfillment) {
+      const fReq = new sql.Request(IdServicePool);
+      const inList = bindIdList(fReq, pageOrderIds, 'fid');
+      if (inList) {
+        const frs = await fReq.query(`
+          SELECT
+            orderID, firstName, lastName, email, currencyCode, documentType, [document], phone,
+            isCorporate, notes, addressType, receiverName, postalCode, city, country, [state],
+            street, [number], neighborhood, referenceAddress
+          FROM dbo.order_fulfillment
+          WHERE orderID IN (${inList})
+        `);
+        const fMap = new Map(frs.recordset.map(r => [r.orderID, r]));
+        rows.forEach(r => { r.fulfillment = fMap.get(r.orderID) || null; });
+      }
+    }
+
+    // Items
+    if (wantItems) {
+      const iReq = new sql.Request(IdServicePool);
+      const inList = bindIdList(iReq, pageOrderIds, 'iid');
+      if (inList) {
+        const irs2 = await iReq.query(`
+          SELECT
+            orderID, id, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity,
+            priceAfterVAT, codebars, imageUrl, whscode,
+            categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames
+          FROM dbo.Order_Items
+          WHERE orderID IN (${inList})
+          ORDER BY orderID ASC, itemIndex ASC, id ASC
+        `);
+        const itemsByOrder = new Map();
+        irs2.recordset.forEach(r => {
+          if (!itemsByOrder.has(r.orderID)) itemsByOrder.set(r.orderID, []);
+          itemsByOrder.get(r.orderID).push({
+            id: r.id,
+            itemIndex: r.itemIndex,
+            uniqueId: r.uniqueId ?? null,
+            lineNum: r.lineNum ?? null,
+            itemcode: r.itemcode,
+            dscription: r.dscription,
+            quantity: r.quantity,
+            priceAfterVAT: moneyOut(r.priceAfterVAT, valuesInCentsOut),
+            codebars: r.codebars ?? null,
+            imageUrl: r.imageUrl ?? null,
+            whscode: r.whscode ?? null,
+            categoryLeafId: r.categoryLeafId ?? null,
+            categoryLeafName: r.categoryLeafName ?? null,
+            categoryPathIds: r.categoryPathIds ?? null,
+            categoryPathNames: r.categoryPathNames ?? null,
+          });
+        });
+        rows.forEach(r => { r.items = itemsByOrder.get(r.orderID) || []; });
+      }
+    }
+
+    // Historial
+    if (wantHistory) {
+      const hReq = new sql.Request(IdServicePool);
+      const inList = bindIdList(hReq, pageOrderIds, 'hid');
+      if (inList) {
+        const hrs2 = await hReq.query(`
+          SELECT
+            h.orderID,
+            h.historyID,
+            h.orderStatusID,
+            cs.statusCode            AS statusCode,
+            cs.[description]         AS statusDescription,
+            h.previousStatusID,
+            ps.statusCode            AS previousStatusCode,
+            ps.[description]         AS previousStatusDescription,
+            h.changeDate
+          FROM dbo.order_status_history AS h
+          LEFT JOIN dbo.order_status AS cs ON cs.orderStatusID = h.orderStatusID
+          LEFT JOIN dbo.order_status AS ps ON ps.orderStatusID = h.previousStatusID
+          WHERE h.orderID IN (${inList})
+          ORDER BY h.orderID ASC, h.changeDate DESC, h.historyID DESC
+        `);
+        const histByOrder = new Map();
+        hrs2.recordset.forEach(r => {
+          if (!histByOrder.has(r.orderID)) histByOrder.set(r.orderID, []);
+          histByOrder.get(r.orderID).push({
+            historyID: r.historyID,
+            orderStatusID: r.orderStatusID,
+            statusCode: r.statusCode,
+            statusDescription: r.statusDescription ?? null,
+            previousStatusID: r.previousStatusID ?? null,
+            previousStatusCode: r.previousStatusCode ?? null,
+            previousStatusDescription: r.previousStatusDescription ?? null,
+            changeDate: r.changeDate,
+          });
+        });
+        rows.forEach(r => { r.statusHistory = histByOrder.get(r.orderID) || []; });
+      }
+    }
+  }
+
+  return {
+    mode: 'list',
+    page,
+    pageSize,
+    total,
+    rows,
+  };
+}
+
+
 module.exports = {
   createOrderWithItems,
   patchOrder,
+  getOrder
 };
