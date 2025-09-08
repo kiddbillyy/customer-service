@@ -30,6 +30,7 @@ El **Commerce Service** es un microservicio encargado de la **gestión de entida
 - **GET /store/{id}** → Obtener Store por ID.
 - **GET /store** → Obtener Lista de Store.
 - **PUT /store/{id}** → Editar Store por ID.
+- **GET /store/get** → Obtener lista de Store básico
 
 ### Sales Channel
 
@@ -491,6 +492,30 @@ commerce-service/
 ```
 
 **URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/store?search=Mimbral&status=1`
+
+
+### Listar stores básico
+**GET** `/store/get`
+**Filtros**
+>hasAddress(true o false)
+>status(puede ser 1 o 0)
+
+```json
+{
+    "ok": true,
+    "page": 1,
+    "pageSize": 10,
+    "total": 1,
+    "data": [
+        {
+            "Id": 6,
+            "Name": "Sucursal Balmaceda"
+        }
+    ]
+}
+```
+
+**URL base**: `https://catalogomimbral.loclx.io/api/comerce-service/store/get?hasAddress=true&status=1`
 
 ---
 
