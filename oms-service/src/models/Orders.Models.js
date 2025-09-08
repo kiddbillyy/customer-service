@@ -885,7 +885,11 @@ async function getOrder(query = {}, options = {}) {
       s.[description] AS statusDescription,
       o.deliveryDate,
       o.createdate,
-      o.updateDate
+      o.updateDate,
+      o.integrationError,
+      o.customerIntegrated,
+      o.customerIntegratedAt,
+      o.customerCardCode
     FROM dbo.Orders o
     INNER JOIN dbo.order_status s ON s.orderStatusID = o.orderStatusID
     WHERE ${where.join(' AND ')}
@@ -896,6 +900,10 @@ async function getOrder(query = {}, options = {}) {
   const rows = rs.recordset.map(r => ({
     orderID: r.orderID,
     salesChannelReferenceId: r.salesChannelReferenceId,
+    integrationError: r.integrationError,
+    customerIntegrated: r.customerIntegrated,
+    customerIntegratedAt: r.customerIntegratedAt,
+    customerCardCode: r.customerCardCode,
     u_ref1: r.u_ref1,
     itemsAmount: r.itemsAmount,
     doctotalsy: moneyOut(r.doctotalsy, valuesInCentsOut),
