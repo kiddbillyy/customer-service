@@ -73,7 +73,6 @@ async function patchOrder(req, res) {
     const user = req.body?.user || 'API';
     const out = await model.patchOrder({ orderID, body: req.body });
 
-    // Arma el payload para Kafka; agrega fulfillment sólo si viene en el PATCH
     const orderPayload = {
       orderID,
       statusChanged: out.statusChanged,

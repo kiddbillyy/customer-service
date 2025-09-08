@@ -196,4 +196,63 @@ async function updateStoreById(id, payload) {
 }
 
 
-module.exports = { createStore, getStoreById, listStores, updateStoreById };
+async function listStoresBasic({ page = 1, pageSize = 10, filters = {} }) {
+  await IdServicePoolConnect;
+
+  const offset = (page - 1) * pageSize;
+  const where = [];
+
+  // Filtros básicos
+  if (filters.search) {
+    where.push(`s.Name LIKE @search`);
+  }
+  if (filters.status !== undefined && filters.status !== null && filters.status !== '') {
+    where.push(`s.Status = @status`);
+  }
+  if (filters.companyId) {
+    where.push(`s.CompanyId = @companyId`);
+  }
+
+  // Filtro hasAddress (usa EXISTS / NOT EXISTS sobre Location)
+  if (filters.hasAddress === true) {
+    where.push(`EXISTS (SELECT 1 FROM Location l WHERE l.StoreId = s.Id)`);
+  } else if (filters.hasAddress === false) {
+    where.push(`NOT EXISTS (SELECT 1 FROM Location l WHERE l.StoreId = s.Id)`);
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+  const countSql = `
+    SELECT COUNT(1) AS total
+    FROM Store s
+    ${whereSql};
+  `;
+
+  const pageSql = `
+    SELECT
+      s.Id,
+      s.Name
+    FROM Store s
+    ${whereSql}
+    ORDER BY s.CreatedAt DESC, s.Id DESC
+    OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+  `;
+
+  const r = new sql.Request(IdServicePool);
+  if (filters.search)  r.input('search', sql.NVarChar(200), `%${filters.search}%`);
+  if (filters.status !== undefined && filters.status !== null && filters.status !== '') {
+    r.input('status', sql.Int, Number(filters.status));
+  }
+  if (filters.companyId) r.input('companyId', sql.Int, Number(filters.companyId));
+  r.input('offset', sql.Int, offset);
+  r.input('pageSize', sql.Int, pageSize);
+
+  const result = await r.query(`${countSql} ${pageSql}`);
+  const total = result.recordsets[0][0]?.total || 0;
+  const data  = result.recordsets[1] || [];
+
+  return { page, pageSize, total, data };
+}
+
+
+module.exports = { createStore, getStoreById, listStores, updateStoreById, listStoresBasic };

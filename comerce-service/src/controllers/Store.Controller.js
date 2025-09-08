@@ -1,5 +1,5 @@
 // controllers/Store.Controller.js
-const { createStore, getStoreById, listStores, updateStoreById } = require('../models/StoreModels');
+const { createStore, getStoreById, listStores, updateStoreById, listStoresBasic } = require('../models/StoreModels');
 const { nowSCLSql121 } = require('../utils/dates');
 
 function getSqlErrorNumber(err) {
@@ -18,6 +18,13 @@ function getSqlErrorMessage(err) {
     err?.message ??
     ''
   );
+}
+function parseBool(v) {
+  if (v === undefined || v === null || v === '') return undefined;
+  const s = String(v).trim().toLowerCase();
+  if (['true','1','si','sí','yes','y'].includes(s)) return true;
+  if (['false','0','no','n'].includes(s)) return false;
+  return undefined; // si viene algo raro, lo ignoramos
 }
 
 async function postStore(req, res) {
@@ -201,6 +208,26 @@ async function putStore(req, res) {
   }
 }
 
+async function getStoresBasic(req, res) {
+  try {
+    const page = parseIntOr(req.query.page, 1);
+    const pageSize = parseIntOr(req.query.pageSize, 10);
+
+    const filters = {
+      search: req.query.search || undefined,
+      status: req.query.status ?? undefined,
+      companyId: req.query.companyId ? Number(req.query.companyId) : undefined,
+      hasAddress: parseBool(req.query.hasAddress), // true => con Location; false => sin Location
+    };
+
+    const result = await listStoresBasic({ page, pageSize, filters });
+    // result.data ya viene con [{ Id, Name }]
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('getStoresBasic error:', err);
+    return res.status(500).json({ ok: false, message: 'Error obteniendo stores (básico)' });
+  }
+}
 
 
-module.exports = { postStore, getStore, getStores, putStore };
+module.exports = { postStore, getStore, getStores, putStore, getStoresBasic };
