@@ -4,6 +4,6 @@ const router = express.Router();
 
 const OrdersRoutes = require('./Orders.Routes')
 
-router.use('/orders', OrdersRoutes);
+router.use('/api', OrdersRoutes);
 
 module.exports = router;
