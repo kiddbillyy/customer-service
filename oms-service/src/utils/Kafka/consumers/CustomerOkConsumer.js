@@ -146,6 +146,7 @@ async function startCustomerOkConsumer() {
 
   await consumer.connect();
   await consumer.subscribe({ topic: TOPIC_CUSTOMER_OK, fromBeginning: false });
+  
 
   await consumer.run({
     eachMessage: async ({ topic, partition, message }) => {
