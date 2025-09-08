@@ -12,3 +12,4 @@ router.get('/:id', getStore);
 router.put('/:id', putStore);
 
 module.exports = router;
+ 

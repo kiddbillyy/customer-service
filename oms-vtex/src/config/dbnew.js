@@ -15,7 +15,7 @@ const omsConfig = {
 
 const IdServicePool = new sql.ConnectionPool(omsConfig);
 const IdServicePoolConnect = IdServicePool.connect()
-  .then(() => console.log('✅ Conectado a OMS-SERVICE (OMS) DB'))
-  .catch(err => console.error('❌ Error conectando a OMS-SERVICE DB:', err));
+  .then(() => console.log('✅ Conectado a OMS_VTEX_DB '))
+  .catch(err => console.error('❌ Error conectando a OMS-VTEX_DB: ', err));
 
 module.exports = { sql, IdServicePool, IdServicePoolConnect };
