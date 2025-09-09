@@ -2,9 +2,8 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const apiRoutes = require('./routes/index');
 const { connectProducer } = require('./utils/kafkaProducer');
-const { startCustomerOkConsumer } = require('./utils/Kafka/consumers/CustomerOkConsumer'); 
+const { startCustomerOkConsumer } = require('./utils/Kafka/consumers/Customervtex'); 
 
 dotenv.config();
 
@@ -12,10 +11,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// tus rutas
-app.use('/api/oms-service', apiRoutes);
+app.get('/healthz', (_req, res) => res.send('ok'));
 
-const PORT = process.env.PORT || 5010;
+const PORT = process.env.PORT || 5011;
 
 app.listen(PORT, async () => {
   try {
@@ -25,7 +23,7 @@ app.listen(PORT, async () => {
 
     // arranca el consumer de customer-ok
     await startCustomerOkConsumer();
-    console.log('📥 CustomerOkConsumer iniciado');
+    console.log('📥 Customervtex iniciado');
   } catch (err) {
     console.error('❌ Error inicializando servicios Kafka:', err);
   }
