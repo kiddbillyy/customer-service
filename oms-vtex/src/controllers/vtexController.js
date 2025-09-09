@@ -1,4 +1,4 @@
-const { handleVtexIntegration } = require('../services/vtexIntegrationService');
+const { handleVtexIntegration } = require('../services/vtexIntegrationService').default;
 
 async function vtexIntegrations(req, res) {
   try {
