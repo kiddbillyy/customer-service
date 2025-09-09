@@ -1,7 +1,6 @@
 // utils/kafka/consumers/CustomerOkConsumer.js
 const { Kafka } = require('kafkajs');
 const { IdServicePool, IdServicePoolConnect, sql } = require('../../../config/dbnew');
-// 🔧 corrige la ruta según tu árbol real:
 const { fetchVtexOrder } = require('../../../service/vtexService');
 
 const TOPIC   = process.env.KAFKA_TOPIC_ORDER_STATUS || 'vtex.order.integration';
@@ -106,7 +105,7 @@ async function persistOrderAndStatus({ commerceId, creationDateIso, state, statu
     return orderPkId;
   } catch (e) {
     try { await tx.rollback(); } catch {}
-    console.error('❌ persistOrderAndStatus error:', e.message);
+    console.error('❌ persistOrderAndStatus error:', e.message)
     throw e;
   }
 }
