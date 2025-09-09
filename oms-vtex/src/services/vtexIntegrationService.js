@@ -14,4 +14,7 @@ async function handleVtexIntegration(payload) {
   console.log(`✅ Mensaje enviado a Kafka [${topic}]: orderId=${payload.OrderId}`);
 }
 
+
+//mensaje para probar linear
+
 module.exports = { handleVtexIntegration };
