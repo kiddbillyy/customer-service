@@ -15,6 +15,4 @@ async function handleVtexIntegration(payload) {
 }
 
 
-//mensaje para probar linear Prueba numero 2
-
 module.exports = { handleVtexIntegration };
