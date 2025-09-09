@@ -2,8 +2,8 @@
 const express = require('express');
 const router = express.Router();
 
-const OrdersRoutes = require('./Orders.Routes')
+const VtexRoutes = require('./vtexRoutes')
 
-router.use('/api', OrdersRoutes);
+router.use('/api', VtexRoutes);
 
 module.exports = router;
