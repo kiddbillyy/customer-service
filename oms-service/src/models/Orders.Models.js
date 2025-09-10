@@ -123,7 +123,7 @@ async function insertOrderFulfillment(tx, orderID, f = {}) {
     .input('receiverName',    sql.NVarChar(150), f.receiverName ?? null)
     .input('postalCode',      sql.NVarChar(20),  f.postalCode ?? null)
     .input('city',            sql.NVarChar(100), f.city ?? null)
-    .input('country',         sql.Char(2),       f.country ? String(f.country).toUpperCase() : null)
+    .input('country',         sql.Char(10),       f.country ? String(f.country).toUpperCase() : null)
     .input('state',           sql.NVarChar(100), f.state ?? null)
     .input('street',          sql.NVarChar(200), f.street ?? null)
     .input('number',          sql.NVarChar(20),  f.number ?? null)
@@ -169,7 +169,7 @@ async function updateOrderFulfillmentPartial(tx, orderID, f = {}) {
   setIf('receiverName',     f.receiverName,     sql.NVarChar(150));
   setIf('postalCode',       f.postalCode,       sql.NVarChar(20));
   setIf('city',             f.city,             sql.NVarChar(100));
-  setIf('country',          f.country,          sql.Char(2),   (v) => v ? String(v).toUpperCase() : null);
+  setIf('country',          f.country,          sql.Char(10),   (v) => v ? String(v).toUpperCase() : null);
   setIf('state',            f.state,            sql.NVarChar(100));
   setIf('street',           f.street,           sql.NVarChar(200));
   setIf('[number]',         f.number,           sql.NVarChar(20));         

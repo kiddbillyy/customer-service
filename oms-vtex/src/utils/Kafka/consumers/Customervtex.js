@@ -3,12 +3,11 @@ const { Kafka } = require('kafkajs');
 const { IdServicePool, IdServicePoolConnect, sql } = require('../../../config/dbnew');
 const { fetchVtexOrder } = require('../../../service/vtexService');
 const { buildOmsPayload } = require('../../../services/omsMapper');
-const { postOrderToOms } = require('../../../services/omsService')
+const { postOrderToOms } = require('../../../services/omsService');
 
 const TOPIC   = process.env.KAFKA_TOPIC_ORDER_STATUS || 'vtex.order.integration';
 const BROKERS = (process.env.KAFKA_BROKER || '').split(',').filter(Boolean);
 
-// ---------- helpers ----------
 function safeJson(bufOrStr) {
   try {
     const s = Buffer.isBuffer(bufOrStr) ? bufOrStr.toString('utf8') : String(bufOrStr || '');
@@ -30,12 +29,10 @@ function parseOrderMessage(message) {
     payload.state ?? payload.State ?? payload.STATE ??
     headers['state'] ?? headers['x-state'] ?? null;
 
-  // status puede venir o no; si no viene, usamos state
   let status =
     payload.status ?? payload.Status ?? payload.STATUS ??
     headers['status'] ?? headers['x-status'] ?? null;
 
-  // 🔧 fallback: si no hay state pero sí status, úsalo como state
   if (!state && status) state = status;
   if (!status && state) status = state;
 
@@ -44,13 +41,15 @@ function parseOrderMessage(message) {
 
   return { orderId, state, status, payload, headers };
 }
+
+// ---------- persistencia ----------
 async function persistOrderAndStatus({ commerceId, creationDateIso, state, status }) {
   await IdServicePoolConnect;
 
   const tx = new sql.Transaction(IdServicePool);
   await tx.begin();
   try {
-    // 1) Buscar si ya existe por commerceId (con lock para evitar carreras)
+    // 1) Buscar si ya existe por commerceId (con lock)
     const findReq = new sql.Request(tx)
       .input('commerceId', sql.NVarChar(100), commerceId);
 
@@ -61,10 +60,9 @@ async function persistOrderAndStatus({ commerceId, creationDateIso, state, statu
     `)).recordset[0];
 
     if (cur) {
-      // 👉 Ya existe: NO hacemos nada más
       console.log('🚫 orders skip (ya existe):', { commerceId, id: cur.id });
       await tx.commit();
-      return Number(cur.id);
+      return { orderPkId: Number(cur.id), created: false };
     }
 
     // 2) Insertar nueva orden (primera vez)
@@ -104,10 +102,10 @@ async function persistOrderAndStatus({ commerceId, creationDateIso, state, statu
 
     await tx.commit();
     console.log('✅ OrderStatusChange insert (inicial) ok → orderId=', orderPkId);
-    return orderPkId;
+    return { orderPkId, created: true };
   } catch (e) {
     try { await tx.rollback(); } catch {}
-    console.error('❌ persistOrderAndStatus error:', e.message)
+    console.error('❌ persistOrderAndStatus error:', e.message);
     throw e;
   }
 }
@@ -119,21 +117,42 @@ async function handleVtexOrderMessage(message, ctx) {
 
   console.log(`📥 [${topic}|p${partition}|o${offset}] orderId=${orderId}, state=${state}, status=${status}`);
 
-  // Obtener creationDate desde VTEX (no bloquea si falla)
-  let creationDateIso = null;
+  // 1) Obtener VTEX (si falla, seguimos con persist pero omitimos el POST)
+  let vtexData = null;
   try {
-    const vtexData = await fetchVtexOrder(orderId);
-    creationDateIso = vtexData?.creationDate || null;
+    vtexData = await fetchVtexOrder(orderId);
   } catch (e) {
     console.warn(`⚠️ VTEX fetch fallo para ${orderId}: ${e.message}`);
   }
 
-  await persistOrderAndStatus({
+  // 2) Persistir en OMS_VTEX_DB (solo crea si no existe)
+  const { orderPkId, created } = await persistOrderAndStatus({
     commerceId: orderId,
-    creationDateIso,
+    creationDateIso: vtexData?.creationDate || null,
     state,
     status
   });
+
+  // 3) POST al OMS solo si es creación inicial y tenemos detalle de VTEX
+  if (!created) {
+    console.log('↩️  OMS POST omitido (orden ya existente)', { orderPkId, commerceId: orderId });
+    return;
+  }
+  if (!vtexData) {
+    console.warn('⚠️ OMS POST omitido: no hay detalle VTEX', { orderPkId, commerceId: orderId });
+    return;
+  }
+
+  try {
+    const payload  = buildOmsPayload(vtexData, { orderId, state, status });
+    console.log('📦 OMS payload (preview 1k):', JSON.stringify(payload).slice(0, 1000));
+    const response = await postOrderToOms(payload);
+    console.log('📤 POST OMS OK', { orderPkId, commerceId: orderId, response });
+  } catch (e) {
+    const status = e?.response?.status;
+    const data   = e?.response?.data;
+    console.error('❌ POST OMS error:', e.message, { status, data, orderPkId, commerceId: orderId });
+  }
 }
 
 async function startCustomerOkConsumer() {
@@ -175,6 +194,7 @@ async function startCustomerOkConsumer() {
 }
 
 module.exports = { startCustomerOkConsumer, handleVtexOrderMessage };
+
 
 // utils/kafka/consumers/Customervtex.js
 
