@@ -58,26 +58,61 @@ function mapShipping(vtex) {
   return { shippingEstimate, deliveryCompany, deliveryDate };
 }
 
+const normalizeCategoryPath = (raw) => {
+  if (!raw) return null;
+  const cleaned = String(raw).replace(/[^\d/]/g, "/").replace(/\/+/g, "/");
+  if (!cleaned.replace(/\//g, "")) return null;
+  const withLeading = cleaned.startsWith("/") ? cleaned : `/${cleaned}`;
+  const withTrailing = withLeading.endsWith("/") ? withLeading : `${withLeading}/`;
+  return withTrailing;
+};
+
+const splitIds = (path) => (path ? path.split("/").filter(Boolean) : []);
+
 function mapItems(vtex) {
   const items = Array.isArray(vtex?.items) ? vtex.items : [];
-  return items.map((it, idx) => ({
-    itemIndex: idx,
-    uniqueId : it?.uniqueId || null,
-    itemcode : it?.refId || it?.id || null,   // prioriza refId si es tu código SAP
-    dscription: it?.name || it?.skuName || null,
-    quantity : it?.quantity || 0,
-    priceAfterVAT: Number(it?.sellingPrice ?? it?.price) || 0,  // VTEX: centavos
-    codebars : it?.ean || null,
-    imageUrl : it?.imageUrl || null,
-    categoryLeafId   : pick(it, 'productCategoryIds') || null,   // ajusta si tienes el árbol real
-    categoryLeafName : pick(it, 'productCategoryName') || null,
-    categoryPathIds  : pick(it, 'productCategoryIds') || null,
-    categoryPathNames: pick(it, 'productCategoryNames') || null,
-  }));
+
+
+  return items.map((it, idx) => {
+    const rawPath =
+      it?.productCategoryIds ??
+      it?.additionalInfo?.categoriesIds ??
+      it?.categoryPathIds ??
+      null;
+
+    const categoryPathIds = normalizeCategoryPath(rawPath);
+    const ids = splitIds(categoryPathIds);
+
+    const productCategories = it?.productCategories || null;
+
+
+    const categoryPathNames = productCategories
+      ? ids.map((id) => productCategories[id]).filter(Boolean).join(" > ")
+      : null;
+
+    const firstId = ids.length ? ids[0] : null;
+    const categoryLeafId = firstId ? Number(firstId) : null;
+    const categoryLeafName = ((firstId && productCategories) ? productCategories[firstId] : undefined) ?? it?.categoryLeafName ?? null;
+    return {
+      itemIndex: idx,
+      uniqueId: it?.uniqueId || null,
+      itemcode: it?.refId || it?.id || null,
+      dscription: it?.name || it?.skuName || null,
+      quantity: Number(it?.quantity ?? 0),
+      priceAfterVAT: Number(it?.sellingPrice ?? it?.price ?? 0),
+      codebars: it?.ean || null,
+      imageUrl: it?.imageUrl || null,
+
+      // 👉 formato final para BD
+      categoryLeafId,
+      categoryLeafName,
+      categoryPathIds,
+      categoryPathNames,
+    };
+  });
 }
 
-
-exports.buildOmsPayload = (vtex, { orderId, state, status }) => {
+exports.buildOmsPayload = (vtex, { orderId}) => {
   const { doctotalsy, valuesInCents } = computeTotals(vtex);
   const { shippingEstimate, deliveryCompany, deliveryDate } = mapShipping(vtex);
 
