@@ -72,6 +72,7 @@ const splitIds = (path) => (path ? path.split("/").filter(Boolean) : []);
 function mapItems(vtex) {
   const items = Array.isArray(vtex?.items) ? vtex.items : [];
 
+
   return items.map((it, idx) => {
     const rawPath =
       it?.productCategoryIds ??
@@ -84,14 +85,14 @@ function mapItems(vtex) {
 
     const productCategories = it?.productCategories || null;
 
+
     const categoryPathNames = productCategories
       ? ids.map((id) => productCategories[id]).filter(Boolean).join(" > ")
-      : it?.categoryPathNames ?? null;
+      : null;
 
     const firstId = ids.length ? ids[0] : null;
     const categoryLeafId = firstId ? Number(firstId) : null;
     const categoryLeafName = ((firstId && productCategories) ? productCategories[firstId] : undefined) ?? it?.categoryLeafName ?? null;
-
     return {
       itemIndex: idx,
       uniqueId: it?.uniqueId || null,
@@ -110,8 +111,6 @@ function mapItems(vtex) {
     };
   });
 }
-
-
 
 exports.buildOmsPayload = (vtex, { orderId}) => {
   const { doctotalsy, valuesInCents } = computeTotals(vtex);
