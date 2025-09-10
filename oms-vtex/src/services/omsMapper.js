@@ -72,6 +72,7 @@ const splitIds = (path) => (path ? path.split("/").filter(Boolean) : []);
 function mapItems(vtex) {
   const items = Array.isArray(vtex?.items) ? vtex.items : [];
 
+
   return items.map((it, idx) => {
     const rawPath =
       it?.productCategoryIds ??
@@ -83,6 +84,7 @@ function mapItems(vtex) {
     const ids = splitIds(categoryPathIds);
 
     const productCategories = it?.productCategories || null;
+
 
     const categoryPathNames = productCategories
       ? ids.map((id) => productCategories[id]).filter(Boolean).join(" > ")
