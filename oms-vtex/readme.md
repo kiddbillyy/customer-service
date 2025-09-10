@@ -1,6 +1,6 @@
-# 🛒 Commerce Service - Mimbral
+#  OMS-VTEX - Mimbral
 
-El **Commerce Service** es un microservicio encargado de la **gestión de entidades comerciales como compañías, tiendas, canales de venta, cuentas, localizaciones y reglas de negocio (geofences, holidays, etc.)**. Forma parte del ecosistema de microservicios de Mimbral y está diseñado para centralizar la administración de información comercial y logística.
+El **OMS-VTEX** es un microservicio encargado de registrar y sincronizar pedidos provenientes de la plataforma VTEX hacia el Order Management System (OMS) de Mimbral.
 
 ---
 
@@ -11,93 +11,39 @@ El **Commerce Service** es un microservicio encargado de la **gestión de entida
 - **Microsoft SQL Server (MSSQL)**: Motor de base de datos.
 - **Docker**: Contenerización y despliegue de servicios.
 - **API Gateway**: Punto de entrada centralizado para ruteo de solicitudes.
-- **Kafka**: Encargado de Enviar Topic de los datos relevantes para que consuman otros microservicios
+- **Kafka**: Encargado de Enviar Topic de los datos relevantes para que consuman otros microservicios y consumir topic       de otro MS.
 
 ---
-
 ## 📌 Endpoints Principales
 
-### Company
+### WEBHOOKS
 
-- **POST /company/Crear** → Crear Comañia.
-- **GET /company/{id}** → Obtener Compañia por ID.
-- **GET /company** → Obtener Lista de Compañias.
-- **PUT /company/{id}** → Editar Compañia por ID.
-
-###  Store
-
-- **POST /store/Crear** →  Crear Store.
-- **GET /store/{id}** → Obtener Store por ID.
-- **GET /store** → Obtener Lista de Store.
-- **PUT /store/{id}** → Editar Store por ID.
-
-### Sales Channel
-
-- **POST /sales-channel/Crear** → Crear Canal de Venta.
-- **GET /sales-channel/Listar** → Obtener Lista de Canales de Venta.
-- **GET /sales-channel/{id}** → Obtener Canales de Venta por ID.
-- **PUT /sales-channel/{id}** → Editar Canales de Venta por ID.
-- **POST /sales-channel/massive** → Crear Canales de Venta Masivo.
-
-### Account
-
-- **POST /account/Crear** → Crear una nueva Cuenta.
-- **GET /account/{id}** → Obtener Cuenta por ID.
-- **GET /account/Listar** → Obtener Lista de Cuentas.
-- **PUT /account/{id}** → Editar cuenta por ID.
-- **POST /account/massive** → Crear Cuentas de Forma Masiva.
-- **GET /account/features/{id}** → Obtener Configuración de Features.
-
-### Location
-
-- **GET /locations** → Obtener Lista de Locaciones.
-- **GET /locations/{id}** → Obtener Locaciones por ID.
-- **POST /locations** → Crear Locaciones.
-- **PUT /locations/{id}** → Editar Locaciones por ID.
-- **PATCH /locations/{id}** → Editar Locaciones por ID.
-
-### Geofence
-
-- **POST /geofences** → Crear Geofence.
-- **PUT /geofences/{id}** → Editar Geofence.
-- **GET /geofences** → Obtener lista de Geofence.
-
-### Holiday
-
-- **POST /holidays** → Crear Feriados.
-- **PUT /holidays/{id}** → Actualizar Feriados.
-- **GET /holidays/{id}** → Obtener Feriados por ID.
-- **GET /holidays** → Obtener Lista de Feriados.
-- **DELETE /holidays/{id}** → Eliminar Feriados.
-
-### LocationGeo
-
-- **GET /location-geo/by-location/{id}** → Obtener Geofence de una Locación por ID.
-- **GET /location-geo/by-geofenc** → Obtener Locaciones de una Geofence.
-- **GET /location-geo** → Obtener Lista de Geofence.
-- **POST /location-geo** → Crear LocationGeo.
-- **DELETE /location-geo/{id}** → Eliminar LocationGeo por ID.
-- **DELETE /location-geo?locationId=&geofenceId=** → Eliminar LocationGeo por Par.
+- **POST /vtex/vtex-hook
 
 ## ⚙️ Configuración
 
 ### Variables de Entorno (`.env`)
 
-| Variable         | Descripción                            | Ejemplo                       |
-|------------------|----------------------------------------|-------------------------------|
-| `PORT`           | Puerto donde corre el servicio         | `5009`                        |
-| `DB_HOST`        | Host base de datos                     | `localhost`                   |
-| `DB_USER`        | Usuario de la base de datos            | `user_db`                     |
-| `DB_PASSWORD`    | Contraseña de la base de datos         | `******`                      |
-| `DB_NAME`        | Nombre de la base de datos             | `COMMERCE_SERVICE`            |
-| `DB_PORT`        | Puerto de la base de datos (MSSQL)     | `1433`                        |
-| `KAFKA_BROKER`   | Dirección del broker de Kafka          | `kafka:9092`                  |
-| `KAFKA_CLIENT_ID`| Identificador del cliente Kafka        | `comerce-service`             |
-| `JWT_SECRET`              | Secreto para firmar tokens JWT| `********`                    |
-| `KAFKA_TOPIC_COMPANY`     | TOPIC                         | `commerce.company.events`     |
-| `KAFKA_TOPIC_SALESCHANNEL`| TOPIC                         | `commerce.saleschannel.events`|
-| `KAFKA_TOPIC_HOLIDAY`     | TOPIC                         | `commerce.holiday.events`     |
-| `KAFKA_TOPIC_GEOFENCE`    | TOPIC                         | `commerce.geofence.events`    |
+### Variables de Entorno (`.env`)
+
+| Variable               | Descripción                                               | Ejemplo                                          |
+|-------------------------|-----------------------------------------------------------|--------------------------------------------------|
+| `PORT`                 | Puerto donde corre el servicio                            | `5011`                                           |
+| `DB_HOST`              | Host de la base de datos (MSSQL)                          | `host.docker.internal`                           |
+| `DB_USER`              | Usuario de la base de datos                               | `DEV`                                            |
+| `DB_PASSWORD`          | Contraseña de la base de datos                            | `1234`                                           |
+| `DB_NAME`              | Nombre de la base de datos                                | `OMS_VTEX_DB`                                    |
+| `DB_PORT`              | Puerto de conexión a la base de datos (MSSQL)             | `1433`                                           |
+| `KAFKA_BROKER`         | Dirección del broker de Kafka                             | `kafka:9092`                                     |
+| `KAFKA_CLIENT_ID`      | Identificador del cliente Kafka                           | `oms-service`                                    |
+| `KAFKA_GROUP_ORDERS`   | Identificador del consumer group para órdenes             | `oms-vtex-sync`                                  |
+| `KAFKA_TOPIC_ORDER_STATUS` | Tópico Kafka de integración de órdenes desde VTEX     | `vtex.order.integration`                         |
+| `OMS_POST_URL`         | URL del endpoint del OMS para registrar pedidos           | `https://catalogomimbral.loclx.io/api/oms-service/orders` |
+| `VTEX_APP_KEY`         | AppKey de integración con la API de VTEX                  | `vtexappkey-mimbralb2c-FNMFHC`                   |
+| `VTEX_APP_TOKEN`       | AppToken de integración con la API de VTEX                | `PZUKZKOCOTTZDFWXRGD...`                         |
+| `VTEX_ACCOUNT`         | Cuenta de VTEX asociada                                   | `mimbralb2c`                                     |
+| `VTEX_ENVIRONMENT`     | Entorno de VTEX                                           | `vtexcommercestable`                             |
+
 
 
 ## Ejecución con Docker
@@ -120,16 +66,16 @@ CMD ["npm", "start"]
 version: '3.8'
 
 networks:
-  orders-service_kafka_network:
+  kafka_network:
     external: true
 
 services:
-  comerce-service:
+  oms-service:
     build: .
-    container_name: comerce-service
+    container_name: oms-vtex
     restart: always
     ports:
-      - "5009:5009"
+      - "5011:5011"
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "win-hp03dio6fsk:192.168.0.165"
@@ -138,31 +84,23 @@ services:
       - 8.8.8.8         
       - 1.1.1.1 
     environment:
-      PORT: 5009
+      PORT: 5011
       DB_HOST: host.docker.internal
       DB_USER: DEV
       DB_PASSWORD: 1234
-      DB_NAME: COMERCE_SERVICE_DB
+      DB_NAME: OMS_VTEX_DB
       DB_PORT: 1433
-      EMAIL_USER: noreply1@cmimbral.cl
-      EMAIL_PASS: nOre_!234
-      EMAIL_HOST: mail.cmimbral.cl
-      EMAIL_PORT: 465
-      EMAIL_SECURE: true
-      JWT_SECRET: mysupersecretkey
       KAFKA_BROKER: kafka:9092
-      KAFKA_CLIENT_ID: comerce-service
+      KAFKA_CLIENT_ID: oms-service
+      KAFKA_GROUP_ORDERS: oms-vtex-sync
+      KAFKA_TOPIC_ORDER_STATUS: vtex.order.integration
       VTEX_APP_KEY: ${VTEX_APP_KEY}
       VTEX_APP_TOKEN: ${VTEX_APP_TOKEN}
       VTEX_ACCOUNT: ${VTEX_ACCOUNT}
       VTEX_ENVIRONMENT: ${VTEX_ENVIRONMENT}
-      SAP_BASE_URL: ${SAP_BASE_URL}
-      SAP_COMPANY_DB: ${SAP_COMPANY_DB}
-      SAP_USERNAME: ${SAP_USERNAME}
-      SAP_PASSWORD: ${SAP_PASSWORD}
-    networks:
-      - orders-service_kafka_network
 
+    networks:
+      - kafka_network
 
 ```
 

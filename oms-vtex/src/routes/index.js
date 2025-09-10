@@ -7,3 +7,5 @@ const VtexRoutes = require('./vtexRoutes')
 router.use('/vtex', VtexRoutes);
 
 module.exports = router;
+
+
