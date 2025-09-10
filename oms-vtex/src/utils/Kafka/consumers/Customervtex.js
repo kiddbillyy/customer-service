@@ -110,6 +110,75 @@ async function persistOrderAndStatus({ commerceId, creationDateIso, state, statu
   }
 }
 
+function getResponseData(resp) {
+  if (!resp) return null;
+  if (resp && typeof resp === 'object' && 'data' in resp && resp.data != null) return resp.data;
+  return resp;
+}
+
+function extractOmsOrderOutcome(resp) {
+  const data = getResponseData(resp);
+  const id = data?.id ?? null;
+  const message = data?.message ?? null;
+
+  if (message === 'ORDER_EXISTS') {
+    return { status: 'ORDER_EXISTS', id: id != null ? String(id) : null, message };
+  }
+  if (id != null) {
+    return { status: 'CREATED', id: String(id), message: message ?? null, itemsInserted: data?.itemsInserted ?? null };
+  }
+  return { status: 'UNKNOWN', id: null, message };
+}
+
+async function updateOrderWithOmsId(orderPkId, omsOrderId) {
+  await IdServicePoolConnect;
+  const req = new sql.Request(IdServicePool)
+    .input('orderPkId', sql.Int, orderPkId)
+    .input('omsOrderId', sql.NVarChar(100), String(omsOrderId));
+  await req.query(`
+    UPDATE dbo.Orders
+    SET ref_omsOrderId = @omsOrderId,
+        updatedAt      = SYSUTCDATETIME(),
+        statusIntegration = 1
+    WHERE id = @orderPkId;
+  `);
+}
+
+async function setOrderErrorIntegration(orderPkId, errorText) {
+  await IdServicePoolConnect;
+  const text = errorText == null ? null : String(errorText).slice(0, 512);
+  const req = new sql.Request(IdServicePool)
+    .input('orderPkId', sql.Int, orderPkId)
+    .input('err', sql.NVarChar(512), text);
+  await req.query(`
+    UPDATE dbo.Orders
+    SET errorIntegration = @err,
+        updatedAt        = SYSUTCDATETIME()
+    WHERE id = @orderPkId;
+  `);
+}
+
+function normalizeOmsError(e) {
+  const msg = e?.response?.data?.message ?? e?.message ?? null;
+  const KNOWN = new Set([
+    'STATUS_NOT_FOUND',
+    'ORDER_EXISTS',
+    'ITEM_INDEX_REQUIRED',
+    'DUPLICATE_ITEM_INDEX',
+    'ITEM_REQUIRED_FIELDS',
+  ]);
+  if (msg && KNOWN.has(msg)) return msg;
+
+  // HTTP con body string "ORDER_EXISTS", etc.
+  if (typeof e?.response?.data === 'string' && KNOWN.has(e.response.data)) return e.response.data;
+
+  // errores de red comunes
+  if (e?.code === 'ECONNREFUSED') return 'OMS_UNREACHABLE';
+  if (e?.code === 'ETIMEDOUT')    return 'OMS_TIMEOUT';
+
+  return msg ? `OMS_POST_FAILED: ${String(msg).slice(0,80)}` : 'OMS_POST_FAILED';
+}
+
 // ---------- consumer ----------
 async function handleVtexOrderMessage(message, ctx) {
   const { topic, partition, offset } = ctx;
@@ -146,12 +215,38 @@ async function handleVtexOrderMessage(message, ctx) {
   try {
     const payload  = buildOmsPayload(vtexData, { orderId, state, status });
     console.log('📦 OMS payload (preview 1k):', JSON.stringify(payload).slice(0, 1000));
+
     const response = await postOrderToOms(payload);
-    console.log('📤 POST OMS OK', { orderPkId, commerceId: orderId, response });
+    const outcome  = extractOmsOrderOutcome(response);
+    console.log("Response: ",response);
+
+    console.log("Outcome: ",outcome);
+
+    if (outcome.status === 'CREATED' && outcome.id) {
+      await updateOrderWithOmsId(orderPkId, outcome.id);
+      await setOrderErrorIntegration(orderPkId, null); // ✅ limpia errorIntegration en éxito
+      console.log('📤 POST OMS OK; ref_omsOrderId y errorIntegration actualizados', {
+        orderPkId, omsOrderId: outcome.id
+      });
+    } else if (outcome.status === 'ORDER_EXISTS') {
+      // registra el error; si trae id, opcionalmente guarda ref_omsOrderId
+      await setOrderErrorIntegration(orderPkId, 'ORDER_EXISTS');
+      if (outcome.id) await updateOrderWithOmsId(orderPkId, outcome.id);
+      console.warn('ℹ️ OMS: ORDER_EXISTS', { orderPkId, commerceId: orderId, id: outcome.id ?? null });
+    } else {
+      // Respuesta inesperada: guarda el mensaje si vino
+      await setOrderErrorIntegration(orderPkId, outcome.message ?? 'UNKNOWN_RESPONSE');
+      console.warn('⚠️ OMS: respuesta inesperada', {
+        orderPkId, commerceId: orderId, response: getResponseData(response)
+      });
+    }
   } catch (e) {
     const status = e?.response?.status;
     const data   = e?.response?.data;
-    console.error('❌ POST OMS error:', e.message, { status, data, orderPkId, commerceId: orderId });
+    const code   = normalizeOmsError(e);
+
+    await setOrderErrorIntegration(orderPkId, code);
+    console.error('❌ POST OMS error:', e.message, { status, data, code, orderPkId, commerceId: orderId });
   }
 }
 
