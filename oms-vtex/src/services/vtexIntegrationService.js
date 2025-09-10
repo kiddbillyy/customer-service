@@ -2,8 +2,6 @@
 const { sendMessage } = require('../producer');
 
 async function handleVtexIntegration(payload) {
-  console.log('📥 Recibido VTEX hook payload:', payload);
-
   const topic = 'vtex.order.integration';
   if (!payload?.OrderId) return;
   
@@ -14,10 +12,6 @@ async function handleVtexIntegration(payload) {
 
   console.log(`✅ Mensaje enviado a Kafka [${topic}]: orderId=${payload.OrderId}`);
 }
-
-
-
-
 
 
 module.exports = { handleVtexIntegration };

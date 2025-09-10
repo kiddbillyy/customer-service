@@ -6,5 +6,13 @@ docker exec -it kafka sh
 
  <!-- {"OrderID":27,"ok":"true","CardCode":"20230330c"}  -->
 
-
+docker exec -it kafka sh
 kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic vtex.order.imported --from-beginning 
+
+
+
+{"orderId":"1558860554229-01","state":"ready-for-handling"}
+
+
+
+kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic vtex.order.integration --from-beginning 
