@@ -5,7 +5,8 @@ async function handleVtexIntegration(payload) {
   console.log('📥 Recibido VTEX hook payload:', payload);
 
   const topic = 'vtex.order.integration';
-
+  if (!payload?.OrderId) return;
+  
   await sendMessage(topic, {
     orderId: payload.OrderId,
     status : payload.State,
