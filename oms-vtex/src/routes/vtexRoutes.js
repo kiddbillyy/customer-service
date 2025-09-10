@@ -3,6 +3,6 @@ const vtexIntegrations = require('../controllers/vtexController');
 
 const router = express.Router();
 
-router.post('/vtex/vtex-hook', vtexIntegrations);
+router.post('/vtex-hook', vtexIntegrations);
 
 module.exports = router;
