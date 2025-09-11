@@ -232,11 +232,11 @@ async function handleVtexOrderMessage(message, ctx) {
       // registra el error; si trae id, opcionalmente guarda ref_omsOrderId
       await setOrderErrorIntegration(orderPkId, 'ORDER_EXISTS');
       if (outcome.id) await updateOrderWithOmsId(orderPkId, outcome.id);
-      console.warn('ℹ️ OMS: ORDER_EXISTS', { orderPkId, commerceId: orderId, id: outcome.id ?? null });
+      console.warn('ℹ OMS: ORDER_EXISTS', { orderPkId, commerceId: orderId, id: outcome.id ?? null });
     } else {
       // Respuesta inesperada: guarda el mensaje si vino
       await setOrderErrorIntegration(orderPkId, outcome.message ?? 'UNKNOWN_RESPONSE');
-      console.warn('⚠️ OMS: respuesta inesperada', {
+      console.warn(' OMS: respuesta inesperada', {
         orderPkId, commerceId: orderId, response: getResponseData(response)
       });
     }
@@ -246,7 +246,7 @@ async function handleVtexOrderMessage(message, ctx) {
     const code   = normalizeOmsError(e);
 
     await setOrderErrorIntegration(orderPkId, code);
-    console.error('❌ POST OMS error:', e.message, { status, data, code, orderPkId, commerceId: orderId });
+    console.error(' POST OMS error:', e.message, { status, data, code, orderPkId, commerceId: orderId });
   }
 }
 
