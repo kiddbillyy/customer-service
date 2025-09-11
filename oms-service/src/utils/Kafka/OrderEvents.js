@@ -92,7 +92,7 @@ function pickOrderFillments(o = {}) {
     Country:          pick(o, 'country', 'Country'),
     PostalCode:       pick(o, 'postalCode', 'PostalCode'),
     ReferenceAddress: pick(o, 'referenceAddress', 'ReferenceAddress'),
-    Notes:            pick(o, 'notes', 'Notes'),
+    Giro:             pick(o, 'giro', 'Giro'),
   };
 }
 

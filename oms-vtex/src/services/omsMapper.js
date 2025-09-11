@@ -42,7 +42,7 @@ function mapFulfillment(vtex) {
     country: addr.country || 'CL',
     postalCode: addr.postalCode || null,
     referenceAddress: addr.reference || null, 
-    notes: null, 
+    giro: client.stateInscription || 'PARTICULAR',
 }
 };
 
