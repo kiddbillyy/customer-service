@@ -611,9 +611,6 @@ patchOrder: async (orderID, changes) => {
   return await OrdersRepository.patchOrder(orderID, updates);
 },
   
-  
 };
-
-
 
 module.exports = OrdersService;

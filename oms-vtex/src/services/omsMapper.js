@@ -20,20 +20,19 @@ function mapFulfillment(vtex) {
   const currencyCode = vtex?.storePreferencesData?.currencyCode || 'CLP';
 
   const isCorporate = client.isCorporate === true || client.isCorporate === 1 || client.isCorporate === '1';
+  const fullName = [client.firstName, client.lastName].filter(Boolean).join(' ');
 
   return {
     firstName: client.firstName || null,
     lastName : client.lastName || null,
     email    : client.email || null,
-    phone    : normalizePhone(client.phone || null),
+    phone: normalizePhone( isCorporate ? (client.corporatePhone || client.phone) : (client.phone || null)),
     isCorporate, 
     currencyCode,
     documentType: client.documentType || 'RUT',
-    document: isCorporate
-      ? client.corporateDocument || null
-      : client.document || null,
+    document: isCorporate ? client.corporateDocument || null : client.document || null,
     addressType: addr.addressType ,
-    receiverName:addr.receiverName ||null,
+    receiverName: addr.receiverName || fullName || null,
     street: addr.street || null,
     number: addr.number || null,
     neighborhood: addr.neighborhood || null,
@@ -42,8 +41,9 @@ function mapFulfillment(vtex) {
     country: addr.country || 'CL',
     postalCode: addr.postalCode || null,
     referenceAddress: addr.reference || null, 
-    notes: null, 
-}
+    giro: isCorporate ? (client.stateInscription || 'EMPRESA'): 'PARTICULAR',
+    cardname: isCorporate ? (client.corporateName || null) : (fullName || null),
+  }
 };
 
 function mapShipping(vtex) {
