@@ -118,7 +118,7 @@ async function insertOrderFulfillment(tx, orderID, f = {}) {
     .input('document',        sql.NVarChar(40),  f.document ?? null)
     .input('phone',           sql.NVarChar(30),  f.phone ?? null)
     .input('isCorporate',     sql.Bit,           toBit(f.isCorporate))
-    .input('notes',           sql.NVarChar(400), f.notes ?? null)
+    .input('giro',           sql.NVarChar(400),  f.giro ?? null)
     .input('addressType',     sql.VarChar(30),   f.addressType ?? null) // 'delivery' | 'store' | 'pickup'
     .input('receiverName',    sql.NVarChar(150), f.receiverName ?? null)
     .input('postalCode',      sql.NVarChar(20),  f.postalCode ?? null)
@@ -129,13 +129,14 @@ async function insertOrderFulfillment(tx, orderID, f = {}) {
     .input('number',          sql.NVarChar(20),  f.number ?? null)
     .input('neighborhood',    sql.NVarChar(100), f.neighborhood ?? null)
     .input('referenceAddress',sql.NVarChar(400), f.referenceAddress ?? null)
+    .input('cardname',        sql.NVarChar(150), f.cardname ?? null)
     .query(`
       INSERT INTO dbo.order_fulfillment (
         orderID, firstName, lastName, email, currencyCode, documentType, [document], phone, isCorporate,
-        notes, addressType, receiverName, postalCode, city, country, [state], street, [number], neighborhood, referenceAddress
+        giro, addressType, receiverName, postalCode, city, country, [state], street, [number], neighborhood, referenceAddress, cardname
       ) VALUES (
         @orderID, @firstName, @lastName, @email, @currencyCode, @documentType, @document, @phone, @isCorporate,
-        @notes, @addressType, @receiverName, @postalCode, @city, @country, @state, @street, @number, @neighborhood, @referenceAddress
+        @giro, @addressType, @receiverName, @postalCode, @city, @country, @state, @street, @number, @neighborhood, @referenceAddress, @cardname
       );
     `);
 }
@@ -164,7 +165,7 @@ async function updateOrderFulfillmentPartial(tx, orderID, f = {}) {
     set.push('isCorporate = @isCorporate');
     req.input('isCorporate', sql.Bit, toBit(f.isCorporate));
   }
-  setIf('notes',            f.notes,            sql.NVarChar(400));
+  setIf('giro',            f.giro,            sql.NVarChar(400));
   setIf('addressType',      f.addressType,      sql.VarChar(30));
   setIf('receiverName',     f.receiverName,     sql.NVarChar(150));
   setIf('postalCode',       f.postalCode,       sql.NVarChar(20));
@@ -175,6 +176,7 @@ async function updateOrderFulfillmentPartial(tx, orderID, f = {}) {
   setIf('[number]',         f.number,           sql.NVarChar(20));         
   setIf('neighborhood',     f.neighborhood,     sql.NVarChar(100));
   setIf('referenceAddress', f.referenceAddress, sql.NVarChar(400));
+  setIf('cardname',         f.cardname,         sql.NVarChar(150));
 
   if (set.length === 0) return { updated: 0 };
 
@@ -727,7 +729,7 @@ async function getOrder(query = {}, options = {}) {
         .query(`
           SELECT
             orderID, firstName, lastName, email, currencyCode, documentType, [document], phone,
-            isCorporate, notes, addressType, receiverName, postalCode, city, country, [state],
+            isCorporate, giro, addressType, receiverName, postalCode, city, country, [state],
             street, [number], neighborhood, referenceAddress
           FROM dbo.order_fulfillment
           WHERE orderID = @id
@@ -928,7 +930,7 @@ async function getOrder(query = {}, options = {}) {
         const frs = await fReq.query(`
           SELECT
             orderID, firstName, lastName, email, currencyCode, documentType, [document], phone,
-            isCorporate, notes, addressType, receiverName, postalCode, city, country, [state],
+            isCorporate, giro, addressType, receiverName, postalCode, city, country, [state],
             street, [number], neighborhood, referenceAddress
           FROM dbo.order_fulfillment
           WHERE orderID IN (${inList})
