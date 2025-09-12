@@ -4,11 +4,45 @@ El **OMS-VTEX** es un microservicio encargado de registrar y sincronizar pedidos
 
 ---
 
+
+
 ## Flujo base entre vtex-oms y el resto de microservicios
 
 <p align="center">
   <img src="DIAGRAMA.jpg" alt="Diagrama ER" width="600">
 </p>
+
+# Proceso de Integración de Pedidos con VTEX
+
+El flujo de integración de pedidos funciona de la siguiente manera:
+
+1. **Recepción del Pedido**
+   - Un **webhook** en VTEX recibe pedidos cuando el pedido se encuentra en estado `ready-for-handling`.
+   - Al momento de recibir el pedido, este se **crea en la base de datos de `vtex-oms`**.
+
+2. **Integración con OMS-SERVICE**
+   - Utilizando el **endpoint de `oms-service`**, el pedido se **integra en el microservicio principal**, que centraliza pedidos de diferentes canales.
+   - Cuando el pedido se inserta en la base de datos de `OMS-SERVICE`, se **retorna la ID correspondiente** a la orden y esta se registra en la base de datos de `vtex-service`.
+
+3. **Consumo de Eventos de Kafka**
+   - Se crea un **consumidor de eventos de Kafka** que recibe un evento para actualizar el estado de la orden en VTEX.
+   - Este evento, enviado desde el **microservicio de finanzas**, es el responsable de notificar el cambio de estado del pedido.
+
+4. **Control de Estado de Integración**
+   - El microservicio **controla el estado de integración hacia `oms-service`**, ofreciendo visibilidad completa del estado de las integraciones.
+   - Después de obtener el nuevo estado, se **registra en la base de datos** y, en base a este estado, se utiliza la **API de VTEX** para cambiar el estado de la orden.
+
+### Ejemplos de Endpoints Utilizados
+
+```
+# Iniciar el manejo de la orden
+POST /api/oms/pvt/orders/{orderId}/start-handling
+
+# Generar la factura de la orden
+POST /api/oms/pvt/orders/{orderId}/invoice
+
+```
+
 
 ## 🚀 Tecnologías Utilizadas
 
