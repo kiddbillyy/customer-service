@@ -4,6 +4,12 @@ El **OMS-VTEX** es un microservicio encargado de registrar y sincronizar pedidos
 
 ---
 
+## Flujo base entre vtex-oms y el resto de microservicios
+
+<p align="center">
+  <img src="DIAGRAMA.jpg" alt="Diagrama ER" width="600">
+</p>
+
 ## 🚀 Tecnologías Utilizadas
 
 - **Node.js**: Entorno de ejecución para JavaScript.
