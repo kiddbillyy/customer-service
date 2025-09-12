@@ -144,11 +144,6 @@ services:
 
 ```
 
-## Diagrama de base de datos:
-<p align= "center">
-  <img src= "" alt="Diagrama ER" width="600">
-</p>
-
 ## 📦 Estructura del Proyecto
 
 ```
