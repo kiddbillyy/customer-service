@@ -137,5 +137,3 @@ sendMessage(topic, payload, { key, headers }):
   log "📮 Mensaje enviado", topic, payload
 
 ---
-
-¿Quieres que también te prepare el `README.md` para el **consumer** (cómo leer estos mensajes de Kafka) y así tengas documentada la dupla **producer-consumer**?
