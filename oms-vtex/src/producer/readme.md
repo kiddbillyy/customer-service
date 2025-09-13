@@ -1,45 +1,52 @@
-Productor Kafka — src/producer/index.js
+# 📮 Productor Kafka — `src/producer/index.js`
 
-¿Qué hace? (explicación no técnica)
+Este módulo es el **productor de mensajes** hacia **Kafka** dentro del microservicio **oms-vtex**.  
+Permite publicar eventos como “nueva orden recibida”, “estado actualizado” o “error de integración”.
 
-Este archivo es como el cartero de tu sistema.
-Cuando tu aplicación tiene una novedad (por ejemplo, “llegó una orden de VTEX”), arma una carta con la información y la envía a un “buzón” llamado Kafka (un sistema de mensajería).
-	•	El tópico es el nombre del buzón (ej. vtex.orderIntegration).
-	•	La key es como el RUT de la carta (ej. el orderId), útil para que todas las cartas de la misma orden lleguen juntas.
-	•	Los headers son post-its con metadatos (ej. trace-id).
+---
 
-Otros microservicios leen ese buzón y actúan: validan cliente, actualizan estados, facturan, etc.
+## 🌐 Explicación no técnica
+Imagina que tu sistema tiene que **avisar algo** (por ejemplo: *“llegó una orden nueva de VTEX”*).  
+Este archivo actúa como un **cartero digital**:
+
+- Arma la carta con los datos (`message`).  
+- Le pone un **RUT** a la carta (la `key`, normalmente el `orderId`).  
+- Si hace falta, le pega **post-its** con notas extras (`headers`).  
+- Y la envía a un **buzón** llamado Kafka (`topic`).  
+
+Otros microservicios abren ese buzón y siguen el flujo (crear cliente, facturar, actualizar estados, etc.).
+
+---
+
+## ⚙️ Explicación técnica
+La función `sendMessage(topic, message, options)`:
+
+1. Serializa el `message` a **JSON**.  
+2. Construye un objeto Kafka `{ key, value, headers }`.  
+3. Llama a `sendBatch(topic, [message])` de `src/utils/kafkaProducer.js`.  
+4. Escribe en consola confirmando el envío.  
+
+### Firma
+
+```ts
+sendMessage(
+  topic: string,
+  message: object,
+  options?: {
+    key?: string | number,
+    headers?: Record<string, string | Buffer>
+  }
+): Promise<void>
+
+	•	topic → Nombre del tópico Kafka (ej: vtex.orderIntegration).
+	•	message → Objeto con la información a publicar (se convierte a JSON).
+	•	key → Clave de partición (recomendado: orderId para mantener orden).
+	•	headers → Metadatos como trace-id, schema-version, etc.
 
 ⸻
 
-¿Qué hace? (explicación técnica)
+🚀 Ejemplo de uso
 
-Expone una función asíncrona sendMessage(topic, message, options) que:
-	1.	Serializa message a JSON.
-	2.	Construye el objeto Kafka { key, value, headers }.
-	3.	Publica el mensaje usando un helper sendBatch(topic, messages[]) (definido en src/utils/kafkaProducer.js).
-	4.	Loguea el envío exitoso.
-
-La key se convierte a string si viene definida. Recomendado usar orderId como clave para particionado determinístico (garantiza orden relativo por orden).
-
-⸻
-
-API
-
-sendMessage(topic, message, options?) → Promise<void>
-	•	topic string — Tópico Kafka destino (p. ej. vtex.orderIntegration).
-	•	message object — Payload del evento (se serializa con JSON.stringify).
-	•	options object (opcional)
-	•	key string|number — Clave de partición. Recomendado: orderId.
-	•	headers Record<string, string|Buffer> — Metadatos (ej. trace-id, schema-version, origin-service).
-
-Errores: Propaga errores de sendBatch (conexión, timeouts, auth). Manejar reintentos/DLQ en capas superiores.
-
-⸻
-
-Ejemplo de uso
-
-// en cualquier parte de tu servicio
 const { sendMessage } = require('../producer');
 
 await sendMessage(
@@ -51,7 +58,7 @@ await sendMessage(
     occurredAt: new Date().toISOString(),
   },
   {
-    key: '1561909550561-01', // particionado estable por orden
+    key: '1561909550561-01', // partición estable por orden
     headers: {
       'trace-id': '6b7a0c9d-2f41-4d7e-9b9e-0f0c123abcde',
       'schema-version': '1',
@@ -60,43 +67,48 @@ await sendMessage(
   }
 );
 
+📋 Resultado esperado:
+El mensaje se publica en el tópico vtex.orderIntegration y cualquier consumidor suscrito podrá procesarlo.
 
 ⸻
 
-Flujo recomendado (resumen)
-	1.	Webhook VTEX → tu API.
-	2.	Validas y persistes datos.
-	3.	sendMessage() publica el evento al tópico.
-	4.	Otros servicios (OMS, Customer, Finanzas) consumen y continúan el proceso.
+📊 Flujo simplificado
+
+Webhook VTEX → OMS-VTEX
+          ↓
+Validación y persistencia en DB
+          ↓
+sendMessage() → Evento a Kafka
+          ↓
+OMS-SERVICE / Customer-Service / Finanzas consumen
+
 
 ⸻
 
-Buenas prácticas
-	•	Key obligatoria en eventos por orden: usa orderId.
-Garantiza orden relativo y procesamiento consistente en los consumidores.
-	•	Headers con trazabilidad: trace-id, correlation-id, origin-service, schema-version.
-	•	Contrato de evento: mantener un esquema estable y versionado (ej. schema-version en header).
-	•	Logs: no imprimir datos sensibles; loguea tópico, orderId y estado.
-	•	Resiliencia: maneja reintentos y DLQ (cola de mensajes muertos) en los consumidores.
-	•	Observabilidad: métricas de entrega, latencia, y errores por tópico.
+✅ Buenas prácticas
+
+Tema	Recomendación
+Key	Siempre usar orderId como key para garantizar orden relativo.
+Headers	Incluir trace-id, correlation-id, origin-service, schema-version.
+Contratos	Versionar los esquemas de mensajes con un header schema-version.
+Logs	Evitar datos sensibles en consola. Loguear solo tópico, key y estado.
+Resiliencia	Manejar reintentos y DLQ (Dead Letter Queue) en consumidores.
+Observabilidad	Medir entregas, latencia y errores por tópico.
+
 
 ⸻
 
-Errores frecuentes y cómo resolver
-	•	sendBatch is not a function
-Revisa src/utils/kafkaProducer.js (que exporte sendBatch correctamente).
-	•	Timeout/Conexión
-Verifica KAFKA_BROKER, red Docker (kafka_network), credenciales y ACLs.
-	•	Mensajes “desordenados”
-Asegura key constante (orderId) para todos los eventos de la misma orden.
-	•	Payload inválido
-Chequea que message sea serializable (sin referencias circulares).
+🛑 Errores frecuentes
+	•	sendBatch is not a function → Revisar que src/utils/kafkaProducer.js exporte correctamente.
+	•	Timeouts o desconexión → Verificar KAFKA_BROKER, red Docker (kafka_network) y credenciales.
+	•	Mensajes desordenados → Usar siempre key = orderId.
+	•	Payload inválido → Revisar que message sea serializable con JSON.stringify.
 
 ⸻
 
-Dependencias de entorno (ejemplo)
+🔧 Variables de entorno necesarias
 
-Ajusta en .env o variables del contenedor:
+Ejemplo en .env:
 
 KAFKA_BROKER=kafka:9092
 KAFKA_CLIENT_ID=oms-service
@@ -106,24 +118,24 @@ KAFKA_TOPIC_ORDER_STATUS=vtex.order.status
 
 ⸻
 
-Relación con otros módulos
-	•	src/utils/kafkaProducer.js: inicializa el producer de Kafka (singleton) y exporta sendBatch(topic, messages[]).
-	•	Consumidores: otros microservicios/threads que se suscriben a los tópicos para continuar el flujo (validaciones, facturación, etc.).
+📂 Relación con otros módulos
+	•	src/utils/kafkaProducer.js → Inicializa el producer Kafka y expone sendBatch().
+	•	Consumidores → Otros microservicios o workers que leen estos tópicos (oms-service, customer-service, finanzas).
 
 ⸻
 
-Pseudocódigo del módulo
+🔎 Pseudocódigo del módulo
 
 sendMessage(topic, payload, { key, headers }):
-  msg = {
-    key:   key != null ? String(key) : undefined
+  mensaje = {
+    key: key ? String(key) : undefined
     value: JSON.stringify(payload)
     headers: headers
   }
-  sendBatch(topic, [msg])
-  log "enviado", topic, payload
 
+  sendBatch(topic, [mensaje])
+  log "📮 Mensaje enviado", topic, payload
 
-⸻
+---
 
-Si quieres, te dejo también la plantilla de src/utils/kafkaProducer.js para que el sendBatch quede documentado igual de claro.
+¿Quieres que también te prepare el `README.md` para el **consumer** (cómo leer estos mensajes de Kafka) y así tengas documentada la dupla **producer-consumer**?
