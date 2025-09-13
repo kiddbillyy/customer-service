@@ -1,4 +1,4 @@
-# 🔁 Kafka Consumer — `src/utils/kafka/consumers/CustomerOkConsumer.js`
+### Kafka Consumer — `src/utils/kafka/consumers/CustomerOkConsumer.js`
 
 Este módulo implementa un **consumidor de Kafka** que recibe eventos de VTEX/OMS, **persiste** la orden y su estado en la base de datos, y en la **creación inicial** hace **POST al OMS** con el payload construido a partir del detalle de la orden en VTEX.
 
