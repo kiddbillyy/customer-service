@@ -32,4 +32,9 @@ sendMessage(
 ): Promise<void>
 ```  
 
-### hola
+### Detalles de funcionamiento
+1.	Serializa el message a JSON.
+2.	Construye el objeto Kafka { key, value, headers }.
+3.	Llama a sendBatch(topic, [message]) (helper en utils/kafkaProducer.js).
+4.	Loguea el envío exitoso.
+
