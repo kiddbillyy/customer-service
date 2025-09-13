@@ -30,6 +30,6 @@ sendMessage(
     headers?: Record<string, string | Buffer>
   }
 ): Promise<void>
-```ts
+<br>```  
 
 ### hola
