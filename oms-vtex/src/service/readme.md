@@ -1,4 +1,4 @@
-## Servicio VTEX — `src/services/vtexService.js`
+### Servicio VTEX — `src/services/vtexService.js`
 
 Este módulo implementa un **servicio de integración con VTEX** que permite obtener información de un pedido específico a partir de su `orderId`.  
 
