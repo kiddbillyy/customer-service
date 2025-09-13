@@ -1,4 +1,4 @@
-# 📮 Productor Kafka — `src/producer/index.js`
+### 📮 Productor Kafka — `src/producer/index.js`
 
 Este módulo es el **productor de mensajes** hacia **Kafka** dentro del microservicio **oms-vtex**.  
 Permite publicar eventos como “nueva orden recibida”, “estado actualizado” o “error de integración”.
