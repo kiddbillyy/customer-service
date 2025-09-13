@@ -1,4 +1,4 @@
-# 📮 Productor Kafka — `src/producer/index.js`
+### 📮 Productor Kafka — `src/producer/index.js`
 
 Este módulo es el **productor de mensajes** hacia **Apache Kafka** dentro del microservicio **oms-vtex**.  
 Permite publicar eventos como **nueva orden recibida**, **estado actualizado** o **error de integración**.
@@ -30,3 +30,13 @@ sendMessage(
     headers?: Record<string, string | Buffer>
   }
 ): Promise<void>
+
+### Detalles de funcionamiento
+	1.	Serializa el message a JSON.
+	2.	Construye el objeto Kafka { key, value, headers }.
+	3.	Llama a sendBatch(topic, [message]) (helper en utils/kafkaProducer.js).
+	4.	Loguea el envío exitoso.
+
+⸻
+
+### 🚀 Ejemplo de uso
