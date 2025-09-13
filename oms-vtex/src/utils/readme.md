@@ -1,4 +1,4 @@
-# ⚙️ Kafka Producer Utils — `src/utils/kafkaProducer.js`
+### Kafka Producer Utils — `src/utils/kafkaProducer.js`
 
 Este módulo implementa la **lógica central de conexión y envío de mensajes a Kafka**.  
 Es utilizado por otros módulos (como `producer/index.js`) para garantizar que los mensajes se envíen de manera confiable, incluso cuando ocurren errores temporales en el clúster Kafka.
