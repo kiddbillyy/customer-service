@@ -73,8 +73,6 @@ POST /api/oms/pvt/orders/{orderId}/invoice
 
 ### Variables de Entorno (`.env`)
 
-### Variables de Entorno (`.env`)
-
 | Variable               | Descripción                                               | Ejemplo                                          |
 |-------------------------|-----------------------------------------------------------|--------------------------------------------------|
 | `PORT`                 | Puerto donde corre el servicio                            | `5011`                                           |
