@@ -44,6 +44,7 @@ El flujo de integración de pedidos funciona de la siguiente manera:
 ### Ejemplos de Endpoints Utilizados
 
 ```
+
 # Iniciar el manejo de la orden
 POST /api/oms/pvt/orders/{orderId}/start-handling
 
