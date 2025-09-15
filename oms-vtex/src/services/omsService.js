@@ -21,11 +21,10 @@ const httpsAgent = new https.Agent({ keepAlive: true, keepAliveMsecs: 20000, max
 
 const client = axios.create({
   baseURL: OMS_POST_URL.replace(/\/+$/,'').replace(/\/orders$/,''),
-  
   timeout: OMS_TIMEOUT_MS,
   httpAgent, httpsAgent,
 });
-console.log('rev:', OMS_POST_URL.replace(/\/+$/,'').replace(/\/orders$/,''));
+
 // Cola para limitar concurrencia hacia el OMS
 const queueOpts = { concurrency: OMS_MAX_CONC };
 if (OMS_MIN_MS > 0) {
