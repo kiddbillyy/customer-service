@@ -8,9 +8,8 @@ async function handleVtexIntegration(payload) {
   await sendMessage(topic, {
     orderId: payload.OrderId,
     status : payload.State,
-  }, { key: payload.OrderId }); // key para particionamiento estable (opcional)
+  }, { key: payload.OrderId });
 
-  console.log(`✅ Mensaje enviado a Kafka [${topic}]: orderId=${payload.OrderId}`);
 }
 
 

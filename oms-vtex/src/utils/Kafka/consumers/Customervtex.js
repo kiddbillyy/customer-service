@@ -1,7 +1,7 @@
-// utils/kafka/consumers/CustomerOkConsumer.js
+
 const { Kafka } = require('kafkajs');
 const { IdServicePool, IdServicePoolConnect, sql } = require('../../../config/dbnew');
-const { fetchVtexOrder } = require('../../../service/vtexService');
+const { fetchVtexOrder } = require('../../../services/vtexService');
 const { buildOmsPayload } = require('../../../services/omsMapper');
 const { postOrderToOms } = require('../../../services/omsService');
 
@@ -254,7 +254,7 @@ async function startCustomerOkConsumer() {
   if (!BROKERS.length) throw new Error('KAFKA_BROKER no está definido (host1:9092,host2:9092)');
 
   const kafka = new Kafka({
-    clientId: process.env.KAFKA_CLIENT_ID || 'orders-vtex-consumer',
+    clientId: process.env.KAFKA_CLIENT_ID,
     brokers : BROKERS,
   });
 
