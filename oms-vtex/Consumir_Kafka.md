@@ -5,4 +5,11 @@ docker exec -it kafka sh
 
 
 
-{"orderId":"1558460554069-01","state":"ready-for-handling"}
+{"orderId":"1560880554995-01","state":"ready-for-handling"}
+
+# docker exec -it kafka sh -c "kafka-console-producer.sh --broker-list localhost:9092 --topic vtex.order.integration"
+
+{"commerceId":"1561090555061-01","state":"picking","source":"finance"}
+
+
+
