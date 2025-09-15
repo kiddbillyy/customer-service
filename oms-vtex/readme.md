@@ -9,14 +9,14 @@ El **OMS-VTEX** es un microservicio encargado de registrar y sincronizar pedidos
 ## Flujo base entre vtex-oms y el resto de microservicios
 
 <p align="center">
-  <img src="DIAGRAMA.png" alt="Diagrama ER" width="600">
+  <img src="DIAGRAMA.jpg" alt="Diagrama ER" width="600">
 </p>
 
 ---
 
 ## Diagrama de base de datos:
 <p align= "center">
-  <img src= "DiagramaER" alt="Diagrama ER" width="600">
+  <img src= "DiagramaER.png" alt="Diagrama ER" width="600">
 </p>
 
 ---
