@@ -1,0 +1,75 @@
+CREATE TABLE `delivery_types` (
+  `deliveryTypeID` int NOT NULL AUTO_INCREMENT,
+  `deliveryTypeName` varchar(255) NOT NULL,
+  PRIMARY KEY (`deliveryTypeID`),
+  UNIQUE KEY `deliveryTypeName` (`deliveryTypeName`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE `order_status` (
+  `orderStatusID` int NOT NULL AUTO_INCREMENT,
+  `statusName` varchar(255) NOT NULL,
+  PRIMARY KEY (`orderStatusID`),
+  UNIQUE KEY `statusName` (`statusName`)
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `order_status_history` (
+  `historyID` int NOT NULL AUTO_INCREMENT,
+  `orderID` int NOT NULL,
+  `orderStatusID` int NOT NULL,
+  `previousStatusID` int DEFAULT NULL,
+  `changeDate` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`historyID`),
+  KEY `order_status_history_orderID_fk` (`orderID`),
+  KEY `order_status_history_statusID_fk` (`orderStatusID`),
+  CONSTRAINT `order_status_history_orderID_fk` FOREIGN KEY (`orderID`) REFERENCES `orders` (`orderID`) ON DELETE CASCADE,
+  CONSTRAINT `order_status_history_statusID_fk` FOREIGN KEY (`orderStatusID`) REFERENCES `order_status` (`orderStatusID`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `orders` (
+  `orderID` int NOT NULL AUTO_INCREMENT,
+  `docentry` int DEFAULT NULL,
+  `docnum` int DEFAULT NULL,
+  `folionum` int DEFAULT NULL,
+  `cardcode` varchar(15) DEFAULT NULL,
+  `cardname` text,
+  `phone1` text,
+  `e_mail` text,
+  `doctotalsy` float DEFAULT NULL,
+  `docdate` varchar(255) DEFAULT NULL,
+  `itemsAmount` int DEFAULT NULL,
+  `orderStatusID` int DEFAULT '1',
+  `paymentMethodID` int DEFAULT NULL,
+  `deliveryTypeID` int DEFAULT NULL,
+  `salesChannelID` int DEFAULT NULL,
+  `recipient` text,
+  `deliveryDate` timestamp NULL DEFAULT NULL,
+  `lastQueryDate` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `createdate` varchar(255) DEFAULT NULL,
+  `createts` int DEFAULT NULL,
+  PRIMARY KEY (`orderID`),
+  UNIQUE KEY `unique_folionum` (`folionum`),
+  KEY `orders_ibfk_2` (`paymentMethodID`),
+  KEY `orders_ibfk_3` (`deliveryTypeID`),
+  KEY `orders_ibfk_4` (`salesChannelID`),
+  KEY `orders_ibfk_1` (`orderStatusID`),
+  CONSTRAINT `orders_ibfk_1` FOREIGN KEY (`orderStatusID`) REFERENCES `order_status` (`orderStatusID`),
+  CONSTRAINT `orders_ibfk_2` FOREIGN KEY (`paymentMethodID`) REFERENCES `payment_methods` (`paymentMethodID`),
+  CONSTRAINT `orders_ibfk_3` FOREIGN KEY (`deliveryTypeID`) REFERENCES `delivery_types` (`deliveryTypeID`),
+  CONSTRAINT `orders_ibfk_4` FOREIGN KEY (`salesChannelID`) REFERENCES `sales_channels` (`salesChannelID`)
+) ENGINE=InnoDB AUTO_INCREMENT=5715 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `payment_methods` (
+  `paymentMethodID` int NOT NULL AUTO_INCREMENT,
+  `paymentMethodName` varchar(255) NOT NULL,
+  PRIMARY KEY (`paymentMethodID`),
+  UNIQUE KEY `paymentMethodName` (`paymentMethodName`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE `sales_channels` (
+  `salesChannelID` int NOT NULL AUTO_INCREMENT,
+  `salesChannelName` varchar(255) NOT NULL,
+  PRIMARY KEY (`salesChannelID`),
+  UNIQUE KEY `salesChannelName` (`salesChannelName`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
