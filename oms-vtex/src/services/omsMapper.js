@@ -262,6 +262,7 @@ exports.buildOmsPayload = (vtex, { orderId }) => {
   if (shippingValue > 0) {
     items.push({
       itemIndex      : items.length,
+      uniqueId       : `shipping-${Date.now()}`,
       itemcode       : '701001008',
       dscription     : 'Flete',
       quantity       : 1,
