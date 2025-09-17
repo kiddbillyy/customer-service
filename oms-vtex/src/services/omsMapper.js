@@ -242,6 +242,78 @@ function mapItems(vtex) {
   });
 }
 
+
+function pickFirstRealPayment(vtex) {
+  const txs = Array.isArray(vtex?.paymentData?.transactions) ? vtex.paymentData.transactions : [];
+  // prioriza transacciones activas
+  for (const tx of txs.sort((a,b)=> (b?.isActive?1:0) - (a?.isActive?1:0))) {
+    const pays = Array.isArray(tx?.payments) ? tx.payments : [];
+    // primer pago con value > 0; fallback al primero existente
+    const p = pays.find(pp => Number(pp?.value) > 0) || pays[0];
+    if (p) return { tx, p };
+  }
+  return { tx: null, p: null };
+}
+
+function mapPaymentForFinance(vtex) {
+  const { tx, p } = pickFirstRealPayment(vtex);
+  if (!tx || !p) return null;
+
+  const cr   = p.connectorResponses || {};
+  const tid  = (cr.Tid || p.tid || "").toString().trim();
+  const rawAcq = (cr.acquirer || p.paymentSystemName || "").toString().trim();
+  const last4Raw =
+    (cr.ReturnCode != null ? String(cr.ReturnCode) : "") ||
+    (p.lastDigits != null ? String(p.lastDigits) : "") ||
+    tid;
+
+  const last4 = last4Raw.replace(/\D/g, "").slice(-4); // solo dígitos
+  const installments = Number.isFinite(+p.installments) ? +p.installments : 1;
+
+  return {
+    acquirer: rawAcq,                 // p.ej. "MercadoPagoV2" o "VD - 0"
+    message: (cr.Message || "").toString().trim(),
+    installments,
+    tid,
+    last4,
+    // opcionales / auditoría:
+    valueCents: Number(p.value ?? 0),
+    paymentSystem: p.paymentSystem || null,
+    paymentSystemName: p.paymentSystemName || null,
+    // muy importante: mismo transactionId del pago elegido
+    idempotencyKey: tx.transactionId || null
+  };
+}
+
+function getIdempotencyKey(vtex) {
+  return vtex?.paymentData?.transactions?.[0]?.transactionId || null;
+}
+
+/**
+ * DTO mínimo que OMS-VTEX envía a finanzas cuando solo manda el pago.
+ * Finanzas luego hace GET al OMS para order/items/cardCode.
+ */
+function buildFinancePaymentDTO(vtex) {
+  const pay = mapPaymentForFinance(vtex);
+  if (!pay) {
+    throw new Error("No se encontró un pago válido en VTEX");
+  }
+  return {
+    orderId: vtex.orderId,                 // "1560720554963-01"
+    idempotencyKey: pay.idempotencyKey,    // del mismo tx elegido
+    payments: {
+      acquirer: pay.acquirer,
+      message: pay.message,
+      installments: pay.installments,
+      tid: pay.tid,
+      last4: pay.last4,
+      valueCents: pay.valueCents,
+      paymentSystem: pay.paymentSystem,
+      paymentSystemName: pay.paymentSystemName
+    }
+  };
+}
+
 // --- NUEVO: helper para tomar el valor de envío (centavos)
 function getShippingValue(vtex) {
   const totals = Array.isArray(vtex?.totals) ? vtex.totals : [];
@@ -250,7 +322,7 @@ function getShippingValue(vtex) {
   return Number.isFinite(value) ? value : 0;
 }
 
-exports.buildOmsPayload = (vtex, { orderId }) => {
+function buildOmsPayload (vtex, { orderId }) {
   const { doctotalsy, valuesInCents } = computeTotals(vtex);
   const { shippingEstimate, deliveryCompany, deliveryDate } = mapShipping(vtex);
 
@@ -288,4 +360,8 @@ exports.buildOmsPayload = (vtex, { orderId }) => {
     fulfillment: mapFulfillment(vtex),
     items,
   };
+};
+
+module.exports = {
+  buildFinancePaymentDTO, buildOmsPayload
 };
