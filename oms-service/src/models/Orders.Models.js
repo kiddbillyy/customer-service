@@ -730,7 +730,7 @@ async function getOrder(query = {}, options = {}) {
           SELECT
             orderID, firstName, lastName, email, currencyCode, documentType, [document], phone,
             isCorporate, giro, addressType, receiverName, postalCode, city, country, [state],
-            street, [number], neighborhood, referenceAddress
+            street, [number], neighborhood, referenceAddress, cardname
           FROM dbo.order_fulfillment
           WHERE orderID = @id
         `);
@@ -931,7 +931,7 @@ async function getOrder(query = {}, options = {}) {
           SELECT
             orderID, firstName, lastName, email, currencyCode, documentType, [document], phone,
             isCorporate, giro, addressType, receiverName, postalCode, city, country, [state],
-            street, [number], neighborhood, referenceAddress
+            street, [number], neighborhood, referenceAddress, cardname
           FROM dbo.order_fulfillment
           WHERE orderID IN (${inList})
         `);
