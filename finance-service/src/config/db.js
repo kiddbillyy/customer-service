@@ -13,10 +13,9 @@ const omsConfig = {
 };
 
 
-const IdServicePool = new sql.ConnectionPool(omsConfig);
-const IdServicePoolConnect = IdServicePool.connect()
-  .then(() => console.log('✅ Conectado a ID-SERVICE (OMS) DB'))
-  .catch(err => console.error('❌ Error conectando a ID-SERVICE DB:', err));
+const FinanceServicePool = new sql.ConnectionPool(omsConfig);
+const FinanceServicePoolConnect = FinanceServicePool.connect()
+  .then(() => console.log('✅ Conectado a FINANCE-SERVICE (OMS) DB'))
+  .catch(err => console.error('❌ Error conectando a FINANCE-SERVICE DB:', err));
 
-module.exports = { sql, IdServicePool, IdServicePoolConnect };
-
+module.exports = { sql, FinanceServicePool, FinanceServicePoolConnect };
