@@ -19,29 +19,29 @@ async function processOrder(orderId) {
 
     if (!invoiceDocEntry) {
       const invPayload = buildReserveInvoicePayload(order);
-      const inv = await post("/Invoices", invPayload, cookie); // SL responde con DocEntry, DocNum, DocTotal
+      const inv = await post("/Invoices", invPayload, cookie); 
       invoiceDocEntry = inv.DocEntry;
       invoiceDocNum   = inv.DocNum;
-      invoiceDocTotal = inv.DocTotal; // usar total devuelto por SAP
+      invoiceDocTotal = inv.DocTotal; 
       await saveState(orderId, { invoiceDocEntry, invoiceDocNum, invoiceDocTotal });
     }
 
-    // B) Pago
-    let payDocEntry = persisted?.payDocEntry;
-    let payDocNum   = persisted?.payDocNum;
+    // // B) Pago
+    // let payDocEntry = persisted?.payDocEntry;
+    // let payDocNum   = persisted?.payDocNum;
 
-    if (!payDocEntry) {
-      // Monto a aplicar = total de la factura de reserva (ajusta si usas otra regla)
-      const payPayload = buildIncomingPaymentPayload({
-        order,
-        invoiceDocEntry,
-        invoiceAmountDecimal: Number(Number(invoiceDocTotal).toFixed(2))
-      });
-      const pay = await post("/IncomingPayments", payPayload, cookie);
-      payDocEntry = pay.DocEntry;
-      payDocNum   = pay.DocNum;
-      await saveState(orderId, { payDocEntry, payDocNum });
-    }
+    // if (!payDocEntry) {
+    //   // Monto a aplicar = total de la factura de reserva (ajusta si usas otra regla)
+    //   const payPayload = buildIncomingPaymentPayload({
+    //     order,
+    //     invoiceDocEntry,
+    //     invoiceAmountDecimal: Number(Number(invoiceDocTotal).toFixed(2))
+    //   });
+    //   const pay = await post("/IncomingPayments", payPayload, cookie);
+    //   payDocEntry = pay.DocEntry;
+    //   payDocNum   = pay.DocNum;
+    //   await saveState(orderId, { payDocEntry, payDocNum });
+    // }
 
     // C) Entrega (opcional) — si la haces en este paso
     // const dnPayload = buildDeliveryPayload({ order, baseDocEntry: invoiceDocEntry });

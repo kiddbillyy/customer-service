@@ -1,3 +1,4 @@
+// domain/paymentMap.js
 module.exports = {
 
     MercadoPagoV2: { formaPago: 26, cuenta: "11004022" },
