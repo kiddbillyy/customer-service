@@ -19,4 +19,3 @@ const FinanceServicePoolConnect = FinanceServicePool.connect()
   .catch(err => console.error('❌ Error conectando a FINANCE-SERVICE DB:', err));
 
 module.exports = { sql, FinanceServicePool, FinanceServicePoolConnect };
-
