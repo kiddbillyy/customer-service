@@ -2,8 +2,10 @@
 const { Kafka } = require('kafkajs');
 const { IdServicePool, IdServicePoolConnect, sql } = require('../../../config/dbnew');
 const { fetchVtexOrder } = require('../../../services/vtexService');
-const { buildOmsPayload } = require('../../../services/omsMapper');
+const { buildOmsPayload, buildFinancePaymentDTO } = require('../../../services/omsMapper');
 const { postOrderToOms } = require('../../../services/omsService');
+const { postPaymentToFinance }   = require('../../../services/financeService');
+
 
 const TOPIC   = process.env.KAFKA_TOPIC_ORDER_STATUS || 'vtex.order.integration';
 const BROKERS = (process.env.KAFKA_BROKER || '').split(',').filter(Boolean);
@@ -179,6 +181,49 @@ function normalizeOmsError(e) {
   return msg ? `OMS_POST_FAILED: ${String(msg).slice(0,80)}` : 'OMS_POST_FAILED';
 }
 
+
+
+async function markPaymentQueued(orderPkId) {
+  await IdServicePoolConnect;
+  const req = new sql.Request(IdServicePool)
+    .input('orderPkId', sql.Int, orderPkId);
+  await req.query(`
+    UPDATE dbo.Orders
+    SET paymentStatusIntegration = 0,      -- pendiente
+        paymentErrorIntegration = NULL,    -- limpio error previo
+        updatedAt = SYSUTCDATETIME()
+    WHERE id = @orderPkId;
+  `);
+}
+
+async function markPaymentOk(orderPkId) {
+  await IdServicePoolConnect;
+  const req = new sql.Request(IdServicePool)
+    .input('orderPkId', sql.Int, orderPkId);
+  await req.query(`
+    UPDATE dbo.Orders
+    SET paymentStatusIntegration = 1,      -- OK
+        paymentErrorIntegration = NULL,
+        updatedAt = SYSUTCDATETIME()
+    WHERE id = @orderPkId;
+  `);
+}
+
+async function markPaymentFailed(orderPkId, errorText) {
+  await IdServicePoolConnect;
+  const text = errorText == null ? null : String(errorText).slice(0, 500);
+  const req = new sql.Request(IdServicePool)
+    .input('orderPkId', sql.Int, orderPkId)
+    .input('err', sql.NVarChar(500), text);
+  await req.query(`
+    UPDATE dbo.Orders
+    SET paymentStatusIntegration = 0,      -- failed/pending
+        paymentErrorIntegration = @err,
+        updatedAt = SYSUTCDATETIME()
+    WHERE id = @orderPkId;
+  `);
+}
+
 // ---------- consumer ----------
 async function handleVtexOrderMessage(message, ctx) {
   const { topic, partition, offset } = ctx;
@@ -224,10 +269,38 @@ async function handleVtexOrderMessage(message, ctx) {
 
     if (outcome.status === 'CREATED' && outcome.id) {
       await updateOrderWithOmsId(orderPkId, outcome.id);
-      await setOrderErrorIntegration(orderPkId, null); // ✅ limpia errorIntegration en éxito
+      await setOrderErrorIntegration(orderPkId, null); // limpia errorIntegration en éxito
       console.log('📤 POST OMS OK; ref_omsOrderId y errorIntegration actualizados', {
         orderPkId, omsOrderId: outcome.id
       });
+
+      //POST A FINANZAS 
+      const finPayload = buildFinancePaymentDTO(vtexData);
+      if (!finPayload?.payments?.acquirer) {
+        console.warn('⚠️ Finance POST omitido: pago no válido/ausente', { orderId });
+      } else {
+        await markPaymentQueued(orderPkId);
+
+        postPaymentToFinance(finPayload)
+          .then(() => {
+            console.log('✅ Finance POST OK', { orderId });
+            return markPaymentOk(orderPkId);
+          })
+          .catch(async (fe) => {
+            const errMsg = fe?.response?.data?.message || fe?.message || 'FINANCE_POST_FAILED';
+            console.error('❌ Finance POST error (async):', errMsg, {
+              orderPkId, commerceId: orderId, status: fe?.response?.status, data: fe?.response?.data
+            });
+            await markPaymentFailed(orderPkId, errMsg);
+          });
+      }
+
+
+
+
+
+
+
     } else if (outcome.status === 'ORDER_EXISTS') {
       // registra el error; si trae id, opcionalmente guarda ref_omsOrderId
       await setOrderErrorIntegration(orderPkId, 'ORDER_EXISTS');
