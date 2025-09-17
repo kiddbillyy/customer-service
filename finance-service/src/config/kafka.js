@@ -1,3 +1,4 @@
+// config/kafka.js
 const { Kafka } = require('kafkajs');
 require('dotenv').config();
 
