@@ -6,10 +6,14 @@ const cors = require('cors');
 const { connectProducer } = require('./utils/kafka/kafkaProducer');
 const consumeMessages = require('./consumer/orderConsumer');   
 const { smokeTest } = require('./infra/sapClient');
+const apiRoutes = require('./routes/index');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+
+app.use('/api/finance', apiRoutes);
 
 // Healthcheck
 app.get('/api/health', (req, res) => {
