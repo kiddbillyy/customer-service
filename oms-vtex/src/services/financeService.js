@@ -46,6 +46,7 @@ async function postPaymentToFinance(payload) {
       );
       return res.data ?? res;
     } catch (e) {
+      console.log("Intento N ° ",i)
       lastErr = e;
       const status = e?.response?.status;
       const retriable = isNetworkTransient(e) || RETRIABLE_HTTP.has(Number(status));

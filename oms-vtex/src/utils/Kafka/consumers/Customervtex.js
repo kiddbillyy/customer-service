@@ -56,15 +56,25 @@ async function persistOrderAndStatus({ commerceId, creationDateIso, state, statu
       .input('commerceId', sql.NVarChar(100), commerceId);
 
     const cur = (await findReq.query(`
-      SELECT id, creationDate
+      SELECT id, paymentStatusIntegration, creationDate
       FROM dbo.Orders WITH (UPDLOCK, HOLDLOCK)
       WHERE commerceId = @commerceId;
     `)).recordset[0];
 
-    if (cur) {
-      console.log('🚫 orders skip (ya existe):', { commerceId, id: cur.id });
+    /* if (cur) {
+      console.log(' orders skip (ya existe):', { commerceId, id: cur.id });
       await tx.commit();
       return { orderPkId: Number(cur.id), created: false };
+    } */
+
+    if (cur) {
+      console.log(' orders skip (ya existe):', { commerceId, id: cur.id });
+      await tx.commit();
+      return {
+        orderPkId: Number(cur.id),
+        created: false,
+        paymentIntegrated: Number(cur.paymentStatusIntegration) === 1,
+      };
     }
 
     // 2) Insertar nueva orden (primera vez)
@@ -84,7 +94,7 @@ async function persistOrderAndStatus({ commerceId, creationDateIso, state, statu
     `);
 
     const orderPkId = Number(inserted.recordset[0].id);
-    console.log('🆕 Orders insert id=', orderPkId, 'commerceId=', commerceId);
+    console.log(' Orders insert id=', orderPkId, 'commerceId=', commerceId);
 
     // 3) Registrar el primer estado SOLO en la creación inicial
     const src     = 'VTEX';
@@ -103,11 +113,11 @@ async function persistOrderAndStatus({ commerceId, creationDateIso, state, statu
     `);
 
     await tx.commit();
-    console.log('✅ OrderStatusChange insert (inicial) ok → orderId=', orderPkId);
+    console.log(' OrderStatusChange insert (inicial) ok → orderId=', orderPkId);
     return { orderPkId, created: true };
   } catch (e) {
     try { await tx.rollback(); } catch {}
-    console.error('❌ persistOrderAndStatus error:', e.message);
+    console.error(' persistOrderAndStatus error:', e.message);
     throw e;
   }
 }
@@ -229,18 +239,18 @@ async function handleVtexOrderMessage(message, ctx) {
   const { topic, partition, offset } = ctx;
   const { orderId, state, status } = parseOrderMessage(message);
 
-  console.log(`📥 [${topic}|p${partition}|o${offset}] orderId=${orderId}, state=${state}, status=${status}`);
+  console.log(` [${topic}|p${partition}|o${offset}] orderId=${orderId}, state=${state}, status=${status}`);
 
   // 1) Obtener VTEX (si falla, seguimos con persist pero omitimos el POST)
   let vtexData = null;
   try {
     vtexData = await fetchVtexOrder(orderId);
   } catch (e) {
-    console.warn(`⚠️ VTEX fetch fallo para ${orderId}: ${e.message}`);
+    console.warn(` VTEX fetch fallo para ${orderId}: ${e.message}`);
   }
 
   // 2) Persistir en OMS_VTEX_DB (solo crea si no existe)
-  const { orderPkId, created } = await persistOrderAndStatus({
+  const { orderPkId, created, paymentIntegrated  } = await persistOrderAndStatus({
     commerceId: orderId,
     creationDateIso: vtexData?.creationDate || null,
     state,
@@ -249,17 +259,40 @@ async function handleVtexOrderMessage(message, ctx) {
 
   // 3) POST al OMS solo si es creación inicial y tenemos detalle de VTEX
   if (!created) {
-    console.log('↩️  OMS POST omitido (orden ya existente)', { orderPkId, commerceId: orderId });
-    return;
-  }
-  if (!vtexData) {
-    console.warn('⚠️ OMS POST omitido: no hay detalle VTEX', { orderPkId, commerceId: orderId });
+    console.log('↩  OMS POST omitido (orden ya existente)', { orderPkId, commerceId: orderId });
+    
+    if (paymentIntegrated) {
+      console.log('↩ Finance POST omitido: paymentStatusIntegration=1', { orderId, orderPkId });
+      return;
+    }
+    
+    if (!vtexData) {
+      console.warn(' OMS POST omitido: no hay detalle VTEX', { orderPkId, commerceId: orderId });
+      return;
+    }
+    const finPayload = buildFinancePaymentDTO(vtexData);
+    if (!finPayload?.payments?.acquirer) {
+      console.warn(' Finance POST omitido: pago no válido/ausente', { orderId });
+      return;
+    }
+    await markPaymentQueued(orderPkId);
+    try {
+      await postPaymentToFinance(finPayload);
+      console.log(' Finance POST OK', { orderId });
+      await markPaymentOk(orderPkId);
+    } catch (fe) {
+      const errMsg = fe?.response?.data?.message || fe?.message || 'FINANCE_POST_FAILED';
+      console.error(' Finance POST error:', errMsg, {
+        orderPkId, commerceId: orderId, status: fe?.response?.status, data: fe?.response?.data
+      });
+      await markPaymentFailed(orderPkId, errMsg);
+    }
     return;
   }
 
   try {
     const payload  = buildOmsPayload(vtexData, { orderId, state, status });
-    console.log('📦 OMS payload (preview 1k):', JSON.stringify(payload).slice(0, 1000));
+    console.log(' OMS payload (preview 1k):', JSON.stringify(payload).slice(0, 1000));
 
     const response = await postOrderToOms(payload);
     const outcome  = extractOmsOrderOutcome(response);
@@ -270,25 +303,25 @@ async function handleVtexOrderMessage(message, ctx) {
     if (outcome.status === 'CREATED' && outcome.id) {
       await updateOrderWithOmsId(orderPkId, outcome.id);
       await setOrderErrorIntegration(orderPkId, null); // limpia errorIntegration en éxito
-      console.log('📤 POST OMS OK; ref_omsOrderId y errorIntegration actualizados', {
+      console.log(' POST OMS OK; ref_omsOrderId y errorIntegration actualizados', {
         orderPkId, omsOrderId: outcome.id
       });
 
       //POST A FINANZAS 
       const finPayload = buildFinancePaymentDTO(vtexData);
       if (!finPayload?.payments?.acquirer) {
-        console.warn('⚠️ Finance POST omitido: pago no válido/ausente', { orderId });
+        console.warn(' Finance POST omitido: pago no válido/ausente', { orderId });
       } else {
         await markPaymentQueued(orderPkId);
 
         postPaymentToFinance(finPayload)
           .then(() => {
-            console.log('✅ Finance POST OK', { orderId });
+            console.log(' Finance POST OK', { orderId });
             return markPaymentOk(orderPkId);
           })
           .catch(async (fe) => {
             const errMsg = fe?.response?.data?.message || fe?.message || 'FINANCE_POST_FAILED';
-            console.error('❌ Finance POST error (async):', errMsg, {
+            console.error(' Finance POST error (async):', errMsg, {
               orderPkId, commerceId: orderId, status: fe?.response?.status, data: fe?.response?.data
             });
             await markPaymentFailed(orderPkId, errMsg);
@@ -296,11 +329,10 @@ async function handleVtexOrderMessage(message, ctx) {
       }
 
 
+    
 
 
-
-
-
+      
     } else if (outcome.status === 'ORDER_EXISTS') {
       // registra el error; si trae id, opcionalmente guarda ref_omsOrderId
       await setOrderErrorIntegration(orderPkId, 'ORDER_EXISTS');
@@ -342,7 +374,7 @@ async function startCustomerOkConsumer() {
       try {
         await handleVtexOrderMessage(message, { topic, partition, offset: message.offset });
       } catch (e) {
-        console.error('❌ Error procesando mensaje:', e.message, {
+        console.error(' Error procesando mensaje:', e.message, {
           topic, partition, offset: message.offset,
           value: message?.value?.toString?.().slice(0, 200)
         });
@@ -351,7 +383,7 @@ async function startCustomerOkConsumer() {
   });
 
   const shutdown = async (signal) => {
-    console.log(`\n🛑 Recibido ${signal}, cerrando consumer...`);
+    console.log(`\n Recibido ${signal}, cerrando consumer...`);
     try { await consumer.disconnect(); } catch {}
     process.exit(0);
   };
