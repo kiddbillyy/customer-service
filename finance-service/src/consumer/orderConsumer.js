@@ -8,9 +8,9 @@ const {
   KAFKA_BROKER = "localhost:9092",
   KAFKA_CLIENT_ID ="finance-service",
   KAFKA_GROUP_ID = "finance-service-group",
-  KAFKA_TOPIC_IN = "finance.orders.reserve",          // donde llega u_ref1
-  KAFKA_TOPIC_OK = "finance.reservation.created",     // éxito
-  KAFKA_TOPIC_DLQ = "finance.deadletter"              // errores
+  KAFKA_TOPIC_IN = "finance.orders.reserve",         
+  KAFKA_TOPIC_OK = "finance.reservation.created",     
+  KAFKA_TOPIC_DLQ = "finance.deadletter"             
 } = process.env;
 
 module.exports = async function consumeMessages() {
@@ -57,11 +57,12 @@ module.exports = async function consumeMessages() {
             u_ref1,
             invoiceDocEntry: state.invoiceDocEntry,
             invoiceDocNum: state.invoiceDocNum,
+            invoiceFolioNum: state.invoiceFolioNum,
             invoiceDocTotal: state.invoiceDocTotal,
             ts: new Date().toISOString()
           })
         }]);
-        console.log(`✅ Reserva OK u_ref1=${u_ref1} DocEntry=${state.invoiceDocEntry}, DocNum=${state.DocNum}`);
+        console.log(`✅ Reserva OK u_ref1=${u_ref1} DocEntry=${state.invoiceDocEntry}, DocNum=${state.invoiceDocNum}, FolioNum=${state.invoiceFolioNum}`);
         } catch (err) {
         const norm = normalizeSlError(err);
         const errorPayload = {
@@ -69,7 +70,7 @@ module.exports = async function consumeMessages() {
             error: {
             code: norm.code,
             httpStatus: norm.httpStatus,
-            message: norm.message, // ← ya NO será [Object]
+            message: norm.message, 
             },
             ts: new Date().toISOString()
         };

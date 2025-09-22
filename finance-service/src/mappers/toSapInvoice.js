@@ -45,7 +45,8 @@ function buildReserveInvoicePayload(order) {
     U_REF1         : order.orderId,
     SalesPersonCode: SALESPERSON_CODE,           
     DocCurrency    : DOC_CURRENCY,              
-    DocumentLines
+    DocumentLines,
+    Comments       : `Orden ${order.orderId} - Generada por OMS-SERVICE`
   };
 
   if (USE_INDICATOR) payload.Indicator = indicator; 
