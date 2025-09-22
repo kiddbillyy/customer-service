@@ -235,3 +235,45 @@ export const sapPriceListEvent = z.object({
   listName: z.string().min(1).max(100),
   createDate: z.coerce.date().optional() // acepta string/Date; opcional
 });
+
+export const customerCreditUpsertEvent = z.object({
+  eventType: z.literal("customer.credit.upsert"),
+  eventId: z.string().uuid(),
+  occurredAt: z.string().datetime(),
+  producer: z.literal("customer-service"),
+  customer: z.object({
+    id: z.string().min(3),
+    rut: z.string().min(5),
+    partnerType: z.enum(["C","P"]),
+    groupNum: z.number().int().nullable().optional(),  // términos de pago (SAP OCTG)
+    groupCode: z.number().int().nullable().optional(), // grupo de cliente (OCRG)
+    listNum: z.number().int().nullable().optional(),   // lista de precios (OPLN)
+    currency: z.string().min(2).optional(),
+    email: z.string().email().nullable().optional(),
+    name: z.string().min(1).optional(),
+  }),
+  credit: z.object({
+    limit: z.number().int().nullable().optional(),
+    graceDays: z.number().int().nullable().optional(),
+    maxDaysPastDue: z.number().int().nullable().optional(),
+    notes: z.string().nullable().optional(),
+  }).optional(),
+  trace: z.object({
+    source: z.string().optional(),
+    requestId: z.string().optional(),
+    ip: z.string().optional(),
+  }).optional(),
+});
+
+export function buildCustomerCreditUpsertEvent({ uuid, nowISO, customer, credit, trace }) {
+  const evt = {
+    eventType: "customer.credit.upsert",
+    eventId: uuid,
+    occurredAt: nowISO,
+    producer: "customer-service",
+    customer,
+    credit,
+    trace,
+  };
+  return customerCreditUpsertEvent.parse(evt);
+}

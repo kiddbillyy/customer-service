@@ -364,8 +364,10 @@ const OrdersService = {
           });
       
           // B) crear factura + pago
-          const { docEntry: invDocEntry, payDocEntry, invoiceAmount, vtexItems } = await createInvoiceInSap(invoicePayload,cookie);
+          //const { docEntry: invDocEntry, payDocEntry, invoiceAmount, vtexItems } = await createInvoiceInSap(invoicePayload,cookie);
 
+
+          const { docEntry: invDocEntry,docNum:   invDocNum,folioNum,  payDocEntry,invoiceAmount,  vtexItems}= await createInvoiceInSap(invoicePayload, cookie);
           console.log(
             `📄 Reserva OK (DocEntry=${invDocEntry} – `+
             `💰 Pago OK (DocEntry=${payDocEntry}`
@@ -379,7 +381,7 @@ const OrdersService = {
         
             await sendInvoiceToVtex({
               orderId,
-              invoiceNumber: invDocEntry,   
+              invoiceNumber: folioNum,   
               issuanceDate,
               invoiceValue,
               items: vtexItems              // ya trae id, price, quantity

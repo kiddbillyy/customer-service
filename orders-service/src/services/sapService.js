@@ -437,6 +437,7 @@ async function createInvoiceInSap(payloadFromFrontend, cookieExtern = null) {
   return {
     docEntry      : inv.DocEntry,
     docNum        : inv.DocNum,
+    folioNum:inv.FolioNum,
     payDocEntry,
     payDocNum,
     invoiceAmount : totalReserva,

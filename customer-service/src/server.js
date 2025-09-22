@@ -1,17 +1,14 @@
+import 'dotenv/config'; // carga .env al inicio
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import customers from './routes/customers.js';
 import masterdata from './routes/masterdata.js';
 import { getPool } from './config/db.js';
-
-// 👇 tu consumer en src/consumer
+import { initKafkaProducer, stopKafkaProducer } from './producer/producer.js';
 import {
   startSapPriceListSyncConsumer,
   stopSapPriceListSyncConsumer
 } from './consumer/sapPriceListSyncConsumer.js';
-
-dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -33,7 +30,9 @@ app.use('/masterdata', masterdata);
 // Manejo de errores
 app.use((err, _req, res, _next) => {
   console.error(err);
-  if (err?.issues) return res.status(400).json({ error: 'VALIDATION_FAILED', details: err.issues });
+  if (err?.issues) {
+    return res.status(400).json({ error: 'VALIDATION_FAILED', details: err.issues });
+  }
   res.status(500).json({ error: 'INTERNAL_ERROR' });
 });
 
@@ -42,11 +41,12 @@ const PORT = Number(process.env.PORT || 5008);
 // guarda el server para shutdown ordenado
 const server = app.listen(PORT, async () => {
   console.log(`Customer Service listening on :${PORT}`);
-  // 🔌 inicia el consumer Kafka
+  // 🔌 inicia producer y consumer Kafka
   try {
+    await initKafkaProducer();
     await startSapPriceListSyncConsumer();
   } catch (e) {
-    console.error('[Kafka SAP] no se pudo iniciar el consumer:', e);
+    console.error('[Kafka] no se pudo iniciar:', e);
   }
 });
 
@@ -54,6 +54,7 @@ const server = app.listen(PORT, async () => {
 async function shutdown() {
   console.log('Shutting down...');
   try { await stopSapPriceListSyncConsumer(); } catch (e) { console.error('stop consumer:', e); }
+  try { await stopKafkaProducer(); } catch (e) { console.error('stop producer:', e); }
   server.close(() => process.exit(0));
 }
 process.on('SIGINT', shutdown);

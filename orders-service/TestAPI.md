@@ -20,6 +20,8 @@
 *luego crea una orden con:*
 - echo '{"orderID": 1, "sequence": "778811", "clientName": "Thomas Riffo", "clientPhone": "956228070", "clientEmail": "thomas@mail.com", "itemsAmount": 2, "totalAmount": 1642980, "orderStatusID": 1, "paymentMethodID": 2, "deliveryTypeID": 1, "salesChannelID": 1, "recipient": "Thomas Riffo", "deliveryDate": "2024-02-01", "products": [{"SKU": "033004015", "quantity": 1}, {"SKU": "555201108", "quantity": 1}]}' | kafka-console-producer.sh --broker-list localhost:9092 --topic sap.order.imported
 
+echo '{"orderId": "1557610553913-01", "state": "ready-for-handling"}' | /opt/kafka/bin/kafka-console-producer.sh --broker-list localhost:9092 --topic vtex.order.imported
+
 
 
 

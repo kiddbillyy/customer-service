@@ -16,7 +16,7 @@ export async function listCustomers({ q, partnerType, groupCode, listNum, page =
   const wh = [];
   if (q) {
     req.input('q', sql.NVarChar, `%${q}%`);
-    wh.push('(c.FirstName LIKE @q OR c.LastName LIKE @q OR c.Email LIKE @q OR c.RUT LIKE @q)');
+    wh.push('(c.FirstName LIKE @q OR c.LastName LIKE @q OR c.Email LIKE @q OR c.RUT LIKE @q OR c.Id LIKE @q)');
   }
   if (partnerType) {
     req.input('pt', sql.Char(1), partnerType);
