@@ -7,3 +7,6 @@
 
 
 # kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic finance.orders.reserve --from-beginning 
+
+
+# kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic finance.reservation.created --from-beginning 
