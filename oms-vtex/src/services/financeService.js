@@ -4,7 +4,7 @@ const http  = require('http');
 const https = require('https');
 const PQueue = require('p-queue').default;
 
-const FINANCE_BASE_URL = process.env.FINANCE_BASE_URL; // ej: https://finance.internal/api
+const FINANCE_BASE_URL = process.env.FINANCE_BASE_URL; 
 const FINANCE_TIMEOUT  = Number(process.env.FINANCE_TIMEOUT_MS ?? 15000);
 const FINANCE_CONC     = Number(process.env.FINANCE_MAX_CONCURRENCY ?? 5);
 
