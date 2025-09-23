@@ -1,5 +1,6 @@
 const dayjs = require("dayjs");
 const paymentMap = require("../domain/paymentMap");
+const { parseAcquirer, deriveCuotas, deriveLast4, pickRule } = require("../domain/paymentRules");
 
 function buildIncomingPaymentPayload({ order, invoiceDocEntry, invoiceAmountDecimal }) {
   const trx = order.payments || {};

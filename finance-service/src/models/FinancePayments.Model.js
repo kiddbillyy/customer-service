@@ -120,10 +120,56 @@ async function getState(orderId) {
   return recordset[0] || null;
 }
 
+async function getPaymentIntakeByOrderId(orderId) {
+  if (!orderId) {
+    const err = new Error('ORDER_ID_REQUIRED');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  await FinanceServicePoolConnect;
+
+  const r = await FinanceServicePool.request()
+    .input('orderId', sql.NVarChar(100), orderId)
+    .query(`
+      SELECT TOP 1
+        id, orderId, idempotencyKey, acquirer, message, installments, tid, last4,
+        valueCents, paymentSystem, paymentSystemName, receivedAt, rawPayload
+      FROM dbo.FinancePaymentIntake WITH (NOLOCK)
+      WHERE orderId = @orderId
+      ORDER BY receivedAt DESC;
+    `);
+
+  const row = r.recordset?.[0];
+  if (!row) {
+    const err = new Error(`INTAKE_NOT_FOUND: ${orderId}`);
+    err.code = 'INTAKE_NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    idempotencyKey: row.idempotencyKey || null,
+    acquirer: row.acquirer || '',
+    message: row.message || '',
+    installments: row.installments != null ? Number(row.installments) : null,
+    tid: row.tid ? String(row.tid) : '',
+    last4: row.last4 ? String(row.last4) : '',
+    valueCents: row.valueCents != null ? Number(row.valueCents) : 0,
+    paymentSystem: row.paymentSystem ? String(row.paymentSystem) : '',
+    paymentSystemName: row.paymentSystemName || '',
+    receivedAt: row.receivedAt,             // Date
+    rawPayload: row.rawPayload || null      // string JSON
+  };
+}
+
 module.exports = {
   savePaymentIntake,
   markProcessing,
   markDone,
   markFailed,
-  getState
+  getState,
+  getPaymentIntakeByOrderId
 };

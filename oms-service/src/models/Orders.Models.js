@@ -1027,7 +1027,6 @@ async function getOrder(query = {}, options = {}) {
   };
 }
 
-
 module.exports = {
   createOrderWithItems,
   patchOrder,
