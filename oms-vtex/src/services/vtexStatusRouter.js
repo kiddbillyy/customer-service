@@ -15,7 +15,6 @@ function resolveVtexAction(state) {
     'start-handling'     : (orderId) => setOrderStartHandling(orderId),
 
 
-
   };
 
   return map[s] || null;

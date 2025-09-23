@@ -11,6 +11,7 @@ docker exec -it kafka sh
 
 {"commerceId":"1561090555061-01","state":"picking","source":"finance"}
 
+{"commerceId": "123-456", "state":"invoiced", "source": "finance"} 
 
 
 

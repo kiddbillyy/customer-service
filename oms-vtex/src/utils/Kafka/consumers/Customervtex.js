@@ -328,11 +328,6 @@ async function handleVtexOrderMessage(message, ctx) {
           });
       }
 
-
-    
-
-
-      
     } else if (outcome.status === 'ORDER_EXISTS') {
       // registra el error; si trae id, opcionalmente guarda ref_omsOrderId
       await setOrderErrorIntegration(orderPkId, 'ORDER_EXISTS');
