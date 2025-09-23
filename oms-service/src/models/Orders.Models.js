@@ -275,7 +275,7 @@ async function createOrderWithItems(body) {
       .input('deliveryDate',    sql.DateTime2(3),  toUtcDateOrNull(body.deliveryDate))
       .input('origin',          sql.NVarChar(50),  body.origin ?? null)
       .input('hostname',        sql.NVarChar(100), body.hostname ?? null)
-      .input('DocEntryOrder',   sql.Int,           body.DocEntryOrder ?? null)
+      .input('DocNum',   sql.Int,           body.DocNum ?? null)
       .input('DocEntryInvoice', sql.Int,           body.DocEntryInvoice ?? null)
       .input('folionum',        sql.Int,           body.folionum ?? null)
       .input('integrationError',sql.NVarChar(sql.MAX), body.integrationError ?? null)
@@ -285,13 +285,13 @@ async function createOrderWithItems(body) {
         INSERT INTO dbo.Orders
           (salesChannelReferenceId, u_ref1, itemsAmount, doctotalsy,
            orderStatusID, deliveryDate, lastQueryDate, createdate, updateDate,
-           integrationError, origin, hostname, DocEntryOrder, DocEntryInvoice, folionum,
+           integrationError, origin, hostname, DocNum, DocEntryInvoice, folionum,
            shippingEstimate, deliveryCompany)
         OUTPUT INSERTED.orderID
         VALUES
           (@scr, @uref, @itemsAmount, @doctotalsy,
            @orderStatusID, @deliveryDate, SYSUTCDATETIME(), SYSUTCDATETIME(), NULL,
-           @integrationError, @origin, @hostname, @DocEntryOrder, @DocEntryInvoice, @folionum,
+           @integrationError, @origin, @hostname, @DocNum, @DocEntryInvoice, @folionum,
            @shippingEstimate, @deliveryCompany);
       `);
 
@@ -366,7 +366,7 @@ async function patchOrder({ orderID, body }) {
     setIf('integrationError', body.integrationError , sql.NVarChar(sql.MAX));
     setIf('origin', body.origin , sql.NVarChar(50));
     setIf('hostname', body.hostname , sql.NVarChar(100));
-    setIf('DocEntryOrder', body.DocEntryOrder , sql.Int);
+    setIf('DocNum', body.DocNum , sql.Int);
     setIf('DocEntryInvoice', body.DocEntryInvoice , sql.Int);
     setIf('folionum', body.folionum , sql.Int);
     setIf('shippingEstimate', body.shippingEstimate , sql.NVarChar(50));
@@ -674,7 +674,7 @@ async function getOrder(query = {}, options = {}) {
         o.integrationError,
         o.origin,
         o.hostname,
-        o.DocEntryOrder,
+        o.DocNum,
         o.DocEntryInvoice,
         o.folionum,
         o.shippingEstimate,
@@ -710,7 +710,7 @@ async function getOrder(query = {}, options = {}) {
       integrationError: head.integrationError ?? null,
       origin: head.origin ?? null,
       hostname: head.hostname ?? null,
-      DocEntryOrder: head.DocEntryOrder ?? null,
+      DocNum: head.DocNum ?? null,
       DocEntryInvoice: head.DocEntryInvoice ?? null,
       folionum: head.folionum ?? null,
       shippingEstimate: head.shippingEstimate ?? null,
@@ -1026,7 +1026,6 @@ async function getOrder(query = {}, options = {}) {
     rows,
   };
 }
-
 
 module.exports = {
   createOrderWithItems,
