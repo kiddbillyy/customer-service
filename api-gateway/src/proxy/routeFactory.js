@@ -38,8 +38,6 @@ export function makeRoute({ path, target,requireAuth = false, requireRbac = fals
       pathRewrite: prependBasePath
         ? (incomingPath) => `${path}${incomingPath}`
         : undefined,
-/*       timeout: 15000,
-      proxyTimeout: 15000, */
       timeout: 75_000,      // tiempo total para establecer/recibir respuesta
       proxyTimeout: 70_000, // inactividad del socket con el destino
       onProxyReq(proxyReq) {

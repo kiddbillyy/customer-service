@@ -71,7 +71,6 @@ async function setOrderStartHandling(orderId) {
     return true;
   }
 
-  // ---- llamada real
   try {
     const { status } = await client.post(url, null);
     console.log(`🚀 VTEX ${orderId} → start-handling (HTTP ${status})`);

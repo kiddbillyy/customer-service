@@ -292,7 +292,6 @@ async function handleVtexOrderMessage(message, ctx) {
 
   try {
     const payload  = buildOmsPayload(vtexData, { orderId, state, status });
-    console.log(' OMS payload (preview 1k):', JSON.stringify(payload).slice(0, 1000));
 
     const response = await postOrderToOms(payload);
     const outcome  = extractOmsOrderOutcome(response);
@@ -302,8 +301,8 @@ async function handleVtexOrderMessage(message, ctx) {
 
     if (outcome.status === 'CREATED' && outcome.id) {
       await updateOrderWithOmsId(orderPkId, outcome.id);
-      await setOrderErrorIntegration(orderPkId, null); // limpia errorIntegration en éxito
-      console.log(' POST OMS OK; ref_omsOrderId y errorIntegration actualizados', {
+      await setOrderErrorIntegration(orderPkId, null); 
+      console.log(' POST OMS OK; ref_omsOrderId actualizados', {
         orderPkId, omsOrderId: outcome.id
       });
 
