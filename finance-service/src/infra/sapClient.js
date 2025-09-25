@@ -122,7 +122,7 @@ async function post(path, body, cookie) {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      timeout: 20000, // cada intento tiene su timeout
+      timeout: 20000, 
     });
     return data;
   } catch (err) {

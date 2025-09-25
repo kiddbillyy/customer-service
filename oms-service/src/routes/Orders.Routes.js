@@ -8,5 +8,5 @@ router.patch('/:id', ctrl.patchOrder);
 
 router.get('/', ctrl.getOrders);
 router.get('/:id', ctrl.getOrders);
-// si prefieres PUT (reemplazo completo de items), puedes usar el mismo handler con body.replaceItems = true
+
 module.exports = router;
