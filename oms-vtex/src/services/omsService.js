@@ -3,9 +3,9 @@ const http  = require('http');
 const https = require('https');
 const PQueue = require('p-queue').default;
 
-const OMS_POST_URL     = process.env.OMS_POST_URL;                  // p.ej. https://oms/api/orders
+const OMS_POST_URL     = process.env.OMS_POST_URL;              
 const OMS_TIMEOUT_MS   = Number(process.env.OMS_TIMEOUT_MS ?? 15000);
-const OMS_MAX_CONC     = Number(process.env.OMS_MAX_CONCURRENCY ?? 5);
+const OMS_MAX_CONC     = Number(process.env.OMS_MAX_CONCURRENCY ?? 7);
 const OMS_MIN_MS_RAW = process.env.OMS_MIN_MS;   
 const OMS_MIN_MS = OMS_MIN_MS_RAW === undefined || OMS_MIN_MS_RAW === ''
   ? 0
@@ -13,8 +13,6 @@ const OMS_MIN_MS = OMS_MIN_MS_RAW === undefined || OMS_MIN_MS_RAW === ''
 
 if (!OMS_POST_URL) throw new Error('OMS_POST_URL no configurado');
 
-/* const httpAgent  = new http.Agent({  keepAlive: true, maxSockets: 200 });
-const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 200 }); */
 const httpAgent  = new http.Agent({  keepAlive: true, keepAliveMsecs: 20000, maxSockets: 200, maxFreeSockets: 50 });
 const httpsAgent = new https.Agent({ keepAlive: true, keepAliveMsecs: 20000, maxSockets: 200, maxFreeSockets: 50 });
 

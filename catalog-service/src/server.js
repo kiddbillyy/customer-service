@@ -6,6 +6,7 @@ require('./sheduler/scheduler_OITM_ITM1');
 const pruebaRoutes = require('./routes/Routes');
 const categoryRoutes = require('./routes/Category.Routes');
 const brandRoutes = require('./routes/Marca.Routes');
+const barcodeRoutes = require('./routes/Barcode.Routes');
 
 
 dotenv.config();
@@ -14,7 +15,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/catalog', categoryRoutes, pruebaRoutes, brandRoutes);
+app.use('/api/catalog', categoryRoutes, pruebaRoutes, brandRoutes, barcodeRoutes);
 
 const PORT = process.env.PORT || 5006;
 
