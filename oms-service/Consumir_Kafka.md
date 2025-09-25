@@ -4,7 +4,7 @@ docker exec -it kafka sh
 # kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic customer.validations --from-beginning
 # kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic customer-ok --from-beginning 
 
- <!-- {"OrderID":272,"ok":"true","CardCode":"20230330c"}  -->
+ <!-- {"OrderID":365,"ok":"true","CardCode":"20230330c"}  -->
 
 
 
