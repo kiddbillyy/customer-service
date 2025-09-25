@@ -106,14 +106,23 @@ const {
   KAFKA_TOPIC_IN  = "finance.orders.reserve",
   KAFKA_TOPIC_OK  = "finance.reservation.created",
   KAFKA_TOPIC_DLQ = "finance.deadletter",
+  KAFKA_TOPIC_OK_BILL = "finance.billing.completed",
 
   // Topic para OMS/VTEX status
   KAFKA_TOPIC_VTEX_STATUS = "vtex.status",
+  
 
   // Config de evento VTEX status
   VTEX_STATUS_EVENT1 = "start-handling", 
-  VTEX_STATUS_SOURCE      = "finance"
+  VTEX_STATUS_SOURCE      = "finance",
+
+  VTEX_STATUS_EVENT2      = "invoiced",
+
 } = process.env;
+
+function newEventId(prefix, key) {
+  return `${prefix}-${key}-${Date.now()}-${Math.floor(Math.random()*1e6)}`;
+}
 
 module.exports = async function consumeMessages() {
   const kafka = new Kafka({
@@ -187,7 +196,39 @@ module.exports = async function consumeMessages() {
           }
         }]);
 
-        console.log(`✅ Reserva OK u_ref1=${u_ref1} DocEntry=${state.invoiceDocEntry}, DocNum=${state.invoiceDocNum}, FolioNum=${state.invoiceFolioNum}`);
+        //console.log(`✅ Reserva OK u_ref1=${u_ref1} DocEntry=${state.invoiceDocEntry}, DocNum=${state.invoiceDocNum}, FolioNum=${state.invoiceFolioNum}`);
+        //evento que se dispara cuando se realiza el pago
+        if (state.payDocEntry && state.payDocNum) {
+          await sendBatch(KAFKA_TOPIC_OK_BILL, [{
+            key: u_ref1,
+            value: JSON.stringify({
+              u_ref1,
+              payDocEntry: state.payDocEntry,
+              payDocNum: state.payDocNum,
+              invoiceDocEntry: state.invoiceDocEntry,
+              invoiceDocNum: state.invoiceDocNum,
+              ts: new Date().toISOString()
+            })
+          }]);
+
+          await sendBatch(KAFKA_TOPIC_VTEX_STATUS, [{
+            key: u_ref1,
+            value: JSON.stringify({
+              commerceId: u_ref1,
+              state: String(VTEX_STATUS_EVENT2).trim(),
+              source: String(VTEX_STATUS_SOURCE).trim(),
+              eventId: newEventId("finance", u_ref1)
+            }),
+            headers: {
+            "x-event-id": Buffer.from(eventId)
+          }
+          }]);
+        }
+
+        console.log(
+          `✅ Reserva/Billing OK u_ref1=${u_ref1} invEntry=${state.invoiceDocEntry} invNum=${state.invoiceDocNum} ` +
+          `folio=${state.invoiceFolioNum} payEntry=${state.payDocEntry || '-'} payNum=${state.payDocNum || '-'}`
+        );
       } catch (err) {
         const norm = normalizeSlError(err);
         const errorPayload = {
