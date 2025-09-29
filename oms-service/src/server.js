@@ -45,6 +45,9 @@ const server = app.listen(PORT, async () => {
   console.log(`🚀 Oms Service corriendo en puerto ${PORT}`);
 });
 
-server.keepAliveTimeout = 70_000;  
-server.headersTimeout   = 75_000;  
+
+// ⏱️ Ajuste de timeouts para evitar cortes prematuros
+server.keepAliveTimeout = 70_000;  // 70s
+server.headersTimeout   = 75_000;  // > keepAliveTimeout
+
 
