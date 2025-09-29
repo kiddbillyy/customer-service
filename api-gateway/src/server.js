@@ -44,5 +44,8 @@ app.get('/health', (_req, res) => res.send('OK'));
 // Error final
 app.use(errorHandler);
 
+
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`🚀 API Gateway on ${PORT}`));
+const server = app.listen(PORT, () => console.log(`🚀 API Gateway on ${PORT}`));
+server.keepAliveTimeout = 70_000;  // igual a upstream
+server.headersTimeout   = 75_000;  // > keepAliveTimeout
