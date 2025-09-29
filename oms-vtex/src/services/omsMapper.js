@@ -348,7 +348,7 @@ function buildOmsPayload (vtex, { orderId }) {
   return {
     salesChannelReferenceId: 'VTEX-001',
     u_ref1: orderId,
-    orderStatusCode: 'NUEVO',
+    orderStatusCode: 'Pedido Nuevo',
     doctotalsy,
     valuesInCents,                    // true → el OMS divide por 100
     deliveryDate: deliveryDate || null,

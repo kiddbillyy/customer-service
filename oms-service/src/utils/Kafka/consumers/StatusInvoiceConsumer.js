@@ -6,7 +6,7 @@ const { Kafka } = require('kafkajs');
 // ---- Config ----
 const TOPIC_VTEX_STATUS = process.env.KAFKA_TOPIC_VTEX_STATUS || 'vtex.status';
 const BROKERS = (process.env.KAFKA_BROKER || 'localhost:9092').split(',').map(s => s.trim());
-const GROUP_ID = process.env.KAFKA_GROUP_VTEX_STATUS || 'oms-vtex-status';
+const GROUP_ID = process.env.KAFKA_GROUP_VTEX_STATUS || 'oms-vtex-status-invoice';
 
 // OMS API (para marcar estado "Pedido Facturado")
 const OMS_API_BASE = process.env.OMS_API_BASE || 'http://localhost:5010';
@@ -93,7 +93,7 @@ function shouldMarkAsInvoiced({ state, source }) {
 async function handleVtexStatus(message) {
   const payload = safeJson(message.value);
 
-  const commerceId = payload.commerceId ?? payload.u_ref1 ?? payload.U_REF1 ?? null; // por compatibilidad
+  const commerceId = payload.commerceId ?? payload.u_ref1 ?? payload.U_REF1 ?? null;
   const state  = payload.state;
   const source = payload.source;
 
