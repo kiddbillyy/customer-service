@@ -10,7 +10,7 @@ const GROUP_ID = process.env.KAFKA_GROUP_FINANCE_OK || 'oms-finance-ok-consumer'
 const OMS_API_BASE = process.env.OMS_API_BASE || 'http://localhost:5010';
 const OMS_ORDERS_PATH = process.env.OMS_ORDERS_PATH || '/api/oms-service/orders';
 const OMS_API_TOKEN = process.env.OMS_API_TOKEN || ''; // opcional: bearer
-const OMS_FINANCE_RESERVED_STATUS_CODE = process.env.OMS_FINANCE_RESERVED_STATUS_CODE || 'FACTURA RESERVA CREADA';
+const OMS_FINANCE_RESERVED_STATUS_CODE = process.env.OMS_FINANCE_RESERVED_STATUS_CODE || 'Factura Reserva';
 
 // ---- Utils ----
 
