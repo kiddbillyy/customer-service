@@ -1,0 +1,61 @@
+{
+  "salesChannelReferenceId": "VTEX-001",
+  "u_ref1": "1561810555255-01",
+  "orderStatusCode": "NUEVO",
+  "doctotalsy": 3504000,
+  "valuesInCents": true,
+  "deliveryDate": "2025-09-23T13:32:03.385735+00:00",
+  "origin": "VTEX",
+  "hostname": "mimbralb2c",
+  "shippingEstimate": "6bd",
+  "deliveryCompany": "BlueExpress Prioritario",
+  "fulfillment": {
+    "firstName": "Sergio",
+    "lastName": "Tobar Garces",
+    "email": "sergiotobarg@gmail.com",
+    "phone": "+56962678066",
+    "isCorporate": false,
+    "currencyCode": "CLP",
+    "documentType": "rutCHL",
+    "document": "168410158",
+    "addressType": "residential",
+    "receiverName": "Sergio Tobar Garces",
+    "street": "Fuente de Sevilla",
+    "number": "1944",
+    "neighborhood": "Puerto Montt",
+    "city": "Puerto Montt",
+    "state": "Región de Los Lagos (X)",
+    "country": "CHL",
+    "postalCode": "5480000",
+    "referenceAddress": null,
+    "giro": "PARTICULAR",
+    "cardname": "Sergio Tobar Garces"
+  },
+  "items": [
+    {
+      "itemIndex": 0,
+      "uniqueId": "1CFD3D3540C2488384D448036415AA3C",
+      "itemcode": "037003032",
+      "dscription": "Ceramica 33X33Cm Canelo 2.07 M2 Caja Cordillera",
+      "quantity": 1,
+      "priceAfterVAT": 1525800,
+      "codebars": null,
+      "imageUrl": "https://mimbralb2c.vteximg.com.br/arquivos/ids/215740-55-55/037003032.jpg.jpg?v=638803208962670000",
+      "categoryLeafId": 3008,
+      "categoryLeafName": "Pisos y Alfombras",
+      "categoryPathIds": "/3008/3126/3883/",
+      "categoryPathNames": "Pisos y Alfombras > Pisos y Revestimientos > Ceramicas"
+    },
+    {
+      "itemIndex": 1,
+      "uniqueId": "shipping-1759158159929",
+      "itemcode": "701001008",
+      "dscription": "Flete",
+      "quantity": 1,
+      "priceAfterVAT": 1978200,
+      "codebars": null,
+      "whscode": null,
+      "U_Subcategoria": "Flete"
+    }
+  ]
+}

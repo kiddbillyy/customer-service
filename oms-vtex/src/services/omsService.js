@@ -13,9 +13,28 @@ const OMS_MIN_MS = OMS_MIN_MS_RAW === undefined || OMS_MIN_MS_RAW === ''
 
 if (!OMS_POST_URL) throw new Error('OMS_POST_URL no configurado');
 
-const httpAgent  = new http.Agent({  keepAlive: true, keepAliveMsecs: 20000, maxSockets: 200, maxFreeSockets: 50 });
-const httpsAgent = new https.Agent({ keepAlive: true, keepAliveMsecs: 20000, maxSockets: 200, maxFreeSockets: 50 });
+//const httpAgent  = new http.Agent({  keepAlive: true, keepAliveMsecs: 20000, maxSockets: 200, maxFreeSockets: 50 });
+const httpAgent  = new http.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 20_000,
+  maxSockets: 200,
+  maxFreeSockets: 50,
+  // 🔧 cerrar sockets libres antes que cualquier upstream (conservador)
+  freeSocketTimeout: 5_000,          // << más corto que cualquier idle upstream
+  // 🔧 evitar sockets “ancianos” aunque estén activos (Node >=18)
+  socketActiveTTL: 30_000
+});
 
+
+//const httpsAgent = new https.Agent({ keepAlive: true, keepAliveMsecs: 20000, maxSockets: 200, maxFreeSockets: 50 });
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 20_000,
+  maxSockets: 200,
+  maxFreeSockets: 50,
+  freeSocketTimeout: 5_000,
+  socketActiveTTL: 30_000
+});
 
 const client = axios.create({
   baseURL: OMS_POST_URL.replace(/\/+$/,'').replace(/\/orders$/,''),
@@ -70,9 +89,11 @@ async function postOrderToOms(payload) {
   for (let i = 0; i <= MAX_RETRIES; i++) {
     const attemptStart = Date.now();
     try {
+      console.log("Payload enviado mediante el post al oms service: ",payload)
       const result = await queue.add(() =>
         client.post('/orders', payload, { headers: { 'Content-Type': 'application/json' } })
       );
+      
       const dur = Date.now() - attemptStart;
       console.log('[OMS] POST ok', { status: result.status, durationMs: dur });
       return result.data ?? result;

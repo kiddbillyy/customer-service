@@ -41,7 +41,7 @@ const apiRoutes = require('./routes/index');
 const { connectProducer } = require('./utils/kafkaProducer');
 const { startCustomerOkConsumer } = require('./utils/Kafka/consumers/CustomerOkConsumer');
 const { startFinanceReservationCreatedConsumer } = require('./utils/Kafka/consumers/FinanceReservationCreatedConsumer');
-const { StatusInvoiceConsumer } = require('./utils/Kafka/consumers/StatusInvoiceConsumer');
+const { startVtexStatusConsumer } = require('./utils/Kafka/consumers/StatusInvoiceConsumer');
 
 dotenv.config();
 
@@ -70,7 +70,7 @@ const server = app.listen(PORT, async () => {
     await startFinanceReservationCreatedConsumer();
     console.log('📥 FinanceReservationCreatedConsumer iniciado');
 
-    await StatusInvoiceConsumer();
+    await startVtexStatusConsumer();
     console.log('📥 StatusInvoiceConsumer iniciado')
     ;
   } catch (err) {
@@ -79,6 +79,7 @@ const server = app.listen(PORT, async () => {
 
   console.log(`🚀 Oms Service corriendo en puerto ${PORT}`);
 });
+
 
 // ⏱️ Ajuste de timeouts para evitar cortes prematuros
 server.keepAliveTimeout = 70_000;  // 70s

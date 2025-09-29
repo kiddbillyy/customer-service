@@ -161,6 +161,8 @@ async function handleFinanceOk(message) {
   }
 }
 
+
+
 // ---- Runner ----
 async function startFinanceReservationCreatedConsumer() {
   const kafka = new Kafka({ clientId: 'oms-finance-ok', brokers: BROKERS });
