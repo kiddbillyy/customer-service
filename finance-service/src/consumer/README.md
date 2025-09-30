@@ -55,7 +55,6 @@ Este módulo (`src/consumer/ordersConsumer.js`) es el **consumer de Kafka** enca
   "source": "finance",
   "eventId": "finance-12345-1696261234567-987654"
 }
-json```
 
 ## ✅ Logs de referencia
 
