@@ -4,28 +4,22 @@ import * as CM from '../models/customersModel.js';
 import * as AM from '../models/addressesModel.js';
 import { searchByName } from '../models/customersModel.js';
 import * as OM from '../models/contactsModel.js';
-import { randomUUID } from 'crypto';
-import { sendCustomerCreditUpsert } from '../producer/producer.js';
-import { buildCustomerCreditUpsertEvent } from '../utils/validators.js';
+import { upsertCustomerCreditIfNeeded } from '../services/customerCreditService.js';
+
 import {
-   customerCreateWithAddrs as customerCreate,
+  customerCreateWithAddrs as customerCreate,
   customerPatch,
   idRutType,
   addressesCreate,
   addressUpsert,
   contactsCreate,
   contactUpsert,
-  partnerType 
+  partnerType
 } from '../utils/validators.js';
 import { z } from 'zod';
 import { createBusinessPartner } from '../integrations/sapB1.js';
 import { createCustomerInRpro } from '../integrations/rpro.js';
 
-
-// Regla de ejemplo: -1 = contado; >= 0 = crédito (ajusta a tu codificación real)
-function isCreditTerms(groupNum) {
-  return typeof groupNum === 'number' && groupNum >= 0;
-}
 /* ===== Customers ===== */
 
 // GET /customers
@@ -80,7 +74,7 @@ export const create = asyncHandler(async (req, res) => {
   // 4) si vinieron direcciones, guárdalas (onConflict=replace)
   if (addresses.length) {
     const { status, payload: addrResult } = await AM.createMany(
-      created.Id || created.id, // por si tu driver devuelve "Id"
+      created.Id || created.id,
       addresses,
       'replace'
     );
@@ -100,9 +94,8 @@ export const create = asyncHandler(async (req, res) => {
     phone: created.Phone ?? created.phone,
     groupCode: created.GroupCode ?? created.groupCode,
     currency: created.Currency ?? created.currency,
-    groupNum: (created.GroupNum ?? payload.groupNum ?? null),   // 👈 pásalo
-    listNum: (created.ListNum ?? payload.listNum ?? null),       // 👈 pásalo
-    // “Giro” va en OCRD.Notes; toma lo que venga del request (payload)
+    groupNum: (created.GroupNum ?? payload.groupNum ?? null),
+    listNum: (created.ListNum ?? payload.listNum ?? null),
     notes: payload.notes ?? null,
   };
 
@@ -121,52 +114,8 @@ export const create = asyncHandler(async (req, res) => {
       : { ok: false, error: String(rpro.reason?.message || rpro.reason) }
   };
 
-
-
-  // --- Evento a customer-credit si la condición de pago es CRÉDITO ---
-  try {
-    // Preferir GroupNum del registro creado; si no existe, usa lo recibido en el payload (si lo manejas)
-    const groupNum = created.GroupNum ?? created.groupNum ?? payload.groupNum ?? null;
-    if (isCreditTerms(groupNum)) {
-      const Id          = created.Id ?? created.id;
-      const RUT         = created.RUT ?? created.rut;
-      const PartnerType = created.PartnerType ?? created.partnerType;
-      const GroupCode   = created.GroupCode ?? created.groupCode ?? null;
-      const ListNum     = created.ListNum ?? created.listNum ?? null;
-      const Currency    = created.Currency ?? created.currency ?? 'CLP';
-      const Email       = created.Email ?? created.email ?? null;
-      const name        = [created.FirstName ?? created.firstName, created.LastName ?? created.lastName]
-                           .filter(Boolean).join(' ') || Id;
-
-      const eventPayload = buildCustomerCreditUpsertEvent({
-        uuid: randomUUID(),
-        nowISO: new Date().toISOString(),
-        customer: {
-          id: Id,
-          rut: RUT,
-          partnerType: PartnerType,
-          groupNum,
-          groupCode: GroupCode,
-          listNum: ListNum,
-          currency: Currency,
-          email: Email,
-          name
-        },
-        credit: {
-          limit: created.CreditLimit ?? null,  // si no lo manejas aún, deja null
-          graceDays: 0,
-          maxDaysPastDue: 30,
-          notes: 'Alta automática por términos de pago crédito'
-        },
-        trace: { source: 'POST /customers', requestId: req.id, ip: req.ip }
-      });
-
-      await sendCustomerCreditUpsert({ key: Id, value: eventPayload });
-    }
-  } catch (e) {
-    console.error('⚠️ customer.credit.upsert no enviado:', e?.message || e);
-    // Best-effort: NO romper la 201
-  }
+  // 7) Emite evento a customer-credit si corresponde (best-effort)
+  await upsertCustomerCreditIfNeeded({ created, payload, req });
 
   return res.status(201).json({ customer: created, integrations });
 });
@@ -217,7 +166,12 @@ export const deleteAddress = asyncHandler(async (req, res) => {
 export const postAddresses = asyncHandler(async (req, res) => {
   const customerId = idRutType.parse(req.params.id);
   const sample = JSON.stringify(req.body);
-  console.log('[POST /addresses] id=', customerId, 'body=', sample?.length > 1000 ? sample.slice(0, 1000) + '…' : sample);
+  console.log(
+    '[POST /addresses] id=',
+    customerId,
+    'body=',
+    sample?.length > 1000 ? sample.slice(0, 1000) + '…' : sample
+  );
 
   const onConflict = String(req.query.onConflict || 'error').toLowerCase(); // error|ignore|replace
   const items = addressesCreate.parse(req.body);

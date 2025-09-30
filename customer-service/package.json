@@ -5,7 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "worker:outbox": "node src/workers/outboxPublisher.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

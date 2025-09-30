@@ -6,6 +6,42 @@ FROM dbo.Customers c WITH (NOLOCK)
 WHERE c.DeletedAt IS NULL
 `;
 
+
+export async function upsertCustomerByCardCodeEnqueueCredit(payload) {
+  const pool = await getPool();
+
+  // ⚠️ El SP espera nombres en PascalCase; mapeamos desde tu payload camelCase
+  const req = pool.request()
+    .input('id', sql.NVarChar(50), payload.id) // PK texto, ej: '22178335C'
+    .input('PartnerType', sql.NVarChar(5), payload.partnerType ?? 'C')
+    .input('RUT', sql.NVarChar(20), payload.rut ?? null)
+    .input('FirstName', sql.NVarChar(100), payload.firstName ?? null)
+    .input('LastName', sql.NVarChar(100), payload.lastName ?? null)
+    .input('Email', sql.NVarChar(255), payload.email ?? null)
+    .input('Phone', sql.NVarChar(40), payload.phone ?? null)
+    .input('Address', sql.NVarChar(255), payload.address ?? null)
+    .input('City', sql.NVarChar(100), payload.city ?? null)
+    .input('Region', sql.NVarChar(100), payload.region ?? null)
+    .input('Country', sql.NVarChar(100), payload.country ?? 'CL')
+    .input('IsActive', sql.Bit, payload.isActive ?? 1)
+    .input('GroupCode', sql.Int, payload.groupCode ?? null)
+    .input('GroupNum', sql.Int, payload.groupNum ?? null)
+    .input('ListNum', sql.Int, payload.listNum ?? null)
+    .input('Currency', sql.NVarChar(3), payload.currency ?? 'CLP')
+    .input('CreditLimit', sql.Decimal(18,2), payload.creditLimit ?? null) // ← si NO es null, el SP encola
+    .input('DiscountPercent', sql.Decimal(9,2), payload.discountPercent ?? null)
+    .input('DefaultBillToCode', sql.NVarChar(50), payload.defaultBillToCode ?? null)
+    .input('DefaultShipToCode', sql.NVarChar(50), payload.defaultShipToCode ?? null)
+    // DefaultContactCode en tu tabla es INT: no lo pasamos por el SP (lo seteas luego)
+    .input('Notes', sql.NVarChar(500), payload.notes ?? null)
+    .input('paymentTermCode', sql.NVarChar(50), payload.paymentTermCode ?? null);
+
+  // Si el SP no existe, SQL lanza error 2812; dejamos que burbujee para que lo veas
+  const { recordset } = await req.execute('dbo.UpsertCustomerByCardCode_EnqueueCredit');
+  const out = recordset?.[0] ?? {};
+  return { id: out.cardCode ?? payload.id, traceId: out.traceId ?? null };
+}
+
 export async function listCustomers({ q, partnerType, groupCode, listNum, page = 1, pageSize = 20 }) {
   const pool = await getPool();
   const off = (page - 1) * pageSize;
@@ -46,7 +82,7 @@ export async function getCustomer(id) {
   return recordset[0] || null;
 }
 
-export async function createCustomer(payload) {
+/*export async function createCustomer(payload) {
   const pool = await getPool();
   const now = new Date();
   const r = await pool.request()
@@ -85,8 +121,25 @@ VALUES
     `);
   return await getCustomer(payload.id);
 }
+  */
 
-export async function updateCustomer(id, patch) {
+export async function createCustomer(payload) {
+  // 1) Crea/actualiza por SP (en la misma TX se encola Outbox si viene creditLimit)
+  await upsertCustomerByCardCodeEnqueueCredit(payload);
+
+  // 2) Si necesitas asegurar campos que el SP no setea (p.ej. DefaultContactCode INT),
+  //    usa tu updateCustomer con el mismo payload (solo setea lo que venga definido).
+  const patch = {};
+  if (payload.defaultBillToCode != null)  patch.defaultBillToCode  = payload.defaultBillToCode;
+  if (payload.defaultShipToCode != null)  patch.defaultShipToCode  = payload.defaultShipToCode;
+  if (payload.defaultContactCode != null) patch.defaultContactCode = payload.defaultContactCode;
+  if (Object.keys(patch).length) await updateCustomer(payload.id, patch);
+
+  return await getCustomer(payload.id);
+}
+
+
+/*export async function updateCustomer(id, patch) {
   const pool = await getPool();
   const sets = [];
   const r = pool.request().input('id', sql.VarChar(64), id)
@@ -108,6 +161,63 @@ export async function updateCustomer(id, patch) {
     listNum: ['ListNum', sql.Int],
     currency: ['Currency', sql.NVarChar(3)],
     creditLimit: ['CreditLimit', sql.Decimal(19,2)],
+    discountPercent: ['DiscountPercent', sql.Decimal(5,2)],
+    defaultBillToCode: ['DefaultBillToCode', sql.NVarChar(50)],
+    defaultShipToCode: ['DefaultShipToCode', sql.NVarChar(50)],
+    defaultContactCode: ['DefaultContactCode', sql.Int],
+    isActive: ['IsActive', sql.Bit]
+  };
+  for (const [key, [col, typ]] of Object.entries(map)) {
+    if (key in patch) {
+      sets.push(`${col}=@${col}`);
+      r.input(col, typ, patch[key]);
+    }
+  }
+  if (!sets.length) return await getCustomer(id);
+
+  await r.query(`UPDATE dbo.Customers SET ${sets.join(', ')}, UpdatedAt=@UpdatedAt WHERE Id=@id AND DeletedAt IS NULL;`);
+  return await getCustomer(id);
+}*/
+
+export async function updateCustomer(id, patch) {
+  // Si viene creditLimit, usa el SP para garantizar evento + consistencia
+  if (Object.prototype.hasOwnProperty.call(patch, 'creditLimit')) {
+    await upsertCustomerByCardCodeEnqueueCredit({
+      id,
+      // pasa solo lo mínimo; el SP hará UPSERT y encolará el evento
+      creditLimit: patch.creditLimit,
+      paymentTermCode: patch.paymentTermCode ?? null,
+      notes: patch.notes ?? null,
+      // opcional: si quieres bloquear/desbloquear en el evento
+      isActive: patch.isActive
+    });
+    // elimina creditLimit/paymentTermCode/notes de patch para no sobreescribir de más
+    const { creditLimit, paymentTermCode, notes, ...rest } = patch;
+    patch = rest;
+  }
+
+  // Resto de campos: usa tu UPDATE por columnas
+  const pool = await getPool();
+  const sets = [];
+  const r = pool.request().input('id', sql.VarChar(64), id)
+    .input('UpdatedAt', sql.DateTime2(3), new Date());
+  const map = {
+    partnerType: ['PartnerType', sql.Char(1)],
+    rut: ['RUT', sql.VarChar(20)],
+    firstName: ['FirstName', sql.NVarChar(100)],
+    lastName: ['LastName', sql.NVarChar(100)],
+    email: ['Email', sql.NVarChar(255)],
+    notes: ['Notes', sql.NVarChar(255)],
+    phone: ['Phone', sql.NVarChar(40)],
+    address: ['Address', sql.NVarChar(255)],
+    city: ['City', sql.NVarChar(100)],
+    region: ['Region', sql.NVarChar(100)],
+    country: ['Country', sql.NVarChar(100)],
+    groupCode: ['GroupCode', sql.Int],
+    groupNum: ['GroupNum', sql.Int],
+    listNum: ['ListNum', sql.Int],
+    currency: ['Currency', sql.NVarChar(3)],
+    // creditLimit lo tratamos por SP arriba 👆
     discountPercent: ['DiscountPercent', sql.Decimal(5,2)],
     defaultBillToCode: ['DefaultBillToCode', sql.NVarChar(50)],
     defaultShipToCode: ['DefaultShipToCode', sql.NVarChar(50)],

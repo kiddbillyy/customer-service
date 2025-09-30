@@ -25,6 +25,9 @@ function calcDV(cuerpo) {
  *  - Requiere DV (0-9 o K/k)
  *  - Devuelve "########-DV" (DV en mayúscula)
  */
+
+const optString = z.preprocess(v => (v == null ? undefined : v), z.string());
+
 const rutWithDV = z.string().transform((s, ctx) => {
   const raw = String(s ?? '').trim().toUpperCase().replace(/\./g, '');
   const m = raw.match(/^(\d{1,12})-?([0-9K])$/);
@@ -62,6 +65,7 @@ const customerBase = z.object({
   groupNum: z.number().int().optional().nullable(),
   listNum: z.number().int().optional().nullable(),
   currency: z.string().max(3).optional().nullable(),
+  isActive: z.boolean().optional(),
   creditLimit: z.number().finite().optional().nullable(),
   discountPercent: z.number().finite().optional().nullable(),
   defaultBillToCode: z.string().max(50).optional().nullable(),
@@ -259,9 +263,11 @@ export const customerCreditUpsertEvent = z.object({
     notes: z.string().nullable().optional(),
   }).optional(),
   trace: z.object({
-    source: z.string().optional(),
-    requestId: z.string().optional(),
-    ip: z.string().optional(),
+    
+
+    source: optString.optional(),
+   requestId: optString.optional(),
+   ip: optString.optional(),
   }).optional(),
 });
 
