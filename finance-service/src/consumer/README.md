@@ -55,7 +55,7 @@ Este módulo (`src/consumer/ordersConsumer.js`) es el **consumer de Kafka** enca
   "source": "finance",
   "eventId": "finance-12345-1696261234567-987654"
 }
-```json
+json```
 
 ## ✅ Logs de referencia
 ''' ✅ Reserva/Billing OK u_ref1=12345 invEntry=100 invNum=500 folio=F123 payEntry=200 payNum=600
