@@ -67,7 +67,7 @@ Aquí lo tienes listo para copiar y pegar en tu `README.md` sin errores de cierr
 ```
 
 ## 🖼️ Diagrama de flujo
-<img width="3840" height="2855" alt="Untitled diagram _ Mermaid Chart-2025-09-30-200311" src="https://github.com/user-attachments/assets/3533ebd5-d4fc-4456-b26b-bda5b4780fca" />
+<img width="3840" height="1295" alt="Untitled diagram _ Mermaid Chart-2025-09-30-204532" src="https://github.com/user-attachments/assets/9a496430-8d4b-4b59-8147-ba806efa00b2" />
 
 ```
 flowchart TD
