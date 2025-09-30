@@ -46,7 +46,9 @@ Este módulo (`src/consumer/ordersConsumer.js`) es el **consumer de Kafka** enca
 
 ---
 
+Aquí lo tienes listo para copiar y pegar en tu `README.md` sin errores de cierre de bloques:
 ## 📑 Ejemplo de evento publicado en `vtex.status`
+````markdown
 
 ```json
 {
@@ -55,42 +57,43 @@ Este módulo (`src/consumer/ordersConsumer.js`) es el **consumer de Kafka** enca
   "source": "finance",
   "eventId": "finance-12345-1696261234567-987654"
 }
+````
 
 ## ✅ Logs de referencia
 
-```markdown
-```bash
+```
 ✅ Reserva/Billing OK u_ref1=12345 invEntry=100 invNum=500 folio=F123 payEntry=200 payNum=600
 ❌ Error Reserva: { u_ref1: '12345', error: { code: 'SL_ERR', httpStatus: 400, message: 'Bad Request' } }
+```
 
 ## 🖼️ Diagrama de flujo
+<img width="3840" height="2855" alt="Untitled diagram _ Mermaid Chart-2025-09-30-200311" src="https://github.com/user-attachments/assets/3533ebd5-d4fc-4456-b26b-bda5b4780fca" />
 
-```markdown
-```mermaid
+```
 flowchart TD
-    subgraph IN["Kafka Topics - Entrada"]
-        A["finance.orders.reserve"]
-    end
+  subgraph IN["Kafka Topics - Entrada"]
+    A["finance.orders.reserve"]
+  end
 
-    subgraph FINANCE["Finance Service (Consumer)"]
-        A --> B[Parsear mensaje]
-        B -->|BAD_JSON| DLQ["finance.deadletter"]
-        B -->|MISSING_u_ref1| DLQ
+  subgraph FINANCE["Finance Service (Consumer)"]
+    A --> B[Parsear mensaje]
+    B -->|BAD_JSON| DLQ["finance.deadletter"]
+    B -->|MISSING_u_ref1| DLQ
 
-        B -->|OK| C[processOrder(u_ref1)]
-        C -->|Error| DLQ
+    B -->|OK| C[processOrder(u_ref1)]
+    C -->|Error| DLQ
 
-        C --> D1[Publicar en finance.reservation.created]
-        C --> D2[Publicar estado VTEX: start-handling → vtex.status]
+    C --> D1[Publicar en finance.reservation.created]
+    C --> D2[Publicar estado VTEX: start-handling → vtex.status]
 
-        C -->|Tiene pago| E1[Publicar en finance.billing.completed]
-        C -->|Tiene pago| E2[Publicar estado VTEX: invoiced → vtex.status]
-    end
+    C -->|Tiene pago| E1[Publicar en finance.billing.completed]
+    C -->|Tiene pago| E2[Publicar estado VTEX: invoiced → vtex.status]
+  end
 
-    subgraph OUT["Kafka Topics - Salida"]
-        D1
-        D2
-        E1
-        E2
-        DLQ
-    end
+  subgraph OUT["Kafka Topics - Salida"]
+    D1
+    D2
+    E1
+    E2
+    DLQ
+  end
