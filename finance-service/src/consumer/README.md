@@ -58,11 +58,16 @@ Este módulo (`src/consumer/ordersConsumer.js`) es el **consumer de Kafka** enca
 json```
 
 ## ✅ Logs de referencia
-''' ✅ Reserva/Billing OK u_ref1=12345 invEntry=100 invNum=500 folio=F123 payEntry=200 payNum=600
-❌ Error Reserva: { u_ref1: '12345', error: { code: 'SL_ERR', httpStatus: 400, message: 'Bad Request' } }'''
 
+```markdown
+```bash
+✅ Reserva/Billing OK u_ref1=12345 invEntry=100 invNum=500 folio=F123 payEntry=200 payNum=600
+❌ Error Reserva: { u_ref1: '12345', error: { code: 'SL_ERR', httpStatus: 400, message: 'Bad Request' } }
 
 ## 🖼️ Diagrama de flujo
+
+```markdown
+```mermaid
 flowchart TD
     subgraph IN["Kafka Topics - Entrada"]
         A["finance.orders.reserve"]
