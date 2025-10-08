@@ -7,6 +7,7 @@ const { connectProducer } = require('./utils/kafkaProducer');
 const { startCustomerOkConsumer } = require('./utils/Kafka/consumers/CustomerOkConsumer');
 const { startFinanceReservationCreatedConsumer } = require('./utils/Kafka/consumers/FinanceReservationCreatedConsumer');
 const { startVtexStatusConsumer } = require('./utils/Kafka/consumers/StatusInvoiceConsumer');
+const { startSellerCreatedConsumer } = require('./utils/Kafka/consumers/sellerCreatedConsumer');
 
 dotenv.config();
 
@@ -36,8 +37,10 @@ const server = app.listen(PORT, async () => {
     console.log('📥 FinanceReservationCreatedConsumer iniciado');
 
     await startVtexStatusConsumer();
-    console.log('📥 StatusInvoiceConsumer iniciado')
-    ;
+    console.log('📥 StatusInvoiceConsumer iniciado');
+
+    await startSellerCreatedConsumer();
+    console.log('📥 SellerCreatedConsumer iniciado');
   } catch (err) {
     console.error('❌ Error inicializando servicios Kafka:', err);
   }

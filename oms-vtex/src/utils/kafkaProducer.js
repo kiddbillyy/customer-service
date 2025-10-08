@@ -28,12 +28,12 @@ const sendBatch = async (topic, messages) => {
     try {
       await p.send({
         topic,
-        messages,                    // [{ key, value, headers }]
+        messages,                    
         acks: 1,
         timeout: 30000,
         compression: CompressionTypes.GZIP,
       });
-      return; // enviado
+      return; 
     } catch (e) {
       lastErr = e;
       const msg = String(e?.message || '');

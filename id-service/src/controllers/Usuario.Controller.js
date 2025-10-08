@@ -2,13 +2,15 @@ const bcrypt = require('bcryptjs');
 const { obtenerUsuarioPorCorreo, insertarUsuario, actualizarUsuarioYPerfil, getUsuarios } = require('../models/usuarioModels');
 const { verificarRutExistente } = require('../utils/verificarRutExistente');
 
+const { userHasSellerRole, getUsuarioDatosBasicos } = require('../models/rolesModels');
+const { emitSellerCreated } = require('../services/events/userEvents');
+
 const crearUsuario = async (req, res) => {
   const {
     correo,
     password,
     activo,
     usuarioCreadorId,
-
     // Datos opcionales del perfil
     nombres,
     apellidos,
@@ -16,7 +18,6 @@ const crearUsuario = async (req, res) => {
     departamentoId,
     telefono,
     urlImagenPerfil,
-
     // Opcionales
     rolId,
     plataformaIds = [] 
@@ -104,6 +105,25 @@ const crearUsuario = async (req, res) => {
       plataformaIds 
     );
 
+    const usuarioId = nuevoUsuario.UsuarioID;
+
+    // 2) ¿Quedó con algún rol que contenga "VENDEDOR"?
+    const esVendedor = await userHasSellerRole(usuarioId);
+
+    // 3) Si es vendedor => publicamos evento a Kafka
+    if (esVendedor) {
+      try {
+        const datos = await getUsuarioDatosBasicos(usuarioId);
+        if (datos) {
+          await emitSellerCreated(datos); 
+          // { usuarioId, correoElectronico, nombres, apellidos, rut, telefono }
+        }
+      } catch (e) {
+        console.error('Error publicando seller.created:', e);
+        // Decisión de negocio: no romper la creación del usuario si falla Kafka
+      }
+    }
+    // Respuesta exitosa
     res.status(201).json({
       message: 'Usuario creado exitosamente.',
       usuarioId: nuevoUsuario.UsuarioID

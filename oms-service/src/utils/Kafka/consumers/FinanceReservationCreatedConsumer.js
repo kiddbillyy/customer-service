@@ -103,7 +103,7 @@ async function propagateOmsStatus({ orderId, statusCode }) {
   const body = JSON.stringify({ orderStatusCode: String(statusCode) });
 
   const res = await doFetch(url, {
-    method: 'PATCH', // o 'PUT' si tu API lo requiere; según tu mensaje es PATCH
+    method: 'PATCH', 
     headers,
     body,
   });
@@ -146,12 +146,11 @@ async function handleFinanceOk(message) {
   });
 
   // 2) Marca estado "FACTURA RESERVA CREADA" en OMS (PATCH /orders/:orderId)
-  //    Solo si hubo actualización y tenemos orderId
   if (updated === 1 && orderId) {
     try {
       await propagateOmsStatus({
         orderId,
-        statusCode: OMS_FINANCE_RESERVED_STATUS_CODE, // "FACTURA RESERVA CREADA" por defecto
+        statusCode: OMS_FINANCE_RESERVED_STATUS_CODE, // "FACTURA RESERVA CREADA"
       });
     } catch (e) {
       console.error('[finance-ok] Error al propagar estado a OMS:', e.message, { orderId, u_ref1 });

@@ -21,3 +21,5 @@ docker exec -it kafka sh
 {"orderId":"1560880554995-01","state":"ready-for-handling"}
 
 {"OrderID":290,"ok":"true","CardCode":"20230330c"}
+
+

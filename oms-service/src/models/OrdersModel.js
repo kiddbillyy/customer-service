@@ -202,10 +202,16 @@ async function listOrdersRich({
   }
 
   // ===== Filtros numéricos exactos =====
+  // if (orderId != null && String(orderId).trim() !== '') {
+  //   req.input('orderId', sql.Int, Number(orderId));
+  //   where.push('o.orderID = @orderId');
+  // }
   if (orderId != null && String(orderId).trim() !== '') {
-    req.input('orderId', sql.Int, Number(orderId));
-    where.push('o.orderID = @orderId');
+  const raw = String(orderId).trim();
+  req.input('orderId_like', sql.NVarChar(50), `%${raw}%`);
+  where.push("CONVERT(NVARCHAR(50), o.orderID) LIKE @orderId_like");
   }
+
   if (folioNum != null && String(folioNum).trim() !== '') {
     req.input('folioNum', sql.Int, Number(folioNum));
     where.push('o.folioNum = @folioNum');
@@ -223,17 +229,56 @@ async function listOrdersRich({
     where.push('(o.u_ref1 LIKE @q OR o.salesChannelReferenceId LIKE @q)');
   }
 
-  // ===== Cliente: nombre / document (fulfillment) / cardcode (orders) =====
+  // // ===== Cliente: nombre / document (fulfillment) / cardcode (orders) =====
+  // if (cliente) {
+  //   const cli = String(cliente).trim();
+  //   req.input('cli_like', sql.NVarChar(200), `%${cli}%`);
+  //   where.push(`(
+  //     f.firstName LIKE @cli_like
+  //     OR f.lastName LIKE @cli_like
+  //     OR f.document LIKE @cli_like
+  //     OR CAST(o.customerCardCode AS NVARCHAR(100)) LIKE @cli_like
+  //   )`);
+  // }
+
+  // ===== Cliente: búsqueda robusta por nombre/apellido/document/cardcode =====
   if (cliente) {
-    const cli = String(cliente).trim();
-    req.input('cli_like', sql.NVarChar(200), `%${cli}%`);
+    // Normaliza espacios; los acentos los maneja el COLLATE en SQL (CI_AI)
+    const cleaned = String(cliente).trim().replace(/\s+/g, ' ');
+    const tokens = cleaned.split(' ').filter(Boolean);
+
+    // Parámetro para la cadena completa (útil para matches largos/contiguos)
+    req.input('cli_like_all', sql.NVarChar(200), `%${cleaned}%`);
+
+    // Parámetros por token: %token%
+    tokens.forEach((t, i) => {
+      req.input(`cli_tok_${i}`, sql.NVarChar(100), `%${t}%`);
+    });
+
+    // Expresiones (aplican COLLATE para acentos/case-insensitive)
+    const fullName = `(LTRIM(RTRIM(f.firstName)) + ' ' + LTRIM(RTRIM(f.lastName))) COLLATE Latin1_General_CI_AI`;
+    const fullNameRev = `(LTRIM(RTRIM(f.lastName)) + ' ' + LTRIM(RTRIM(f.firstName))) COLLATE Latin1_General_CI_AI`;
+    const docExpr = `f.document COLLATE Latin1_General_CI_AI`;
+    const cardExpr = `CAST(o.customerCardCode AS NVARCHAR(100)) COLLATE Latin1_General_CI_AI`;
+
+    // Todas las palabras deben aparecer en el nombre completo (orden libre)
+    const tokensAND_full = tokens.map((_, i) => `${fullName} LIKE @cli_tok_${i}`).join(' AND ');
+    const tokensAND_rev  = tokens.map((_, i) => `${fullNameRev} LIKE @cli_tok_${i}`).join(' AND ');
+
+    // Si solo hay 1 token, evita "AND" vacío
+    const nameBlock = tokens.length > 1
+      ? `(${tokensAND_full}) OR (${tokensAND_rev})`
+      : `${fullName} LIKE @cli_tok_0 OR ${fullNameRev} LIKE @cli_tok_0`;
+
     where.push(`(
-      f.firstName LIKE @cli_like
-      OR f.lastName LIKE @cli_like
-      OR f.document LIKE @cli_like
-      OR CAST(o.customerCardCode AS NVARCHAR(100)) LIKE @cli_like
+      ${fullName} LIKE @cli_like_all
+      OR ${fullNameRev} LIKE @cli_like_all
+      OR ${nameBlock}
+      OR ${docExpr} LIKE @cli_like_all
+      OR ${cardExpr} LIKE @cli_like_all
     )`);
   }
+
 
   // ===== statusCode (estado actual) =====
   if (orderStatusId != null && String(orderStatusId).trim() !== '') {
@@ -272,6 +317,7 @@ async function listOrdersRich({
       -- cliente (order_fulfillment)
       f.firstName,
       f.lastName,
+      f.cardname,
       f.email,
       f.phone,
       f.document,
@@ -332,6 +378,9 @@ async function getItemsByOrderIds(orderIds = []) {
     return `@${name}`;
   }).join(',');
 
+ 
+  req.input('excludeItemcode', sql.NVarChar(50), '701001008');
+
   const rs = (await req.query(`
     SELECT
       oi.orderID,
@@ -341,6 +390,7 @@ async function getItemsByOrderIds(orderIds = []) {
       lineNum  = oi.lineNum
     FROM dbo.Order_Items oi WITH (NOLOCK)
     WHERE oi.orderID IN (${inParams})
+      AND LTRIM(RTRIM(CAST(oi.itemcode AS NVARCHAR(50)))) <> @excludeItemcode
     ORDER BY oi.orderID, lineNum;
   `)).recordset || [];
 
@@ -357,4 +407,31 @@ async function getItemsByOrderIds(orderIds = []) {
   return map;
 }
 
-module.exports = { listOrdersRich, getItemsByOrderIds };
+async function getStatusHistoryByOrderId(orderId) {
+  await IdServicePoolConnect;
+  const req = new sql.Request(IdServicePool);
+  req.input('orderId', sql.Int, Number(orderId));
+
+  const rs = (await req.query(`
+    SELECT
+      h.historyID,
+      h.orderID,
+      s.statusCode,
+      s.description,
+      h.changeDate
+    FROM dbo.order_status_history h WITH (READPAST)
+    LEFT JOIN dbo.order_status s ON s.orderStatusID = h.orderStatusID
+    WHERE h.orderID = @orderId
+    ORDER BY h.changeDate ASC, h.historyID ASC;
+  `)).recordset || [];
+
+  return rs.map(r => ({
+    id: Number(r.historyID),
+    orderId: Number(r.orderID),
+    status: r.statusCode || null,
+    changeDate: r.changeDate || null,
+    user: null,
+  }));
+}
+
+module.exports = { listOrdersRich, getItemsByOrderIds, getStatusHistoryByOrderId };
