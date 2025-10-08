@@ -109,11 +109,6 @@ function buildPedido(salesChannelReferenceId, u_ref1) {
   return a || b || '';
 }
 
-function buildNombre(firstName, lastName) {
-  const name = [firstName, lastName].filter(Boolean).join(' ').trim();
-  return name || null;
-}
-
 function buildDireccion({ street, number, neighborhood, city, country, referenceAddress }) {
   const base = [
     [street, number].filter(Boolean).join(' ').trim(),
@@ -178,12 +173,18 @@ async function getOrdersView(req, res) {
         seller:    DEFAULT_SELLER,
       },
       datosCliente: {
-        nombre:  buildNombre(r.firstName, r.lastName),
+        nombre: r.cardname ?? `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim(),
         correo:  r.email || null,
         celular: r.phone || null,
+        rut:    r.cardcode || r.document, 
       },
       datosEntrega: {
-        tipoEntrega:     r.addressType || null,
+          tipoEntrega:
+            r.addressType === 'residential'
+              ? 'Envio a Domicilio'
+              : r.addressType === 'pickup'
+                ? 'Retiro en tienda Chorrillo'
+                : r.addressType || null,
         direccion:       buildDireccion({
                           street: r.street, number: r.number,
                           neighborhood: r.neighborhood, city: r.city,

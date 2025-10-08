@@ -89,7 +89,6 @@ async function postOrderToOms(payload) {
   for (let i = 0; i <= MAX_RETRIES; i++) {
     const attemptStart = Date.now();
     try {
-      console.log("Payload enviado mediante el post al oms service: ",payload)
       const result = await queue.add(() =>
         client.post('/orders', payload, { headers: { 'Content-Type': 'application/json' } })
       );

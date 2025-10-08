@@ -97,6 +97,7 @@ async function buildIncomingPaymentPayload({ orderId, invoiceDocEntry, invoiceAm
     TaxDate: today,
     DueDate: today,
     DocCurrency: "CLP",
+    Comments       : `OMS-SERVICE`,
     PaymentInvoices: [{
       DocEntry: invoiceDocEntry,
       InvoiceType: "it_Invoice",

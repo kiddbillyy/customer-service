@@ -118,7 +118,8 @@ async function insertOrderFulfillment(tx, orderID, f = {}) {
     .input('document',        sql.NVarChar(40),  f.document ?? null)
     .input('phone',           sql.NVarChar(30),  f.phone ?? null)
     .input('isCorporate',     sql.Bit,           toBit(f.isCorporate))
-    .input('giro',           sql.NVarChar(400), f.giro ?? null)
+    .input('giro',            sql.NVarChar(400), f.giro ?? null)
+    .input('cardname',        sql.NVarChar(150), f.cardname ?? null) 
     .input('addressType',     sql.VarChar(30),   f.addressType ?? null) // 'delivery' | 'store' | 'pickup'
     .input('receiverName',    sql.NVarChar(150), f.receiverName ?? null)
     .input('postalCode',      sql.NVarChar(20),  f.postalCode ?? null)
@@ -132,10 +133,10 @@ async function insertOrderFulfillment(tx, orderID, f = {}) {
     .query(`
       INSERT INTO dbo.order_fulfillment (
         orderID, firstName, lastName, email, currencyCode, documentType, [document], phone, isCorporate,
-        giro, addressType, receiverName, postalCode, city, country, [state], street, [number], neighborhood, referenceAddress
+        giro, cardname, addressType, receiverName, postalCode, city, country, [state], street, [number], neighborhood, referenceAddress
       ) VALUES (
         @orderID, @firstName, @lastName, @email, @currencyCode, @documentType, @document, @phone, @isCorporate,
-        @giro, @addressType, @receiverName, @postalCode, @city, @country, @state, @street, @number, @neighborhood, @referenceAddress
+        @giro, @cardname, @addressType, @receiverName, @postalCode, @city, @country, @state, @street, @number, @neighborhood, @referenceAddress
       );
     `);
 }
@@ -165,6 +166,7 @@ async function updateOrderFulfillmentPartial(tx, orderID, f = {}) {
     req.input('isCorporate', sql.Bit, toBit(f.isCorporate));
   }
   setIf('giro',             f.giro,            sql.NVarChar(400));
+  setIf('cardname',         f.cardname,        sql.NVarChar(150));
   setIf('addressType',      f.addressType,      sql.VarChar(30));
   setIf('receiverName',     f.receiverName,     sql.NVarChar(150));
   setIf('postalCode',       f.postalCode,       sql.NVarChar(20));
