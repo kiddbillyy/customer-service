@@ -22,5 +22,7 @@ services:
       DB_NAME: ID_SERVICE_DB
       JWT_SECRET: mysupersecretkey
       TZ: America/Santiago
+      LOG_UPSTREAM: "1"
+      LOG_UPSTREAM_SLOW_MS: "200"
     networks:
       - kafka_network
