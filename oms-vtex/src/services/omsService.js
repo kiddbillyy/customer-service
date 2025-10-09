@@ -16,24 +16,27 @@ if (!OMS_POST_URL) throw new Error('OMS_POST_URL no configurado');
 //const httpAgent  = new http.Agent({  keepAlive: true, keepAliveMsecs: 20000, maxSockets: 200, maxFreeSockets: 50 });
 const httpAgent  = new http.Agent({
   keepAlive: true,
-  keepAliveMsecs: 20_000,
+  keepAliveMsecs: 10_000,
   maxSockets: 200,
-  maxFreeSockets: 50,
+  maxFreeSockets: 8,
   // 🔧 cerrar sockets libres antes que cualquier upstream (conservador)
-  freeSocketTimeout: 5_000,          // << más corto que cualquier idle upstream
+  freeSocketTimeout: 2_000,          // << más corto que cualquier idle upstream
   // 🔧 evitar sockets “ancianos” aunque estén activos (Node >=18)
-  socketActiveTTL: 30_000
+  socketActiveTTL: 30_000,
+  noDelay: true,
 });
 
 
 //const httpsAgent = new https.Agent({ keepAlive: true, keepAliveMsecs: 20000, maxSockets: 200, maxFreeSockets: 50 });
 const httpsAgent = new https.Agent({
   keepAlive: true,
-  keepAliveMsecs: 20_000,
+  keepAliveMsecs: 10_000,
   maxSockets: 200,
   maxFreeSockets: 50,
-  freeSocketTimeout: 5_000,
-  socketActiveTTL: 30_000
+  freeSocketTimeout: 2_000,
+  socketActiveTTL: 30_000,
+  scheduling: 'lifo',
+  maxCachedSessions: 0
 });
 
 const client = axios.create({
