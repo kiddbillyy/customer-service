@@ -114,5 +114,27 @@ async function querySellerStatuses() {
   `);
   return recordset;
 }
+async function getSellerByRut(rutInput) {
+  const rutPlain = toRutPlain(rutInput);
+  if (!rutPlain) return null;
 
-module.exports = { querySellers, querySellerStatuses };
+  await IdServicePoolConnect;
+
+  const { recordset } = await IdServicePool.request()
+    .input('rutPlain', sql.NVarChar, rutPlain)
+    .query(`
+      SELECT TOP 1
+        LTRIM(RTRIM(CONCAT(COALESCE(S.NOMBRE, ''), ' ', COALESCE(S.APELLIDO, '')))) AS name,
+        S.EXTERNAL_SAP_ID AS external_sap_id,
+        SS.NOMBRE AS status
+      FROM SELLER S
+      LEFT JOIN SELLER_STATUS SS ON SS.ID = S.STATUS_ID
+      WHERE S.RUT = @rutPlain
+         OR REPLACE(REPLACE(S.RUT, '.', ''), '-', '') = @rutPlain
+      ORDER BY CASE WHEN S.RUT = @rutPlain THEN 0 ELSE 1 END, S.ID ASC
+    `);
+
+  return recordset[0] || null;
+}
+
+module.exports = { querySellers, querySellerStatuses, getSellerByRut };

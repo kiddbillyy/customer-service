@@ -1,5 +1,6 @@
 // src/controllers/seller.controller.js
-const { querySellers, querySellerStatuses } = require('../models/seller.Models');
+const { querySellers, querySellerStatuses, getSellerByRut } = require('../models/seller.Models');
+const { toRutPlain } = require('../utils/rut'); 
 
 async function getSellers(req, res) {
   try {
@@ -58,7 +59,33 @@ async function getSellerStatuses(req, res) {
   }
 }
 
+async function getSellerByRutController(req, res) {
+  try {
+    const rutInput = req.params.rut || req.query.rut; 
+    const rutPlain = toRutPlain(rutInput);
+
+    if (!rutPlain) {
+      return res.status(400).json({ error: 'RUT inválido.' });
+    }
+
+    const row = await getSellerByRut(rutPlain);
+    if (!row) {
+      return res.status(404).json({ error: 'Seller no encontrado.' });
+    }
+
+    return res.json({
+      name: row.name || null,
+      external_sap_id: row.external_sap_id || null,
+      status: row.status || null,
+    });
+  } catch (err) {
+    console.error('Error getSellerByRutController:', err);
+    return res.status(500).json({ error: 'Error interno del servidor.' });
+  }
+}
+
 module.exports = {
   getSellers,
   getSellerStatuses,
+  getSellerByRutController
 };
