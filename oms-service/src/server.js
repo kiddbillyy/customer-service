@@ -50,7 +50,7 @@ const server = app.listen(PORT, async () => {
 
 
 // ⏱️ Ajuste de timeouts para evitar cortes prematuros
-server.keepAliveTimeout = 70_000;  // 70s
-server.headersTimeout   = 75_000;  // > keepAliveTimeout
+server.keepAliveTimeout = 65_000;  // 70s
+server.headersTimeout   = 70_000;  // > keepAliveTimeout
 
 

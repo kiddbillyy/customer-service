@@ -23,6 +23,7 @@ const httpAgent  = new http.Agent({
   freeSocketTimeout: 2_000,          // << más corto que cualquier idle upstream
   // 🔧 evitar sockets “ancianos” aunque estén activos (Node >=18)
   socketActiveTTL: 30_000,
+  scheduling: 'lifo', 
   noDelay: true,
 });
 

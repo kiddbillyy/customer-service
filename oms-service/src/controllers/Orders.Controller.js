@@ -177,5 +177,31 @@ async function getOrders(req, res) {
 }
 
 
+async function getCustomersPendingIntegration(req, res) {
+  try {
+    const {
+      createdFrom,       // opcional (ISO)
+      createdTo,         // opcional (ISO, exclusivo)
+      page = '1',
+      pageSize = '100',
+    } = req.query;
 
-module.exports = { createOrder, patchOrder, getOrders };
+    const out = await model.getOrdersPendingCustomerIntegration({
+      createdFrom,
+      createdTo,
+      page: Number(page),
+      pageSize: Number(pageSize),
+    });
+
+    // out = { page, pageSize, total, rows: [ { ... , fulfillment: {...}, retryCustomer: {...} } ] }
+    return res.status(200).json(out);
+  } catch (err) {
+    console.error('getCustomersPendingIntegration error:', err);
+    return res
+      .status(500)
+      .json({ message: err?.message || 'Error al listar pendientes de integración de customer.' });
+  }
+}
+
+
+module.exports = { createOrder, patchOrder, getOrders, getCustomersPendingIntegration };

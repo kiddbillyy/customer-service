@@ -15,5 +15,5 @@ router.get('/:orderId/issue-summary', getOrderIssueSummary);
 router.get('/', ctrl.getOrders);
 router.get('/:id', ctrl.getOrders);
 
-
+router.get('/customers/pending', ctrl.getCustomersPendingIntegration);
 module.exports = router;

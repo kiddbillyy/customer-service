@@ -6,5 +6,5 @@ export default rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  // trustProxy: false // (por defecto es false; no lo declares)
+  trustProxy: false // (por defecto es false; no lo declares)
 });
