@@ -24,5 +24,6 @@ services:
       TZ: America/Santiago
       LOG_UPSTREAM: "1"
       LOG_UPSTREAM_SLOW_MS: "200"
+      DEBUG_SOCKETS: "true"
     networks:
       - kafka_network

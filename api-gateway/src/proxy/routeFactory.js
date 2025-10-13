@@ -225,19 +225,27 @@ import auth from '../middlewares/auth.js';
 import rbac from '../middlewares/rbac.js';
 import http from 'node:http';
 import { logger } from '../middlewares/logger.js';
+import Agent from 'agentkeepalive';
 
 const DEBUG_SOCKETS = /^(1|true)$/i.test(process.env.DEBUG_SOCKETS || '');
 
 // --- Ajustes del pool de sockets (mantiene el comportamiento estable del original)
-const httpAgent = new http.Agent({
+/* const httpAgent = new Agent({
   keepAlive: true,
-  keepAliveMsecs: 10_000,
   maxSockets: 512,
-  maxFreeSockets: 8,
-  freeSocketTimeout: 1_000,
-  socketActiveTTL: 30_000,
+  maxFreeSockets: 2,
+  freeSocketTimeout: 30_000,
   scheduling: 'lifo',
   noDelay: true,
+  keepAliveMsecs: 1_000,
+}); */
+const httpAgent = new Agent({
+  keepAlive: true,
+  keepAliveMsecs: 1000,
+  maxFreeSockets: 2,
+  freeSocketTimeout: 2000,   // expira libres muy rápido
+  socketActiveTTL: 10000,    // jubila aunque estén en uso por “edad”
+  scheduling: 'lifo',
 });
 
 // Helpers de conteo para el Agent
@@ -395,6 +403,7 @@ export function makeRoute({
       onProxyReq(proxyReq, req) {
         req._gwUpStart = process.hrtime.bigint();
         if (req.id) proxyReq.setHeader('X-Request-Id', req.id);
+        /* proxyReq.setHeader('Connection', 'keep-alive'); */
 
         // Introspección de socket
         attachSocketDebug(proxyReq, req, target);
@@ -461,6 +470,12 @@ export function makeRoute({
             console.log('[RES] aborted', { requestId: req.id });
           });
         }
+        console.log('[HEADERS IN]', {
+            url: req.originalUrl,
+            status: proxyRes.statusCode,
+            connectionHeader: proxyRes.headers['connection'] // <-- La cabecera clave
+        });
+
 
         if (
           LOG_UPSTREAM &&
