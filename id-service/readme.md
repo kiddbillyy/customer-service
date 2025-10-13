@@ -418,7 +418,7 @@ Registra un nuevo usuario con sus datos personales, credenciales, rol y platafor
   "urlImagenPerfil": "https://miapp.cl/perfiles/nuevo.png",
   "canalDeVenta": "MercadoLibre",
   "canalDeVentaId": "MER-001",
-  "rolId": 3,
+  "rolesIds": [3, 5], 
   "plataformaIds": [1, 3]
 }
 ```
