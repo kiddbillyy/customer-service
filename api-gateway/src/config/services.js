@@ -32,7 +32,7 @@ export default {
   comerceService:  { path: '/api/comerce-service',  target: 'http://comerce-service:5009', requireAuth: true,  requireRbac: false  },
 
   // Ruta Microservicio OMS SERVICE
-  omsService:  { path: '/api/oms-service',  target: 'http://oms-service:5010', requireAuth: false,  requireRbac: false, agentProfile: 'strict' },
+  omsService:  { path: '/api/oms-service',  target: 'http://oms-service:5010', requireAuth: false,  requireRbac: false },
   // Rutas Microservicio VTEX OMS (Este nunca debe ser requireAuth True)
   vtexOms:  { path: '/api/vtex-oms',  target: 'http://oms-vtex:5011', requireAuth: false,  requireRbac: false  },
   finance:  { path: '/api/finance',  target: 'http://finance-service:5012', requireAuth: false,  requireRbac: false  },

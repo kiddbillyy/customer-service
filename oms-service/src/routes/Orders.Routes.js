@@ -5,7 +5,7 @@ const { getOrdersView } = require('../controllers/OrdersController');
 const { getOrderIssueSummary } = require('../controllers/OrdersDetails.Controller')
 
 const router = express.Router();
-router.post('/', ctrl.createOrder);
+/* router.post('/', ctrl.createOrder);
 router.patch('/:id', ctrl.patchOrder);
 
 router.get('/summary', getOrdersView);
@@ -15,5 +15,21 @@ router.get('/:orderId/issue-summary', getOrderIssueSummary);
 router.get('/', ctrl.getOrders);
 router.get('/:id', ctrl.getOrders);
 
+router.get('/customers/pending', ctrl.getCustomersPendingIntegration);
+
+ */
+
+
+router.get('/customers/pending', ctrl.getCustomersPendingIntegration);
+router.get('/summary', getOrdersView);
+router.get('/:orderId/issue-summary', getOrderIssueSummary);
+
+// listado
+router.get('/', ctrl.getOrders);
+// detalle (usa un handler de detalle, no el de listado)
+router.get('/:id', ctrl.getOrders);
+
+router.post('/', ctrl.createOrder);
+router.patch('/:id', ctrl.patchOrder);
 
 module.exports = router;
