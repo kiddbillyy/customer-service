@@ -85,8 +85,6 @@ export function makeRoute({
   return { mountPoint: path, handler: router, breaker };
 }
  */
-// src/proxy/routeFactory.js
-// src/proxy/routeFactory.js
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import createBreaker from '../utils/createBreaker.js';
@@ -95,8 +93,8 @@ import rbac from '../middlewares/rbac.js';
 import http from 'node:http';
 import { logger } from '../middlewares/logger.js';
 
-// --- Ajustes del pool de sockets (mantiene el comportamiento estable del original)
-const httpAgent = new http.Agent({
+// --- Agentes: pool (keep-alive) y close (sin keep-alive)
+const pooledAgent = new http.Agent({
   keepAlive: true,
   keepAliveMsecs: 10_000,
   maxSockets: 512,
@@ -107,18 +105,52 @@ const httpAgent = new http.Agent({
   noDelay: true,
 });
 
-// Control de logging por variables de entorno
+const closeAgent = new http.Agent({ keepAlive: false });
+
+function pickAgent(profile) {
+  switch ((profile || '').toLowerCase()) {
+    case 'close':
+    case 'no-keepalive':
+    case 'nokeepalive':
+      return closeAgent;
+    default:
+      return pooledAgent;
+  }
+}
+
+// --- Logging control por env
 const LOG_UPSTREAM = String(process.env.LOG_UPSTREAM || '').toLowerCase() === '1' ||
                      String(process.env.LOG_UPSTREAM || '').toLowerCase() === 'true';
-const ONLY_PATH    = process.env.LOG_UPSTREAM_ONLY_PATH || ''; // ej: "/api/oms-service"
+const ONLY_PATH    = process.env.LOG_UPSTREAM_ONLY_PATH || '';
 const SLOW_MS      = Number(process.env.LOG_UPSTREAM_SLOW_MS || '0');
 
-// Mensaje al cargar el módulo (útil para confirmar que este archivo es el que corre)
-try { logger.info('[GW-MODULE]', { file: import.meta.url }); } catch { /* noop en tests */ }
+try { logger.info('[GW-MODULE]', { file: import.meta.url }); } catch {}
 
 function matchOnlyPath(url = '') {
-  // Si se define ONLY_PATH, solo loguea para ese prefijo; si está vacío, loguea todo
   return !ONLY_PATH || url.startsWith(ONLY_PATH);
+}
+
+// --- wrapper con retry para errores transitorios GET
+function makeProxyWithRetry(opts) {
+  let proxy;
+  const origOnError = opts.onError;
+  proxy = createProxyMiddleware({
+    ...opts,
+    onError: (err, req, res, ...rest) => {
+      const retryable =
+        !req.__retried &&
+        req.method === 'GET' &&
+        (err?.code === 'ECONNRESET' || err?.code === 'EPIPE' || /socket hang up/i.test(err?.message || ''));
+
+      if (retryable && !res.headersSent) {
+        req.__retried = true;
+        req.headers['x-retry'] = '1';
+        return setImmediate(() => proxy(req, res));
+      }
+      return origOnError ? origOnError(err, req, res, ...rest) : res.end();
+    },
+  });
+  return proxy;
 }
 
 export function makeRoute({
@@ -128,14 +160,14 @@ export function makeRoute({
   requireRbac = false,
   publicPaths = [],
   prependBasePath = true,
+  agentProfile = 'pooled',          // ← perfil de agente
 }) {
-  // Log de alta de ruta (una vez por servicio)
-  logger.info('[GW-ROUTE]', { path, target, requireAuth, requireRbac, prependBasePath });
+  logger.info('[GW-ROUTE]', { path, target, requireAuth, requireRbac, prependBasePath, agentProfile });
 
   const breaker = createBreaker(target);
   const router = express.Router();
 
-  // Auth + RBAC (sin cambiar la semántica del original)
+  // Auth + RBAC
   if (requireAuth) {
     router.use((req, res, next) => {
       const rel = (req.originalUrl || req.url || '').replace(path, '') || '/';
@@ -145,44 +177,45 @@ export function makeRoute({
     });
   }
 
+  const agent = pickAgent(agentProfile);
+  const agentIsClose = (agentProfile || '').toLowerCase().includes('close');
+
   router.use(
-    createProxyMiddleware({
+    makeProxyWithRetry({
       target,
       changeOrigin: true,
-      agent: httpAgent,
+      agent,                                 // ← usa el agente según perfil
       pathRewrite: prependBasePath ? (incomingPath) => `${path}${incomingPath}` : undefined,
-
-      // timeouts alineados con el server original
-      timeout: 60_000,      // tiempo total de la request (cliente→gateway)
-      proxyTimeout: 55_000, // inactividad del socket (gateway→upstream)
+      timeout: 60_000,
+      proxyTimeout: 55_000,
 
       onProxyReq(proxyReq, req) {
-        // cronómetro para medir upstream
+        // si usamos perfil "close", fuerza cierre en este hop
+        if (agentIsClose) {
+          proxyReq.setHeader('Connection', 'close');
+          // en Node >= 18 también:
+          // proxyReq.shouldKeepAlive = false;
+        }
+
         req._gwUpStart = process.hrtime.bigint();
-        // Propaga el request-id si existe
         if (req.id) proxyReq.setHeader('X-Request-Id', req.id);
 
-        // Log corto de entrada al proxy (filtrado por env)
         if (LOG_UPSTREAM && matchOnlyPath(req.originalUrl || req.url)) {
           logger.info('[GW-HIT]', {
             requestId: req.id,
             method: req.method,
             url: req.originalUrl || req.url,
             target,
+            agentProfile,
           });
         }
       },
 
       onProxyRes(proxyRes, req) {
-        const dtMs =
-          req._gwUpStart ? Number(process.hrtime.bigint() - req._gwUpStart) / 1e6 : undefined;
+        const dtMs = req._gwUpStart ? Number(process.hrtime.bigint() - req._gwUpStart) / 1e6 : undefined;
 
-        // Log de salida del upstream (opcionalmente solo si supera SLOW_MS)
-        if (
-          LOG_UPSTREAM &&
-          matchOnlyPath(req.originalUrl || req.url) &&
-          (SLOW_MS === 0 || (dtMs != null && dtMs >= SLOW_MS))
-        ) {
+        if (LOG_UPSTREAM && matchOnlyPath(req.originalUrl || req.url) &&
+            (SLOW_MS === 0 || (dtMs != null && dtMs >= SLOW_MS))) {
           const h = proxyRes.headers || {};
           logger.info('[GW-OUT]', {
             requestId: req.id,
@@ -195,11 +228,12 @@ export function makeRoute({
             xUp: h['x-envoy-upstream-service-time'] || h['x-response-time'],
             contentLength: h['content-length'],
             upstreamMs: dtMs != null ? Math.round(dtMs) : undefined,
+            retried: !!req.__retried,
+            agentProfile,
           });
         }
       },
 
-      // Mapeo de errores a 504/502 (con log estructurado)
       onError: (err, req, res) => {
         logger.error('[ProxyError]', {
           requestId: req.id,
@@ -207,6 +241,8 @@ export function makeRoute({
           code: err?.code,
           message: err?.message,
           url: req?.originalUrl || req?.url,
+          retried: !!req.__retried,
+          agentProfile,
         });
         const timeoutish = err?.code === 'ETIMEDOUT' || err?.code === 'ECONNRESET';
         if (!res.headersSent) {

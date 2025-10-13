@@ -44,7 +44,9 @@ async function getUsuarioDatosBasicos(usuarioId, conn) {
         P.NOMBRES           AS nombres,
         P.APELLIDOS         AS apellidos,
         P.RUT               AS rut,
-        P.TELEFONO          AS telefono
+        P.TELEFONO          AS telefono,
+        p.CanalDeVenta              AS canalDeVenta,
+        p.CanalDeVentaId            AS canalDeVentaId
       FROM USUARIOS U
       LEFT JOIN PERFILES P ON P.UsuarioID = U.UsuarioID
       WHERE U.UsuarioID = @usuarioId

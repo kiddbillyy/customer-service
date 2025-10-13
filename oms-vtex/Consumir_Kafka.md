@@ -7,7 +7,7 @@ docker exec -it kafka sh
 
 {"orderId":"1560880554995-01","state":"ready-for-handling"}
 
-# docker exec -it kafka sh -c "kafka-console-producer.sh --broker-list localhost:9092 --topic vtex.order.integration"
+# docker exec -it kafka sh -c "kafka-console-producer.sh --broker-list localhost:9092 --topic seller.validation"
 
 # kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic vtex.status --from-beginning 
 
