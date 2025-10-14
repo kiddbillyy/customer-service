@@ -1,140 +1,10 @@
-// // helpers para tomar campos sin romper si faltan
-// const pick = (obj, path, dflt=null) =>
-//   path.split('.').reduce((o,k)=> (o && o[k] != null ? o[k] : dflt), obj);
+const DEFAULT_SELLER = '401';
+const DEFAULT_COSTING_CODE = 'CC';
+const DEFAULT_COSTING_CODE2 = 'FERR';
+const DEFAULT_TAX_CODE = 'IVA';
+const DEFAULT_WHS_CODE = '01'; 
+const DEFAULT_IS_RESERVATION_INVOICE = true;
 
-// function normalizePhone(p){ return p ? String(p).replace(/\s+/g,' ').trim() : null; }
-
-
-// function computeTotals(vtex) {
-//   const orderValue = Number.isFinite(vtex?.value) ? vtex.value : null;
-
-//   return {
-//     doctotalsy: orderValue,
-//     valuesInCents: true,
-//   };
-// }
-
-// function mapFulfillment(vtex) {
-//   const client = vtex?.clientProfileData || {};
-//   const addr   = vtex?.shippingData?.address || {};
-//   const currencyCode = vtex?.storePreferencesData?.currencyCode || 'CLP';
-
-//   const isCorporate = client.isCorporate === true || client.isCorporate === 1 || client.isCorporate === '1';
-//   const fullName = [client.firstName, client.lastName].filter(Boolean).join(' ');
-
-//   return {
-//     firstName: client.firstName || null,
-//     lastName : client.lastName || null,
-//     email    : client.email || null,
-//     phone: normalizePhone( isCorporate ? (client.corporatePhone || client.phone) : (client.phone || null)),
-//     isCorporate, 
-//     currencyCode,
-//     documentType: client.documentType || 'RUT',
-//     document: isCorporate ? client.corporateDocument || null : client.document || null,
-//     addressType: addr.addressType ,
-//     receiverName: addr.receiverName || fullName || null,
-//     street: addr.street || null,
-//     number: addr.number || null,
-//     neighborhood: addr.neighborhood || null,
-//     city: addr.city || null,
-//     state: addr.state || null,
-//     country: addr.country || 'CL',
-//     postalCode: addr.postalCode || null,
-//     referenceAddress: addr.reference || null, 
-//     giro: isCorporate ? (client.stateInscription || 'EMPRESA'): 'PARTICULAR',
-//     cardname: isCorporate ? (client.corporateName || null) : (fullName || null),
-//   }
-// };
-
-// function mapShipping(vtex) {
-//   const li = Array.isArray(vtex?.shippingData?.logisticsInfo) ? vtex.shippingData.logisticsInfo : [];
-
-//   const first = li.find(x => x?.selectedSla) || li[0] || {};
-//   const selected = (first?.slas || []).find(s => s?.name === first?.selectedSla) || first?.slas?.[0] || {};
-//   const shippingEstimate = selected?.shippingEstimate || null;
-//   const deliveryCompany = selected?.name || selected?.courierName || null;
-//   const deliveryDate = selected?.shippingEstimateDate  || null;
-
-//   return { shippingEstimate, deliveryCompany, deliveryDate };
-// }
-
-// const normalizeCategoryPath = (raw) => {
-//   if (!raw) return null;
-//   const cleaned = String(raw).replace(/[^\d/]/g, "/").replace(/\/+/g, "/");
-//   if (!cleaned.replace(/\//g, "")) return null;
-//   const withLeading = cleaned.startsWith("/") ? cleaned : `/${cleaned}`;
-//   const withTrailing = withLeading.endsWith("/") ? withLeading : `${withLeading}/`;
-//   return withTrailing;
-// };
-
-// const splitIds = (path) => (path ? path.split("/").filter(Boolean) : []);
-
-// function mapItems(vtex) {
-//   const items = Array.isArray(vtex?.items) ? vtex.items : [];
-
-
-//   return items.map((it, idx) => {
-//     const rawPath =
-//       it?.productCategoryIds ??
-//       it?.additionalInfo?.categoriesIds ??
-//       it?.categoryPathIds ??
-//       null;
-
-//     const categoryPathIds = normalizeCategoryPath(rawPath);
-//     const ids = splitIds(categoryPathIds);
-
-//     const productCategories = it?.productCategories || null;
-
-
-//     const categoryPathNames = productCategories
-//       ? ids.map((id) => productCategories[id]).filter(Boolean).join(" > ")
-//       : null;
-
-//     const firstId = ids.length ? ids[0] : null;
-//     const categoryLeafId = firstId ? Number(firstId) : null;
-//     const categoryLeafName = ((firstId && productCategories) ? productCategories[firstId] : undefined) ?? it?.categoryLeafName ?? null;
-//     return {
-//       itemIndex: idx,
-//       uniqueId: it?.uniqueId || null,
-//       itemcode: it?.refId || it?.id || null,
-//       dscription: it?.name || it?.skuName || null,
-//       quantity: Number(it?.quantity ?? 0),
-//       priceAfterVAT: Number(it?.sellingPrice ?? it?.price ?? 0),
-//       codebars: it?.ean || null,
-//       imageUrl: it?.imageUrl || null,
-
-//       // 👉 formato final para BD
-//       categoryLeafId,
-//       categoryLeafName,
-//       categoryPathIds,
-//       categoryPathNames,
-//     };
-//   });
-// }
-
-// exports.buildOmsPayload = (vtex, { orderId}) => {
-//   const { doctotalsy, valuesInCents } = computeTotals(vtex);
-//   const { shippingEstimate, deliveryCompany, deliveryDate } = mapShipping(vtex);
-
-//   return {
-//     salesChannelReferenceId: 'VTEX-001',                 
-//     u_ref1: orderId,                                     
-//     orderStatusCode: 'ready-for-handling',
-//     //orderStatusID: '1',                                  
-//     doctotalsy,
-//     valuesInCents,                                       // true → el OMS divide por 100
-//     deliveryDate: deliveryDate || null,                  
-//     origin: 'VTEX',
-//     hostname: 'mimbralb2c',
-//     shippingEstimate: shippingEstimate,         // fallback por si no viene
-//     deliveryCompany: deliveryCompany,    // fallback
-
-//     fulfillment: mapFulfillment(vtex),
-//     items: mapItems(vtex),
-//   };
-// };
-
-// helpers para tomar campos sin romper si faltan
 const pick = (obj, path, dflt=null) =>
   path.split('.').reduce((o,k)=> (o && o[k] != null ? o[k] : dflt), obj);
 
@@ -144,7 +14,7 @@ function computeTotals(vtex) {
   const orderValue = Number.isFinite(vtex?.value) ? vtex.value : null;
   return {
     doctotalsy: orderValue,
-    valuesInCents: true, // el OMS divide por 100
+    valuesInCents: true, 
   };
 }
 
@@ -201,7 +71,15 @@ const normalizeCategoryPath = (raw) => {
 
 const splitIds = (path) => (path ? path.split("/").filter(Boolean) : []);
 
-function mapItems(vtex) {
+function mapItems(vtex, defaults = {}) {
+  const {
+    seller: dSeller = DEFAULT_SELLER,
+    costingCode: dCC = DEFAULT_COSTING_CODE,
+    costingCode2: dCC2 = DEFAULT_COSTING_CODE2,
+    taxCode: dTax = DEFAULT_TAX_CODE,
+    whscode: dWhs = DEFAULT_WHS_CODE, 
+  } = defaults;
+
   const items = Array.isArray(vtex?.items) ? vtex.items : [];
   return items.map((it, idx) => {
     const rawPath =
@@ -222,26 +100,35 @@ function mapItems(vtex) {
     const categoryLeafId = firstId ? Number(firstId) : null;
     const categoryLeafName = ((firstId && productCategories) ? productCategories[firstId] : undefined) ?? it?.categoryLeafName ?? null;
 
+    const seller = dSeller;
+    const costingCode  =  dCC;
+    const costingCode2 =  dCC2;
+    const taxCode      =  dTax;
+
     return {
       itemIndex: idx,
       uniqueId: it?.uniqueId || null,
       itemcode: it?.refId || it?.id || null,
       dscription: it?.name || it?.skuName || null,
       quantity: Number(it?.quantity ?? 0),
-      // VTEX ya viene en centavos; OMS dividirá por 100 según valuesInCents
       priceAfterVAT: Number(it?.sellingPrice ?? it?.price ?? 0),
       codebars: it?.ean || null,
       imageUrl: it?.imageUrl || null,
 
-      // 👉 formato final para BD
       categoryLeafId,
       categoryLeafName,
       categoryPathIds,
       categoryPathNames,
+
+
+      seller,
+      CostingCode:  costingCode,
+      CostingCode2: costingCode2,
+      TaxCode:      taxCode,
+      whscode: dWhs, 
     };
   });
 }
-
 
 function pickFirstRealPayment(vtex) {
   const txs = Array.isArray(vtex?.paymentData?.transactions) ? vtex.paymentData.transactions : [];
@@ -271,16 +158,14 @@ function mapPaymentForFinance(vtex) {
   const installments = Number.isFinite(+p.installments) ? +p.installments : 1;
 
   return {
-    acquirer: rawAcq,                 // p.ej. "MercadoPagoV2" o "VD - 0"
+    acquirer: rawAcq,
     message: (cr.Message || "").toString().trim(),
     installments,
     tid,
     last4,
-    // opcionales / auditoría:
     valueCents: Number(p.value ?? 0),
     paymentSystem: p.paymentSystem || null,
     paymentSystemName: p.paymentSystemName || null,
-    // muy importante: mismo transactionId del pago elegido
     idempotencyKey: tx.transactionId || null
   };
 }
@@ -299,8 +184,8 @@ function buildFinancePaymentDTO(vtex) {
     throw new Error("No se encontró un pago válido en VTEX");
   }
   return {
-    orderId: vtex.orderId,                 // "1560720554963-01"
-    idempotencyKey: pay.idempotencyKey,    // del mismo tx elegido
+    orderId: vtex.orderId,
+    idempotencyKey: pay.idempotencyKey,
     payments: {
       acquirer: pay.acquirer,
       message: pay.message,
@@ -326,8 +211,20 @@ function buildOmsPayload (vtex, { orderId }) {
   const { doctotalsy, valuesInCents } = computeTotals(vtex);
   const { shippingEstimate, deliveryCompany, deliveryDate } = mapShipping(vtex);
 
-  // 1) Items base desde VTEX
-  const items = mapItems(vtex);
+  // seller header (si VTEX no es consistente, usa default)
+  const headerSeller = DEFAULT_SELLER;
+
+  // whscode fijo en header
+  const whscode = DEFAULT_WHS_CODE;
+
+  // 1) Items base desde VTEX con defaults
+  const items = mapItems(vtex, {
+    seller: headerSeller,
+    costingCode: DEFAULT_COSTING_CODE,
+    costingCode2: DEFAULT_COSTING_CODE2,
+    taxCode: DEFAULT_TAX_CODE,
+    whscode,
+  });
 
   // 2) Agregar ítem de flete si corresponde (en CENTAVOS, sin dividir)
   const shippingValue = getShippingValue(vtex);
@@ -338,10 +235,15 @@ function buildOmsPayload (vtex, { orderId }) {
       itemcode       : '701001008',
       dscription     : 'Flete',
       quantity       : 1,
-      priceAfterVAT  : shippingValue, // en centavos, OMS divide por 100
+      priceAfterVAT  : shippingValue, 
       codebars       : null,
-      whscode        : null,
-      U_Subcategoria : 'Flete'
+      imageUrl       : null,
+       U_Subcategoria : 'Flete',
+      seller         : headerSeller,
+      CostingCode    : DEFAULT_COSTING_CODE,
+      CostingCode2   : DEFAULT_COSTING_CODE2,
+      TaxCode        : DEFAULT_TAX_CODE,
+      whscode       : whscode,
     });
   }
 
@@ -350,12 +252,16 @@ function buildOmsPayload (vtex, { orderId }) {
     u_ref1: orderId,
     orderStatusCode: 'Pedido Nuevo',
     doctotalsy,
-    valuesInCents,                    // true → el OMS divide por 100
+    valuesInCents,
     deliveryDate: deliveryDate || null,
     origin: 'VTEX',
     hostname: 'mimbralb2c',
     shippingEstimate,
     deliveryCompany,
+
+    isReservationInvoice: DEFAULT_IS_RESERVATION_INVOICE,
+    seller: headerSeller,
+    whscode, 
 
     fulfillment: mapFulfillment(vtex),
     items,
@@ -365,3 +271,6 @@ function buildOmsPayload (vtex, { orderId }) {
 module.exports = {
   buildFinancePaymentDTO, buildOmsPayload
 };
+
+
+

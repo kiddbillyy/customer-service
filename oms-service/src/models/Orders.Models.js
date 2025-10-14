@@ -318,18 +318,20 @@ async function createOrderWithItems(body) {
       .input('shippingEstimate',sql.NVarChar(50),  body.shippingEstimate ?? null)
       .input('deliveryCompany', sql.NVarChar(100), body.deliveryCompany ?? null)
       .input('seller',        sql.NVarChar(150), body.seller ?? null)
+      .input('isReservationInvoice', sql.Bit, toBit(body.isReservationInvoice))
+
       .query(`
         INSERT INTO dbo.Orders
           (salesChannelReferenceId, u_ref1, itemsAmount, doctotalsy,
            orderStatusID, deliveryDate, lastQueryDate, createdate, updateDate,
            integrationError, origin, hostname, InvoiceDocNum, DocEntryInvoice, folionum,
-           shippingEstimate, deliveryCompany, seller)
+           shippingEstimate, deliveryCompany, seller, isReservationInvoice)
         OUTPUT INSERTED.orderID
         VALUES
           (@scr, @uref, @itemsAmount, @doctotalsy,
            @orderStatusID, @deliveryDate, SYSUTCDATETIME(), SYSUTCDATETIME(), NULL,
            @integrationError, @origin, @hostname, @InvoiceDocNum, @DocEntryInvoice, @folionum,
-           @shippingEstimate, @deliveryCompany, @seller);
+           @shippingEstimate, @deliveryCompany, @seller, @isReservationInvoice);
       `);
 
     const orderID = ins.recordset[0].orderID;
@@ -558,7 +560,8 @@ async function getOrder(query = {}, options = {}) {
         o.customerIntegrated,
         o.customerIntegratedAt,
         o.customerCardCode,
-        o.seller
+        o.seller,
+        o.isReservationInvoice
       FROM dbo.Orders AS o
       INNER JOIN dbo.order_status AS s ON s.orderStatusID = o.orderStatusID
       WHERE ${where.join(' AND ')}
@@ -595,7 +598,8 @@ async function getOrder(query = {}, options = {}) {
       customerIntegrated: head.customerIntegrated ?? null,
       customerIntegratedAt: head.customerIntegratedAt ?? null,
       customerCardCode: head.customerCardCode ?? null,
-      seller: head.seller ?? null,   // 👈 agregado
+      seller: head.seller ?? null,
+      isReservationInvoice: head.isReservationInvoice ?? 0,
     };
 
     // Fulfillment (sin seller porque solo va en Orders/Order_Items)
@@ -622,8 +626,7 @@ async function getOrder(query = {}, options = {}) {
             id, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity,
             priceAfterVAT, codebars, imageUrl, whscode,
             categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames,
-            seller,
-            CostingCode, CostingCode2, TaxCode
+            seller, CostingCode, CostingCode2, TaxCode
           FROM dbo.Order_Items
           WHERE orderID = @id
           ORDER BY itemIndex ASC, id ASC
@@ -777,7 +780,8 @@ async function getOrder(query = {}, options = {}) {
       o.customerIntegrated,
       o.customerIntegratedAt,
       o.customerCardCode,
-      o.seller           
+      o.seller,
+      o.isReservationInvoice           
     FROM dbo.Orders o
     INNER JOIN dbo.order_status s ON s.orderStatusID = o.orderStatusID
     WHERE ${where.join(' AND ')}
@@ -803,7 +807,8 @@ async function getOrder(query = {}, options = {}) {
     deliveryDate: r.deliveryDate,
     createdate: r.createdate,
     updateDate: r.updateDate,
-    seller: r.seller ?? null,  
+    seller: r.seller ?? null,
+    isReservationInvoice: r.isReservationInvoice ?? 0,  
   }));
 
   // Batch expand
