@@ -116,5 +116,6 @@ const PORT = process.env.PORT || 8080;
 const server = app.listen(PORT, () => logger.info('🚀 API Gateway on', { port: PORT }));
 
 // timeouts del server
-server.keepAliveTimeout = 65_000;
+/* server.keepAliveTimeout = 65_000;
 server.headersTimeout   = 70_000;
+ */

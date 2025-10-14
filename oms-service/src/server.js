@@ -20,7 +20,7 @@ app.use(express.json());
 app.use('/api/oms-service', apiRoutes);
 
 // healthcheck (para gateway/k8s)
-app.get('/health', (_req, res) => res.status(200).send('OK'));
+//app.get('/health', (_req, res) => res.status(200).send('OK'));
 
 const PORT = process.env.PORT || 5010;
 
@@ -48,13 +48,17 @@ const server = app.listen(PORT, async () => {
   } catch (err) {
     console.error('❌ Error inicializando servicios Kafka:', err);
   }
-
   console.log(`🚀 Oms Service corriendo en puerto ${PORT}`);
+
 });
 
-
-// ⏱️ Ajuste de timeouts para evitar cortes prematuros
+// Alinea con el gateway (55s) y dale holgura
+server.keepAliveTimeout = 65_000;  // > proxyTimeout del gateway
+server.headersTimeout   = 70_000;  // > keepAliveTimeout
+server.requestTimeout   = 0;       // opcional (sin límite)
+/* // ⏱️ Ajuste de timeouts para evitar cortes prematuros
 server.keepAliveTimeout = 65_000;  // 70s
 server.headersTimeout   = 70_000;  // > keepAliveTimeout
 
 
+ */
