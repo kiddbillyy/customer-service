@@ -29,7 +29,7 @@ export default {
   email:  { path: '/api/email',  target: 'http://email-service:5008', requireAuth: false },
 
   // Rutas Microservicio Comerce Service
-  comerceService:  { path: '/api/comerce-service',  target: 'http://comerce-service:5009', requireAuth: true,  requireRbac: false  },
+  comerceService:  { path: '/api/comerce-service',  target: 'http://comerce-service:5009', requireAuth: false,  requireRbac: false  },
 
   // Ruta Microservicio OMS SERVICE
   omsService:  { path: '/api/oms-service',  target: 'http://oms-service:5010', requireAuth: false,  requireRbac: false },
