@@ -21,6 +21,14 @@ function validateItemRequired(it) {
   }
 }
 
+const toBit = (v) => {
+  if (v == null) return null;         
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  const s = String(v).trim().toLowerCase();
+  return (s === '1' || s === 'true' || s === 'sí' || s === 'si' || s === 'y') ? 1 : 0;
+};
+
+
 // ---------- Status helpers ----------
 async function getOrCreateStatusId(tx, { orderStatusID = null, orderStatusCode = null }) {
   const r = new sql.Request(tx);
@@ -71,6 +79,11 @@ async function insertItems(tx, { orderID, items = [], valuesInCents = true }) {
 
     const priceAfterVAT = normMoney(it.priceAfterVAT, valuesInCents);
 
+    // Soporta ambas variantes de nombre
+    const costingCode  = it.costingCode  ?? it.CostingCode  ?? null;
+    const costingCode2 = it.costingCode2 ?? it.CostingCode2 ?? null;
+    const taxCode      = it.taxCode      ?? it.TaxCode      ?? null;
+
     await new sql.Request(tx)
       .input('orderID', sql.Int, orderID)
       .input('itemIndex', sql.Int, itemIndex)
@@ -87,27 +100,26 @@ async function insertItems(tx, { orderID, items = [], valuesInCents = true }) {
       .input('categoryLeafName', sql.NVarChar(120), it.categoryLeafName ?? null)
       .input('categoryPathIds', sql.NVarChar(255), it.categoryPathIds ?? null)
       .input('categoryPathNames', sql.NVarChar(512), it.categoryPathNames ?? null)
-      .input('vendedor', sql.NVarChar(150), it.vendedor ?? null)
+      .input('seller', sql.NVarChar(150), it.seller ?? null)
+      .input('CostingCode',  sql.NVarChar(50), costingCode)
+      .input('CostingCode2', sql.NVarChar(50), costingCode2)
+      .input('TaxCode',      sql.NVarChar(50), taxCode)
       .query(`
         INSERT INTO dbo.Order_Items
-          (orderID, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity, priceAfterVAT, codebars, imageUrl, whscode,
-           categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames, vendedor)
+          (orderID, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity, priceAfterVAT,
+           codebars, imageUrl, whscode, categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames,
+           seller, CostingCode, CostingCode2, TaxCode)
         VALUES
-          (@orderID, @itemIndex, @uniqueId, @lineNum, @itemcode, @dscription, @quantity, @priceAfterVAT, @codebars, @imageUrl, @whscode,
-           @categoryLeafId, @categoryLeafName, @categoryPathIds, @categoryPathNames, @vendedor);
+          (@orderID, @itemIndex, @uniqueId, @lineNum, @itemcode, @dscription, @quantity, @priceAfterVAT,
+           @codebars, @imageUrl, @whscode, @categoryLeafId, @categoryLeafName, @categoryPathIds, @categoryPathNames,
+           @seller, @CostingCode, @CostingCode2, @TaxCode);
       `);
 
     inserted += 1;
   }
   return { inserted };
 }
-const toBit = (v) => {
-  if (v == null) return null;
-  if (typeof v === 'boolean') return v ? 1 : 0;
-  const s = String(v).trim().toLowerCase();
-  return (s === '1' || s === 'true' || s === 'sí' || s === 'si' || s === 'y') ? 1 : 0;
-};
-
+// ---------- Fulfillment ----------
 async function insertOrderFulfillment(tx, orderID, f = {}) {
   await new sql.Request(tx)
     .input('orderID',         sql.Int,           orderID)
@@ -199,6 +211,11 @@ async function upsertItems(tx, { orderID, items = [], valuesInCents = true }) {
 
     const priceAfterVAT = normMoney(it.priceAfterVAT, valuesInCents);
 
+    // soporta camelCase / SAP case
+    const costingCode  = it.costingCode  ?? it.CostingCode  ?? null;
+    const costingCode2 = it.costingCode2 ?? it.CostingCode2 ?? null;
+    const taxCode      = it.taxCode      ?? it.TaxCode      ?? null;
+
     await new sql.Request(tx)
       .input('orderID', sql.Int, orderID)
       .input('itemIndex', sql.Int, itemIndex)
@@ -215,38 +232,52 @@ async function upsertItems(tx, { orderID, items = [], valuesInCents = true }) {
       .input('categoryLeafName', sql.NVarChar(120), it.categoryLeafName ?? null)
       .input('categoryPathIds', sql.NVarChar(255), it.categoryPathIds ?? null)
       .input('categoryPathNames', sql.NVarChar(512), it.categoryPathNames ?? null)
-      .input('vendedor', sql.NVarChar(150), it.vendedor ?? null)
+      .input('seller', sql.NVarChar(150), it.seller ?? null)
+      // 🔹 nuevos
+      .input('CostingCode',  sql.NVarChar(50), costingCode)
+      .input('CostingCode2', sql.NVarChar(50), costingCode2)
+      .input('TaxCode',      sql.NVarChar(50), taxCode)
       .query(`
         MERGE dbo.Order_Items AS tgt
         USING (SELECT @orderID AS orderID, @itemIndex AS itemIndex) AS src
         ON (tgt.orderID = src.orderID AND tgt.itemIndex = src.itemIndex)
         WHEN MATCHED THEN
           UPDATE SET
-            uniqueId        = @uniqueId,
-            lineNum         = @lineNum,
-            itemcode        = @itemcode,
-            dscription      = @dscription,
-            quantity        = @quantity,
-            priceAfterVAT   = @priceAfterVAT,
-            codebars        = @codebars,
-            imageUrl        = @imageUrl,
-            whscode         = @whscode,
+            uniqueId         = @uniqueId,
+            lineNum          = @lineNum,
+            itemcode         = @itemcode,
+            dscription       = @dscription,
+            quantity         = @quantity,
+            priceAfterVAT    = @priceAfterVAT,
+            codebars         = @codebars,
+            imageUrl         = @imageUrl,
+            whscode          = @whscode,
             categoryLeafId   = @categoryLeafId,
             categoryLeafName = @categoryLeafName,
             categoryPathIds  = @categoryPathIds,
             categoryPathNames= @categoryPathNames,
-            vendedor         = @vendedor
+            seller           = @seller,
+            CostingCode      = @CostingCode,      
+            CostingCode2     = @CostingCode2,     
+            TaxCode          = @TaxCode           
         WHEN NOT MATCHED THEN
-          INSERT (orderID, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity, priceAfterVAT, codebars, imageUrl, whscode,
-                  categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames, vendedor)
-          VALUES (@orderID, @itemIndex, @uniqueId, @lineNum, @itemcode, @dscription, @quantity, @priceAfterVAT, @codebars, @imageUrl, @whscode,
-                  @categoryLeafId, @categoryLeafName, @categoryPathIds, @categoryPathNames, @vendedor);
+          INSERT (
+            orderID, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity, priceAfterVAT,
+            codebars, imageUrl, whscode, categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames,
+            seller, CostingCode, CostingCode2, TaxCode   
+          )
+          VALUES (
+            @orderID, @itemIndex, @uniqueId, @lineNum, @itemcode, @dscription, @quantity, @priceAfterVAT,
+            @codebars, @imageUrl, @whscode, @categoryLeafId, @categoryLeafName, @categoryPathIds, @categoryPathNames,
+            @seller, @CostingCode, @CostingCode2, @TaxCode   
+          );
       `);
 
     upserted += 1;
   }
   return { upserted };
 }
+
 
 async function createOrderWithItems(body) {
   await IdServicePoolConnect;
@@ -286,19 +317,19 @@ async function createOrderWithItems(body) {
       .input('integrationError',sql.NVarChar(sql.MAX), body.integrationError ?? null)
       .input('shippingEstimate',sql.NVarChar(50),  body.shippingEstimate ?? null)
       .input('deliveryCompany', sql.NVarChar(100), body.deliveryCompany ?? null)
-      .input('vendedor',        sql.NVarChar(150), body.vendedor ?? null)
+      .input('seller',        sql.NVarChar(150), body.seller ?? null)
       .query(`
         INSERT INTO dbo.Orders
           (salesChannelReferenceId, u_ref1, itemsAmount, doctotalsy,
            orderStatusID, deliveryDate, lastQueryDate, createdate, updateDate,
            integrationError, origin, hostname, InvoiceDocNum, DocEntryInvoice, folionum,
-           shippingEstimate, deliveryCompany, vendedor)
+           shippingEstimate, deliveryCompany, seller)
         OUTPUT INSERTED.orderID
         VALUES
           (@scr, @uref, @itemsAmount, @doctotalsy,
            @orderStatusID, @deliveryDate, SYSUTCDATETIME(), SYSUTCDATETIME(), NULL,
            @integrationError, @origin, @hostname, @InvoiceDocNum, @DocEntryInvoice, @folionum,
-           @shippingEstimate, @deliveryCompany, @vendedor);
+           @shippingEstimate, @deliveryCompany, @seller);
       `);
 
     const orderID = ins.recordset[0].orderID;
@@ -312,7 +343,7 @@ async function createOrderWithItems(body) {
     await insertStatusHistory(tx, { orderID, newStatusID: statusId, previousStatusID: null });
 
     const items = Array.isArray(body.items) ? body.items : [];
-    const itemsWithVendedor = items.map(it => ({ ...it, vendedor: it?.vendedor ?? (body.vendedor ?? null) }));
+    const itemsWithVendedor = items.map(it => ({ ...it, seller: it?.seller ?? (body.seller ?? null) }));
     const { inserted } = await insertItems(tx, { orderID, items: itemsWithVendedor, valuesInCents });
 
     await tx.commit();
@@ -378,7 +409,7 @@ async function patchOrder({ orderID, body }) {
     setIf('folionum', body.folionum , sql.Int);
     setIf('shippingEstimate', body.shippingEstimate , sql.NVarChar(50));
     setIf('deliveryCompany',  body.deliveryCompany  , sql.NVarChar(100));
-    setIf('vendedor',         body.vendedor,        sql.NVarChar(150)); // 👈 NUEVO
+    setIf('seller',         body.seller,        sql.NVarChar(150)); 
 
     if (statusChanged) {
       req.input('orderStatusID', sql.Int, newStatusID);
@@ -417,8 +448,8 @@ async function patchOrder({ orderID, body }) {
     // ------ Items ------
     let itemsUpserted = 0;
     if (Array.isArray(body.items) && body.items.length) {
-      // hereda vendedor desde body.vendedor si el ítem no lo trae
-      const itemsWithVendedor = body.items.map(it => ({ ...it, vendedor: it?.vendedor ?? (body.vendedor ?? null) }));
+      // hereda seller desde body.seller si el ítem no lo trae
+      const itemsWithVendedor = body.items.map(it => ({ ...it, seller: it?.seller ?? (body.seller ?? null) }));
 
       if (body.replaceItems === true) {
         await new sql.Request(tx).input('id', sql.Int, orderID)
@@ -527,7 +558,7 @@ async function getOrder(query = {}, options = {}) {
         o.customerIntegrated,
         o.customerIntegratedAt,
         o.customerCardCode,
-        o.vendedor           -- 👈 agregado
+        o.seller
       FROM dbo.Orders AS o
       INNER JOIN dbo.order_status AS s ON s.orderStatusID = o.orderStatusID
       WHERE ${where.join(' AND ')}
@@ -564,10 +595,10 @@ async function getOrder(query = {}, options = {}) {
       customerIntegrated: head.customerIntegrated ?? null,
       customerIntegratedAt: head.customerIntegratedAt ?? null,
       customerCardCode: head.customerCardCode ?? null,
-      vendedor: head.vendedor ?? null,   // 👈 agregado
+      seller: head.seller ?? null,   // 👈 agregado
     };
 
-    // Fulfillment (sin vendedor porque solo va en Orders/Order_Items)
+    // Fulfillment (sin seller porque solo va en Orders/Order_Items)
     if (includeFulfillment) {
       const frs = await new sql.Request(IdServicePool)
         .input('id', sql.Int, orderID)
@@ -582,7 +613,7 @@ async function getOrder(query = {}, options = {}) {
       out.fulfillment = frs.recordset[0] || null;
     }
 
-    // Items (detalle) — agrega vendedor
+    // Items (detalle) — agrega seller
     if (includeItems) {
       const irs = await new sql.Request(IdServicePool)
         .input('id', sql.Int, orderID)
@@ -591,10 +622,12 @@ async function getOrder(query = {}, options = {}) {
             id, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity,
             priceAfterVAT, codebars, imageUrl, whscode,
             categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames,
-            vendedor   -- 👈 agregado
+            seller,
+            CostingCode, CostingCode2, TaxCode
           FROM dbo.Order_Items
           WHERE orderID = @id
           ORDER BY itemIndex ASC, id ASC
+
         `);
       out.items = irs.recordset.map(r => ({
         id: r.id,
@@ -612,7 +645,10 @@ async function getOrder(query = {}, options = {}) {
         categoryLeafName: r.categoryLeafName ?? null,
         categoryPathIds: r.categoryPathIds ?? null,
         categoryPathNames: r.categoryPathNames ?? null,
-        vendedor: r.vendedor ?? null,   // 👈 agregado
+        seller: r.seller ?? null, 
+        costingCode:  r.CostingCode  ?? null,
+        costingCode2: r.CostingCode2 ?? null,
+        taxCode:      r.TaxCode      ?? null,
       }));
     }
 
@@ -741,7 +777,7 @@ async function getOrder(query = {}, options = {}) {
       o.customerIntegrated,
       o.customerIntegratedAt,
       o.customerCardCode,
-      o.vendedor            -- 👈 agregado
+      o.seller           
     FROM dbo.Orders o
     INNER JOIN dbo.order_status s ON s.orderStatusID = o.orderStatusID
     WHERE ${where.join(' AND ')}
@@ -767,7 +803,7 @@ async function getOrder(query = {}, options = {}) {
     deliveryDate: r.deliveryDate,
     createdate: r.createdate,
     updateDate: r.updateDate,
-    vendedor: r.vendedor ?? null,   // 👈 agregado
+    seller: r.seller ?? null,  
   }));
 
   // Batch expand
@@ -791,20 +827,22 @@ async function getOrder(query = {}, options = {}) {
       }
     }
 
-    // Items (lista) — agrega vendedor
+    // Items (lista) — agrega seller
     if (wantItems) {
       const iReq = new sql.Request(IdServicePool);
       const inList = bindIdList(iReq, pageOrderIds, 'iid');
       if (inList) {
         const irs2 = await iReq.query(`
-          SELECT
-            orderID, id, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity,
-            priceAfterVAT, codebars, imageUrl, whscode,
-            categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames,
-            vendedor   -- 👈 agregado
-          FROM dbo.Order_Items
-          WHERE orderID IN (${inList})
-          ORDER BY orderID ASC, itemIndex ASC, id ASC
+        SELECT
+          orderID, id, itemIndex, uniqueId, lineNum, itemcode, dscription, quantity,
+          priceAfterVAT, codebars, imageUrl, whscode,
+          categoryLeafId, categoryLeafName, categoryPathIds, categoryPathNames,
+          seller,
+          CostingCode, CostingCode2, TaxCode
+        FROM dbo.Order_Items
+        WHERE orderID IN (${inList})
+        ORDER BY orderID ASC, itemIndex ASC, id ASC
+
         `);
         const itemsByOrder = new Map();
         irs2.recordset.forEach(r => {
@@ -825,7 +863,10 @@ async function getOrder(query = {}, options = {}) {
             categoryLeafName: r.categoryLeafName ?? null,
             categoryPathIds: r.categoryPathIds ?? null,
             categoryPathNames: r.categoryPathNames ?? null,
-            vendedor: r.vendedor ?? null,   // 👈 agregado
+            seller: r.seller ?? null,
+            costingCode:  r.CostingCode  ?? null,
+            costingCode2: r.CostingCode2 ?? null,
+            taxCode:      r.TaxCode      ?? null,
           });
         });
         rows.forEach(r => { r.items = itemsByOrder.get(r.orderID) || []; });
