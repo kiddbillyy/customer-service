@@ -416,7 +416,9 @@ Registra un nuevo usuario con sus datos personales, credenciales, rol y platafor
   "departamentoId": 2,
   "telefono": "+56911112222",
   "urlImagenPerfil": "https://miapp.cl/perfiles/nuevo.png",
-  "rolId": 3,
+  "canalDeVenta": "MercadoLibre",
+  "canalDeVentaId": "MER-001",
+  "rolesIds": [3, 5], 
   "plataformaIds": [1, 3]
 }
 ```
@@ -454,6 +456,8 @@ Actualiza la información de un usuario existente, incluyendo datos personales, 
   "departamentoId": 2,
   "telefono": "+56912345678",
   "urlImagenPerfil": "https://miapp.cl/perfiles/actualizado.png",
+  "canalDeVenta": "MercadoLibre",
+  "canalDeVentaId": "MER-001",
   "usuarioActualizadorId": 1,
   "rolId": 2,
   "plataformaIds": [1,2]

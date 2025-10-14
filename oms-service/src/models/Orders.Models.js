@@ -924,8 +924,145 @@ async function getOrder(query = {}, options = {}) {
 }
 
 
+async function getOrdersPendingCustomerIntegration(query = {}) {
+  const {
+    createdFrom,      // opcional: ISO date/string
+    createdTo,        // opcional: ISO date/string (exclusivo)
+    page = 1,
+    pageSize = 100,   // máx 500 recomendado
+  } = query;
+
+  await IdServicePoolConnect;
+
+  const _page = Math.max(1, Number(page) || 1);
+  const _pageSize = Math.min(500, Math.max(1, Number(pageSize) || 100));
+  const offset = (_page - 1) * _pageSize;
+
+  // WHERE base: customerIntegrated = 0 (o NULL)
+  const where = ['ISNULL(o.customerIntegrated, 0) = 0'];
+  const reqCount = new sql.Request(IdServicePool);
+  if (createdFrom) {
+    where.push('o.createdate >= @cfrom');
+    reqCount.input('cfrom', sql.DateTime2(3), new Date(createdFrom));
+  }
+  if (createdTo) {
+    where.push('o.createdate < @cto');
+    reqCount.input('cto', sql.DateTime2(3), new Date(createdTo));
+  }
+
+  // total
+  const countSql = `
+    SELECT COUNT(1) AS total
+    FROM dbo.Orders o
+    WHERE ${where.join(' AND ')}
+  `;
+  const total = (await reqCount.query(countSql)).recordset[0]?.total ?? 0;
+
+  // página (LEFT JOIN 1:1 con fulfillment)
+  const req = new sql.Request(IdServicePool);
+  for (const p of reqCount.parameters ? Object.values(reqCount.parameters) : []) {
+    req.input(p.name, p.type, p.value);
+  }
+  req.input('limit', sql.Int, _pageSize);
+  req.input('offset', sql.Int, offset);
+
+  const pageSql = `
+    SELECT
+      -- Header
+      o.orderID,
+      o.salesChannelReferenceId,
+      o.u_ref1,
+      o.integrationError,
+      o.origin,
+      o.hostname,
+      o.createdate,
+      o.updateDate,
+      o.orderStatusID,
+      o.customerIntegrated,
+      o.customerIntegratedAt,
+      o.customerCardCode,
+
+      -- Fulfillment para reintento de customer
+      f.firstName,
+      f.lastName,
+      f.email,
+      f.currencyCode,
+      f.documentType,
+      f.[document],
+      f.phone,
+      f.isCorporate,
+      f.giro,
+      f.cardname,
+      f.addressType,
+      f.receiverName,
+      f.postalCode,
+      f.city,
+      f.country,
+      f.[state],
+      f.street,
+      f.[number],
+      f.neighborhood,
+      f.referenceAddress
+    FROM dbo.Orders o
+    LEFT JOIN dbo.order_fulfillment f ON f.orderID = o.orderID
+    WHERE ${where.join(' AND ')}
+    ORDER BY o.createdate DESC, o.orderID DESC
+    OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
+  `;
+
+  const rs = await req.query(pageSql);
+
+  // Armar salida con un bloque 'retryCustomer' útil para el reintento
+  const rows = rs.recordset.map(r => ({
+    orderID: r.orderID,
+    salesChannelReferenceId: r.salesChannelReferenceId,
+    u_ref1: r.u_ref1,
+
+    // Información útil para diagnosticar
+    integrationError: r.integrationError ?? null,
+    origin: r.origin ?? null,
+    hostname: r.hostname ?? null,
+    createdate: r.createdate,
+    updateDate: r.updateDate,
+    orderStatusID: r.orderStatusID,
+    customerIntegrated: r.customerIntegrated ?? 0,
+    customerIntegratedAt: r.customerIntegratedAt ?? null,
+    customerCardCode: r.customerCardCode ?? null,
+
+    // Datos crudos de fulfillment
+    fulfillment: {
+      firstName: r.firstName ?? null,
+      lastName: r.lastName ?? null,
+      email: r.email ?? null,
+      currencyCode: r.currencyCode ?? null,
+      documentType: r.documentType ?? null,
+      document: r.document ?? null,
+      phone: r.phone ?? null,
+      isCorporate: r.isCorporate ?? null,
+      giro: r.giro ?? null,
+      cardname: r.cardname ?? null,
+      addressType: r.addressType ?? null,
+      receiverName: r.receiverName ?? null,
+      postalCode: r.postalCode ?? null,
+      city: r.city ?? null,
+      country: r.country ?? null,
+      state: r.state ?? null,
+      street: r.street ?? null,
+      number: r.number ?? null,
+      neighborhood: r.neighborhood ?? null,
+      referenceAddress: r.referenceAddress ?? null,
+    },
+  
+  }));
+
+  return { page: _page, pageSize: _pageSize, total, rows };
+}
+
+
+
 module.exports = {
   createOrderWithItems,
   patchOrder,
-  getOrder
+  getOrder,
+  getOrdersPendingCustomerIntegration
 };
