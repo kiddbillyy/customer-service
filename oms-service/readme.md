@@ -106,6 +106,7 @@ oms-service/
   "hostname": "mimbral.cl",
   "shippingEstimate": "3db",
   "deliveryCompany": "Bluexpress",
+  "seller": "401",
   "fulfillment": {
     "firstName": "Jonathan",
     "lastName": "Molina",
@@ -140,7 +141,11 @@ oms-service/
       "categoryLeafId": 3081,
       "categoryLeafName": "Parrillas",
       "categoryPathIds": "/3005/3081/",
-      "categoryPathNames": "Jardín y Terraza > Parrillas"
+      "categoryPathNames": "Jardín y Terraza > Parrillas",
+      "seller": "401",
+      "CostingCode": "CC",
+      "CostingCode2": "FERR",
+      "TaxCode": "IVA"
     },
     {
       "itemIndex": 1,
@@ -154,7 +159,11 @@ oms-service/
       "categoryLeafId": 3642,
       "categoryLeafName": "Accesorios de parrilla",
       "categoryPathIds": "/3005/3081/3642/",
-      "categoryPathNames": "Jardín y Terraza > Parrillas > Accesorios de parrilla"
+      "categoryPathNames": "Jardín y Terraza > Parrillas > Accesorios de parrilla",
+      "seller": "401",
+      "CostingCode": "CC",
+      "CostingCode2": "FERR",
+      "TaxCode": "IVA"
     },
     {
       "itemIndex": 2,
@@ -168,7 +177,11 @@ oms-service/
       "categoryLeafId": 3313,
       "categoryLeafName": "Cortinas de baño",
       "categoryPathIds": "/426/3033/3313/",
-      "categoryPathNames": "Baño > Toallas, Cortinas y Pisos de Baño > Cortinas de baño"
+      "categoryPathNames": "Baño > Toallas, Cortinas y Pisos de Baño > Cortinas de baño",
+      "seller": "401"
+      "CostingCode": "CC",
+      "CostingCode2": "FERR",
+      "TaxCode": "IVA"
     }
   ]
 }
@@ -196,6 +209,7 @@ oms-service/
   "shippingEstimate": "4bd",
   "deliveryCompany": "BlueExpress"
   /* Opcional: "fulfillment": { ... } */
+  /* Opcional: "Items":*/
 }
 ```
 
