@@ -144,7 +144,7 @@ const TOPIC = process.env.SELLER_CREATED_TOPIC || 'seller.created';
 const GROUP_ID = process.env.KAFKA_GROUP_ID || 'oms-service-seller-consumer';
 const DLQ_TOPIC = process.env.SELLER_CREATED_DLQ_TOPIC || 'seller.created.dlq';
 
-// ⬇️ nuevo topic para pedir validación en SAP
+
 const SELLER_VALIDATION_SAP_TOPIC = process.env.SELLER_VALIDATION_SAP_TOPIC || 'seller-validation-sap';
 
 /** Asegura que exista el estado y devuelve su ID (crea si falta). */
@@ -174,13 +174,17 @@ async function createSellerIfNotExists(payload) {
   try {
     const statusId = await ensureSellerStatusId('Pendiente', tx);
 
-    const rutPlain = toRutPlain(payload.rut);                 // obligatorio
-    const email = (payload.correoElectronico || '').trim() || null;
-    const nombre = payload.nombres || null;
-    const apellido = payload.apellidos || null;
-    const telefono = (payload.telefono || '').trim() || null; // ⬅️ incluimos teléfono si viene
-    const sapRaw = payload.externalSapId;
-    const sap = sapRaw == null ? null : (String(sapRaw).trim() || null);
+    const rutPlain = toRutPlain(payload.rut); // obligatorio
+    const email    = (payload.correoElectronico || payload.correo || '').trim() || null;
+    const nombre   = payload.nombres  || null;
+    const apellido = payload.apellidos|| null;
+    const telefono = (payload.telefono || '').trim() || null;
+    const sapRaw   = payload.externalSapId;
+    const sap      = sapRaw == null ? null : (String(sapRaw).trim() || null);
+
+    // 🔸 NUEVO: Canal de venta (acepta camel/pascal)
+    const canalVenta   = (payload.canalDeVenta   ?? payload.CanalDeVenta   ?? '').toString().trim() || null;
+    const canalVentaId = (payload.canalDeVentaId ?? payload.CanalDeVentaId ?? '').toString().trim() || null;
 
     // 1) ¿Existe ya por RUT? (plano + fallback formateado histórico)
     const exists = await new sql.Request(tx)
@@ -196,35 +200,39 @@ async function createSellerIfNotExists(payload) {
       return { created: false, reason: 'already_exists' };
     }
 
-    // 2) INSERT (RUT SIEMPRE plano)  ⬅️ devolvemos el ID insertado
+    // 2) INSERT 
     const inserted = await new sql.Request(tx)
-      .input('sap', sql.VarChar, sap)
-      .input('nombre', sql.NVarChar, nombre)
-      .input('apellido', sql.NVarChar, apellido)
-      .input('rut', sql.NVarChar, rutPlain)
-      .input('email', sql.NVarChar, email)
-      .input('telefono', sql.NVarChar, telefono)
-      .input('statusId', sql.Int, statusId)
+      .input('sap',        sql.VarChar,      sap)
+      .input('nombre',     sql.NVarChar,     nombre)
+      .input('apellido',   sql.NVarChar,     apellido)
+      .input('rut',        sql.NVarChar,     rutPlain)
+      .input('email',      sql.NVarChar,     email)
+      .input('telefono',   sql.NVarChar,     telefono)
+      .input('canal',      sql.NVarChar(100),canalVenta)
+      .input('canalId',    sql.NVarChar(100),canalVentaId)
+      .input('statusId',   sql.Int,          statusId)
       .query(`
         INSERT INTO SELLER (
-          EXTERNAL_SAP_ID, NOMBRE, APELLIDO, RUT, EMAIL, TELEFONO, STATUS_ID, FECHA_CREACION
+          EXTERNAL_SAP_ID, NOMBRE, APELLIDO, RUT, EMAIL, TELEFONO,
+          CANAL_DE_VENTA, CANAL_DE_VENTA_ID,
+          STATUS_ID, FECHA_CREACION
         )
         OUTPUT INSERTED.ID
-        VALUES (@sap, @nombre, @apellido, @rut, @email, @telefono, @statusId, GETDATE())
+        VALUES (@sap, @nombre, @apellido, @rut, @email, @telefono,
+                @canal, @canalId,
+                @statusId, GETDATE());
       `);
 
     const sellerId = inserted.recordset[0].ID;
-
     await tx.commit();
 
-    // 3) 🔔 Publicar solicitud de validación en SAP (post-commit)
-    //    (solo si se creó). Incluimos datos necesarios.
+    // 3) Publicar solicitud de validación en SAP 
     try {
       const event = {
         event: 'seller.validation.request',
         version: 1,
         ts: new Date().toISOString(),
-        idempotencyKey: `seller:${sellerId}`,       // útil si el validador es idempotente
+        idempotencyKey: `seller:${sellerId}`,
         seller: {
           id: sellerId,
           rut: rutPlain,
@@ -232,18 +240,19 @@ async function createSellerIfNotExists(payload) {
           nombres: nombre,
           apellidos: apellido,
           telefono,
-          externalSapId: sap,                       // puede venir null
-          statusId,                                 // FK del estado "Pendiente"
+          externalSapId: sap,
+          canalDeVenta: canalVenta,      
+          canalDeVentaId: canalVentaId,      
+          statusId,
           statusName: 'Pendiente'
         }
       };
 
       await sendBatch(SELLER_VALIDATION_SAP_TOPIC, [{
-        key: String(sellerId),                      
+        key: String(sellerId),
         value: JSON.stringify(event),
       }]);
     } catch (pubErr) {
-      // No rompas la creación si falla esta publicación secundaria
       console.warn('⚠️ No se pudo publicar a seller-validation-sap:', pubErr?.message || pubErr);
     }
 
@@ -258,6 +267,7 @@ async function createSellerIfNotExists(payload) {
     throw err;
   }
 }
+
 
 async function startSellerCreatedConsumer() {
   const consumer = kafka.consumer({ groupId: GROUP_ID });
@@ -288,13 +298,11 @@ async function startSellerCreatedConsumer() {
           // Nota: la publicación a 'seller-validation-sap' ya se hace adentro, post-commit.
         } else {
           console.log(`↩︎ seller no creado (ya existía)`, { rut: rutPlain, reason: result.reason });
-          // Si quisieras encolar validación igual cuando ya existía y no tiene EXTERNAL_SAP_ID,
-          // aquí podrías consultar y publicar condicionalmente.
+
         }
       } catch (err) {
         console.error(`❌ error procesando ${TOPIC}:`, err?.message || err);
 
-        // DLQ con error + original
         try {
           await sendBatch(DLQ_TOPIC, [{
             key: message.key?.toString() || null,
