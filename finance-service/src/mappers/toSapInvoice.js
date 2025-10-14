@@ -13,7 +13,7 @@ const SERIES_BOLETA  = 151; // boleta electrónica
 const SERIES_FACTURA = 139; // factura electrónica
 const INDIC_BOLETA   = 39;  // SII
 const INDIC_FACTURA  = 33;  // SII
-
+//
 function buildReserveInvoicePayload(order) {
   const isCorp  = isCorporate(order);
   const serie   = isCorp ? SERIES_FACTURA : SERIES_BOLETA;
