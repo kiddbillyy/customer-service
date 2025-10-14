@@ -107,6 +107,7 @@ oms-service/
   "shippingEstimate": "3db",
   "deliveryCompany": "Bluexpress",
   "seller": "401",
+  "isReservationInvoice": "1",
   "fulfillment": {
     "firstName": "Jonathan",
     "lastName": "Molina",
