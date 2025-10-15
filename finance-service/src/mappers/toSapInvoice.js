@@ -41,7 +41,7 @@ function buildReserveInvoicePayload(order) {
     DocDate        : today,
     DocDueDate     : today,
     Series         : serie,
-    ReserveInvoice : "tYES",
+    ReserveInvoice : "tYES", //tNO
     U_REF1         : order.orderId,
     SalesPersonCode: SALESPERSON_CODE,           
     DocCurrency    : DOC_CURRENCY,              
