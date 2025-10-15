@@ -9,6 +9,19 @@ function buildTargetJson(target) {
   const delivery = !!(target && typeof target === 'object' && target.delivery === true);
   return JSON.stringify({ delivery });
 }
+function toSqlDateOnly(v) {
+  if (!v) return null;
+  if (v instanceof Date) {
+    // toma solo la parte de fecha en UTC
+    return new Date(Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate()))
+      .toISOString().slice(0, 10); // 'YYYY-MM-DD'
+  }
+  const s = String(v);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
+  throw new Error('Invalid date; expected YYYY-MM-DD');
+}
+
 function buildScopeJson(scope) {
   if (!scope) return null;
   if (typeof scope !== 'object') return null;
@@ -45,10 +58,11 @@ async function createHoliday({ name, day, status = 'active', target = {}, scope 
 
   const tgt = buildTargetJson(target);
   const scp = buildScopeJson(scope);
+  const dayOnly = toSqlDateOnly(day); 
 
   const r = await IdServicePool.request()
     .input('Name', sql.NVarChar(200), name)
-    .input('Day', sql.Date, day)
+    .input('Day', sql.Date, dayOnly)
     .input('Status', sql.NVarChar(8), normStatus(status))
     .input('Target', sql.NVarChar(sql.MAX), tgt)
     .input('Scope', sql.NVarChar(sql.MAX), scp)
@@ -146,8 +160,17 @@ async function listHolidays({ active = null, dateFrom = null, dateTo = null, q =
     where.push('h.Status = @st');
     req.input('st', sql.NVarChar(8), st);
   }
-  if (dateFrom) { where.push('h.Day >= @df'); req.input('df', sql.Date, dateFrom); }
-  if (dateTo)   { where.push('h.Day <= @dt'); req.input('dt', sql.Date, dateTo); }
+if (dateFrom) {
+  const df = toSqlDateOnly(dateFrom);
+  where.push('h.Day >= CONVERT(date, @df)');
+  req.input('df', sql.NVarChar(10), df); // o sql.Date, ya es solo fecha
+}
+if (dateTo) {
+  const dt = toSqlDateOnly(dateTo);
+  where.push('h.Day <= CONVERT(date, @dt)');
+  req.input('dt', sql.NVarChar(10), dt);
+}
+
   if (q)        { where.push('h.Name LIKE @q'); req.input('q', sql.NVarChar(210), `%${q}%`); }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';

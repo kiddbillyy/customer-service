@@ -29,4 +29,16 @@ async function getPaymentState(req, res) {
   }
 }
 
-module.exports = { intakePayment, getPaymentState };
+async function getPaymentIntake(req, res) {
+  try {
+    const orderId = req.params.orderId;
+    const st = await model.getPayment(orderId);
+    if (!st) return res.status(404).json({ message: 'Orden no encontrada.' });
+    return res.status(200).json({ state: st });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error al consultar estado.' });
+  }
+}
+
+module.exports = { intakePayment, getPaymentState, getPaymentIntake };
