@@ -1,148 +1,3 @@
-// 'use strict';
-// const { IdServicePool, IdServicePoolConnect, sql } = require('../config/dbnew');
-
-// async function listOrdersRich({
-//   page = 1,
-//   pageSize = 50,
-//   q = null,
-//   dateFrom = null,
-//   dateTo = null,
-//   sortBy = 'orderID',
-//   sortDir = 'DESC',
-// } = {}) {
-//   await IdServicePoolConnect;
-
-//   const sortCol = (['orderID','createDate'].includes(String(sortBy))) ? sortBy : 'orderID';
-//   const dir = (String(sortDir).toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
-
-//   const req = new sql.Request(IdServicePool);
-//   const where = [];
-
-//   if (q) {
-//     req.input('q', sql.NVarChar(200), `%${String(q).trim()}%`);
-//     where.push('(o.u_ref1 LIKE @q OR o.salesChannelReferenceId LIKE @q)');
-//   }
-//   if (dateFrom) {
-//     req.input('dateFrom', sql.DateTime2, new Date(dateFrom));
-//     where.push('o.createDate >= @dateFrom');
-//   }
-//   if (dateTo) {
-//     req.input('dateTo', sql.DateTime2, new Date(dateTo));
-//     where.push('o.createDate <  @dateTo');
-//   }
-//   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-
-//   // total
-//   const totalRow = (await req.query(`
-//     SELECT COUNT(1) AS total
-//     FROM dbo.Orders o WITH (NOLOCK)
-//     ${whereSql};
-//   `)).recordset?.[0];
-//   const total = Number(totalRow?.total || 0);
-
-//   // paginación
-//   const limit  = Math.max(1, Math.min(500, Number(pageSize)));
-//   const offset = Math.max(0, (Number(page) - 1) * limit);
-//   req.input('limit',  sql.Int, limit);
-//   req.input('offset', sql.Int, offset);
-
-//   // SIN CTE: usamos ROW_NUMBER() en un derived table
-//   const rows = (await req.query(`
-//     SELECT
-//       o.orderID,
-//       o.salesChannelReferenceId,
-//       o.u_ref1,
-//       o.createDate,
-
-//       -- cliente (order_fulfillment)
-//       f.firstName,
-//       f.lastName,
-//       f.email,
-//       f.phone,
-
-//       -- entrega
-//       o.deliveryDate,
-//       o.deliveryCompany,
-//       f.addressType,
-//       f.country,
-//       f.city,
-//       f.street,
-//       f.number,
-//       f.neighborhood,
-//       f.referenceAddress,
-
-//       -- totales/pago (ajusta si tu columna real es otra)
-//       o.doctotalsy AS total,
-//       o.origin    AS paymentType,
-
-//       -- estado actual (por FK) y/o último en historial
-//       curr.statusCode AS currStatusCode,
-//       hist.statusCode AS histStatusCode,
-//       hist.changeDate AS lastChangeDate
-//     FROM (
-//       SELECT
-//         o.orderID,
-//         ROW_NUMBER() OVER (ORDER BY o.${sortCol} ${dir}) AS rn
-//       FROM dbo.Orders o WITH (NOLOCK)
-//       ${whereSql}
-//     ) p
-//     JOIN dbo.Orders o WITH (NOLOCK) ON o.orderID = p.orderID
-//     LEFT JOIN dbo.order_fulfillment f ON f.orderID = o.orderID
-//     LEFT JOIN dbo.order_status curr   ON curr.orderStatusID = o.orderStatusID
-//     OUTER APPLY (
-//       SELECT TOP (1) s.statusCode, h.changeDate
-//       FROM dbo.order_status_history h WITH (READPAST)
-//       JOIN dbo.order_status s ON s.orderStatusID = h.orderStatusID
-//       WHERE h.orderID = o.orderID
-//       ORDER BY h.changeDate DESC, h.historyID DESC
-//     ) hist
-//     WHERE p.rn BETWEEN (@offset + 1) AND (@offset + @limit)
-//     ORDER BY o.${sortCol} ${dir};
-//   `)).recordset || [];
-
-//   return { rows, total, page: Number(page), pageSize: limit };
-// }
-
-// async function getItemsByOrderIds(orderIds = []) {
-//   if (!orderIds.length) return {};
-//   await IdServicePoolConnect;
-
-//   const req = new sql.Request(IdServicePool);
-//   const inParams = orderIds.map((id, i) => {
-//     const name = `id${i}`;
-//     req.input(name, sql.Int, Number(id));
-//     return `@${name}`;
-//   }).join(',');
-
-//   const rs = (await req.query(`
-//     SELECT
-//       oi.orderID,
-//       item     = oi.itemcode,
-//       producto = oi.dscription,
-//       cantidad = oi.quantity,
-//       lineNum  = oi.lineNum
-//     FROM dbo.Order_Items oi WITH (NOLOCK)
-//     WHERE oi.orderID IN (${inParams})
-//     ORDER BY oi.orderID, lineNum;
-//   `)).recordset || [];
-
-//   const map = {};
-//   for (const r of rs) {
-//     const oid = Number(r.orderID);
-//     if (!map[oid]) map[oid] = [];
-//     map[oid].push({
-//       producto: r.producto || null,
-//       item:     r.item || null,
-//       cantidad: r.cantidad != null ? Number(r.cantidad) : null,
-//     });
-//   }
-//   return map;
-// }
-
-// module.exports = { listOrdersRich, getItemsByOrderIds };
-
-
-
 'use strict';
 const { IdServicePool, IdServicePoolConnect, sql } = require('../config/dbnew');
 
@@ -378,34 +233,52 @@ async function getItemsByOrderIds(orderIds = []) {
     return `@${name}`;
   }).join(',');
 
- 
+  // Excluir ítem especial (igual que antes)
   req.input('excludeItemcode', sql.NVarChar(50), '701001008');
 
   const rs = (await req.query(`
     SELECT
       oi.orderID,
-      item     = oi.itemcode,
-      producto = oi.dscription,
-      cantidad = oi.quantity,
-      lineNum  = oi.lineNum
+      oi.itemcode                                     AS item,
+      oi.dscription                                   AS producto,
+      oi.quantity                                     AS cantidad,
+      oi.lineNum                                      AS lineNum,
+      oi.whscode                                      AS whscode,     -- <<< NUEVO
+
+      -- seller del ítem (código que viene en Order_Items)
+      CAST(oi.seller AS NVARCHAR(50))                 AS sellerCode,
+
+      -- match con tabla Seller por EXTERNAL_SAP_ID
+      s.EXTERNAL_SAP_ID,
+      RTRIM(LTRIM(ISNULL(s.NOMBRE, '')))              AS nombreV,
+      RTRIM(LTRIM(ISNULL(s.APELLIDO, '')))            AS apellidoV
     FROM dbo.Order_Items oi WITH (NOLOCK)
+    LEFT JOIN dbo.Seller s
+      ON CAST(oi.seller AS NVARCHAR(50)) = CAST(s.EXTERNAL_SAP_ID AS NVARCHAR(50))
     WHERE oi.orderID IN (${inParams})
       AND LTRIM(RTRIM(CAST(oi.itemcode AS NVARCHAR(50)))) <> @excludeItemcode
-    ORDER BY oi.orderID, lineNum;
+    ORDER BY oi.orderID, oi.lineNum;
   `)).recordset || [];
 
   const map = {};
   for (const r of rs) {
     const oid = Number(r.orderID);
     if (!map[oid]) map[oid] = [];
+    const sellerName = [r.nombreV, r.apellidoV].filter(Boolean).join(' ').trim() || null;
     map[oid].push({
-      producto: r.producto || null,
-      item:     r.item || null,
-      cantidad: r.cantidad != null ? Number(r.cantidad) : null,
+      producto:   r.producto || null,
+      item:       r.item || null,
+      cantidad:   r.cantidad != null ? Number(r.cantidad) : null,
+      whscode:    r.whscode || null,       
+
+      sellerCode: r.sellerCode || null,
+      sellerName: sellerName,
     });
   }
   return map;
 }
+
+
 
 async function getStatusHistoryByOrderId(orderId) {
   await IdServicePoolConnect;
