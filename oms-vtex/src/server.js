@@ -10,6 +10,8 @@ const { startVtexStatusConsumer } = require('./utils/Kafka/consumers/VtexStatusC
 
 const VtexIntegrations = require("./routes/index")
 
+const { omsPreflight } = require('./services/omsService');
+
 dotenv.config();
 
 const app = express();
@@ -24,6 +26,9 @@ const PORT = process.env.PORT || 5011;
 
 app.listen(PORT, async () => {
   try {
+
+    await omsPreflight();
+
     await connectProducer();
     console.log('✅ Kafka Producer conectado');
 

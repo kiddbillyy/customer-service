@@ -120,6 +120,19 @@ async function getState(orderId) {
   return recordset[0] || null;
 }
 
+
+async function getPayment(orderId) {
+  await FinanceServicePoolConnect;
+  const { recordset } = await FinanceServicePool.request()
+    .input('orderId', sql.NVarChar(100), orderId)
+    .query(`
+      SELECT *
+      FROM dbo.FinancePaymentIntake
+      WHERE orderId = @orderId;
+    `);
+  return recordset[0] || null;
+}
+
 async function getPaymentIntakeByOrderId(orderId) {
   if (!orderId) {
     const err = new Error('ORDER_ID_REQUIRED');
@@ -171,5 +184,6 @@ module.exports = {
   markDone,
   markFailed,
   getState,
-  getPaymentIntakeByOrderId
+  getPaymentIntakeByOrderId,
+  getPayment
 };

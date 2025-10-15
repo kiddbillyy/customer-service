@@ -83,6 +83,23 @@ function parseRetryAfter(resp) {
   const t = Date.parse(ra);
   return Number.isNaN(t) ? null : Math.max(0, t - Date.now());
 }
+async function omsPreflight() {
+  try {
+    // ideal: endpoint de salud
+    await client.get('/health', { timeout: 3000 });
+    console.log('[OMS] health ok (GET /health)');
+  } catch (e1) {
+    try {
+      // fallback: no crea recursos
+      await client.head('/orders', { timeout: 3000 });
+      console.log('[OMS] health ok (HEAD /orders)');
+    } catch (e2) {
+      console.warn('[OMS] health check falló:',
+        e2.code, e2.response?.status, e2.message);
+    }
+  }
+}
+
 
 // API
 async function postOrderToOms(payload) {
@@ -129,4 +146,4 @@ async function postOrderToOms(payload) {
   throw lastErr;
 }
 
-module.exports = { postOrderToOms };
+module.exports = { postOrderToOms, omsPreflight };
