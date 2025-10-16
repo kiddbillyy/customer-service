@@ -62,6 +62,8 @@ async function getOrder(u_ref1) {
     customer: { cardCode: row.customerCardCode || null },
     fulfillment: row.fulfillment || {},
     items: row.items || [],
+    isReservationInvoice: !!(row.isReservationInvoice === true || row.isReservationInvoice === 1 || row.isReservationInvoice === "1"),
+    seller: row.seller != null ? String(row.seller) : undefined, 
     valuesInCents: false,
     doctotalsy: row.doctotalsy,
     raw: row
