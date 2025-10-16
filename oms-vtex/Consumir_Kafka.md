@@ -1,11 +1,11 @@
 docker exec -it kafka sh
 1.
 # kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic vtex.order.integration --from-beginning 
- <!-- {"orderId":"1558860554229-01","state":"ready-for-handling"}  -->
+ <!-- {"orderId":"1569150560293-01","state":"ready-for-handling"}  -->
 
 
 
-{"orderId":"1568780560105-01","state":"ready-for-handling"}
+{"orderId":"1569120560271-01","state":"ready-for-handling"}
 
 # docker exec -it kafka sh -c "kafka-console-producer.sh --broker-list localhost:9092 --topic seller.validation"
 # docker exec -it kafka sh -c "kafka-console-producer.sh --broker-list localhost:9092 --topic vtex.order.integration"
@@ -18,6 +18,6 @@ docker exec -it kafka sh
 
 
 
-{"OrderID":290,"ok":"true","CardCode":"20230330c"}
+{"OrderID":1643,"ok":"true","CardCode":"20230330c"}
 
 

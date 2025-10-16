@@ -57,18 +57,7 @@ async function processOrder(orderId) {
     const needsCard    = !cardCodeForPayment;
     const needsLines   = !(invoiceObj?.DocumentLines && invoiceObj.DocumentLines.length > 0);
 
-    /* if (invoiceDocEntry && (invoiceFolioNum === undefined || invoiceFolioNum === null || !cardCodeForPayment)) {
-      // GET /Invoices({DocEntry})
-      const inv = await get(`/Invoices(${invoiceDocEntry})`, cookie);
-      invoiceFolioNum = inv?.FolioNum ?? null;
 
-      if (invoiceFolioNum !== null) {
-        await saveState(orderId, { invoiceFolioNum });
-      }
-      if (!cardCodeForPayment) {
-        cardCodeForPayment = inv?.CardCode || null;
-      }
-    } */
    if (invoiceDocEntry && (needsFolio || needsCard || needsLines)) {
       const inv = await get(`/Invoices(${invoiceDocEntry})`, cookie);
       if (!invoiceObj) invoiceObj = inv;
