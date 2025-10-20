@@ -1,0 +1,22 @@
+{
+  "name": "multivende-oms",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "lint": "echo \"(add eslint if you want)\""
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "kafkajs": "^2.2.4",
+    "mssql": "^10.0.4",
+    "node-cron": "^4.2.1",
+    "pino": "^9.13.1",
+    "pino-http": "^9.0.0",
+    "zod": "^3.25.76"
+  }
+}

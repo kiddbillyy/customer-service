@@ -1,0 +1,268 @@
+// src/controllers/customersController.js
+import { asyncHandler } from '../utils/asyncHandler.js';
+import * as CM from '../models/customersModel.js';
+import * as AM from '../models/addressesModel.js';
+import { searchByName } from '../models/customersModel.js';
+import * as OM from '../models/contactsModel.js';
+import { upsertCustomerCreditIfNeeded,emitCustomerCreditUpsertOnPatch  } from '../services/customerCreditService.js';
+
+import {
+  customerCreateWithAddrs as customerCreate,
+  customerPatch,
+  idRutType,
+  addressesCreate,
+  addressUpsert,
+  contactsCreate,
+  contactUpsert,
+  partnerType
+} from '../utils/validators.js';
+import { z } from 'zod';
+import { createBusinessPartner,upsertBusinessPartner  } from '../integrations/sapB1.js';
+import { createCustomerInRpro } from '../integrations/rpro.js';
+
+/* ===== Customers ===== */
+
+// GET /customers
+export const list = asyncHandler(async (req, res) => {
+  const { q, partnerType: pt, groupCode, listNum, page, pageSize } = req.query;
+  const data = await CM.listCustomers({
+    q: q?.trim(),
+    partnerType: pt ? partnerType.parse(pt) : undefined,
+    groupCode: groupCode != null ? Number(groupCode) : undefined,
+    listNum: listNum != null ? Number(listNum) : undefined,
+    page: page ? Number(page) : 1,
+    pageSize: pageSize ? Math.min(Number(pageSize), 100) : 20
+  });
+  res.json(data);
+});
+
+// GET /customers/:id
+export const getOne = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  const item = await CM.getCustomer(id);
+  if (!item) return res.status(404).json({ error: 'NOT_FOUND' });
+  res.json(item);
+});
+
+// GET /customers/find?q=...
+export const findCustomersByName = asyncHandler(async (req, res) => {
+  const q = String(req.query.q ?? '').trim();
+  if (!q) return res.status(400).json({ error: 'BAD_REQUEST', details: 'query "q" es requerido' });
+
+  const page = Math.max(1, parseInt(req.query.page ?? '1', 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize ?? '20', 10)));
+  const includeDeleted = String(req.query.includeDeleted ?? 'false').toLowerCase() === 'true';
+  const pt = req.query.partnerType ? partnerType.parse(req.query.partnerType) : undefined;
+
+  const result = await searchByName({ name: q, partnerType: pt, page, pageSize, includeDeleted });
+  res.json(result);
+});
+
+// POST /customers  (crea en SQL → guarda direcciones si vienen → integra SAP/RPRO)
+export const create = asyncHandler(async (req, res) => {
+  // 1) valida el customer (sin addresses embebidas)
+  const payload = customerCreate.parse(req.body);
+
+  // 2) si el request trae addresses, valídalas por separado
+  const addresses = req.body.addresses
+    ? addressesCreate.parse(req.body.addresses)
+    : [];
+
+  // 3) crea el cliente en tu BD
+  const created = await CM.createCustomer(payload);
+
+  // 4) si vinieron direcciones, guárdalas (onConflict=replace)
+  if (addresses.length) {
+    const { status, payload: addrResult } = await AM.createMany(
+      created.Id || created.id,
+      addresses,
+      'replace'
+    );
+    if (status >= 400) {
+      return res.status(status).json({ error: 'ADDR_INSERT_FAILED', details: addrResult });
+    }
+  }
+
+  // 5) mapea el registro de SQL a lo que espera SAP/RPRO
+  const customerDTO = {
+    id: created.Id ?? created.id,
+    partnerType: created.PartnerType ?? created.partnerType,
+    rut: created.RUT ?? created.rut,
+    firstName: created.FirstName ?? created.firstName,
+    lastName: created.LastName ?? created.lastName,
+    email: created.Email ?? created.email,
+    phone: created.Phone ?? created.phone,
+    groupCode: created.GroupCode ?? created.groupCode,
+    currency: created.Currency ?? created.currency,
+    groupNum: (created.GroupNum ?? payload.groupNum ?? null),
+    listNum: (created.ListNum ?? payload.listNum ?? null),
+    notes: payload.notes ?? null,
+  };
+
+  // 6) integra con SAP y RPRO usando LAS MISMAS direcciones del request
+  const [sap, rpro] = await Promise.allSettled([
+    createBusinessPartner(customerDTO, addresses),
+    createCustomerInRpro(customerDTO, addresses)
+  ]);
+
+  const integrations = {
+    sapB1: sap.status === 'fulfilled'
+      ? sap.value
+      : { ok: false, error: String(sap.reason?.message || sap.reason) },
+    rpro: rpro.status === 'fulfilled'
+      ? rpro.value
+      : { ok: false, error: String(rpro.reason?.message || rpro.reason) }
+  };
+
+  // 7) Emite evento a customer-credit si corresponde (best-effort)
+  try {
+  await upsertCustomerCreditIfNeeded({ created, payload, req });
+} catch (e) {
+  console.warn('[credit][emit][warn]', e?.message || e);
+}
+  return res.status(201).json({ customer: created, integrations });
+});
+
+// PATCH /customers/:id
+export const patch = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  const payload = customerPatch.parse(req.body);
+
+  // 1) Actualiza en tu BD (usa SP si viene creditLimit, etc.)
+  const updated = await CM.updateCustomer(id, payload);
+  if (!updated) return res.status(404).json({ error: 'NOT_FOUND_OR_DELETED' });
+
+  // 1.1) Si el PATCH convirtió al cliente a CRÉDITO (groupNum >= 0), emite upsert a customer-credit
+  try {
+    if (Object.prototype.hasOwnProperty.call(payload, 'groupNum')) {
+      const gn = updated.GroupNum ?? null;
+      if (typeof gn === 'number' && gn >= 0) {
+        await upsertCustomerCreditIfNeeded({ created: updated, payload, req });
+      }
+    }
+
+    // 1.2) Si el PATCH incluye creditLimit, emite evento customer.credit.upsert (post-SP)
+    if (Object.prototype.hasOwnProperty.call(payload, 'creditLimit')) {
+      await emitCustomerCreditUpsertOnPatch({ id, updated, payload, req });
+    }
+  } catch (e) {
+    console.warn('[credit][patch][warn]', e?.message || e);
+  }
+
+  // 2) Si el PATCH trae campos que mapean a SAP, dispara upsert
+  const camposSAP = [
+    'firstName','lastName','email','phone','currency','notes',
+    'groupCode','groupNum','listNum','defaultBillToCode','defaultShipToCode',
+    'creditLimit'
+  ];
+  const tocaSAP = camposSAP.some(k => Object.prototype.hasOwnProperty.call(payload, k));
+
+  let sapResp = { ok: true, skipped: true };
+  if (tocaSAP) {
+    try {
+      console.log('[SAP BP][UPSERT][TRY]', id, 'fields=', camposSAP.filter(k => k in payload));
+      sapResp = await upsertBusinessPartner(updated);
+      console.log('[SAP BP][UPSERT][DONE]', id, sapResp);
+    } catch (e) {
+      console.error('[SAP BP][UPSERT][EX]', id, e?.message || e);
+      sapResp = { ok: false, error: String(e?.message || e) };
+    }
+  }
+
+  return res.json({ customer: updated, integrations: { sapB1: sapResp } });
+});
+
+// DELETE /customers/:id (soft delete)
+export const remove = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  const ok = await CM.softDeleteCustomer(id);
+  if (!ok) return res.status(404).json({ error: 'NOT_FOUND_OR_ALREADY_DELETED' });
+  res.status(204).end();
+});
+
+/* ===== Direcciones ===== */
+
+// GET /customers/:id/addresses
+export const listAddresses = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  res.json(await AM.listAddresses(id));
+});
+
+// PUT /customers/:id/addresses  (upsert uno)
+export const upsertAddressCtl = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  const body = addressUpsert.parse(req.body);
+  await AM.upsertAddress(id, body);
+  res.status(200).json({ ok: true });
+});
+
+// DELETE /customers/:id/addresses/:addressCode
+export const deleteAddress = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  const code = z.string().min(1).parse(req.params.addressCode);
+  const ok = await AM.removeAddress(id, code);
+  if (!ok) return res.status(404).json({ error: 'ADDRESS_NOT_FOUND' });
+  res.status(204).end();
+});
+
+// POST /customers/:id/addresses?onConflict=error|ignore|replace  (bulk)
+export const postAddresses = asyncHandler(async (req, res) => {
+  const customerId = idRutType.parse(req.params.id);
+  const sample = JSON.stringify(req.body);
+  console.log(
+    '[POST /addresses] id=',
+    customerId,
+    'body=',
+    sample?.length > 1000 ? sample.slice(0, 1000) + '…' : sample
+  );
+
+  const onConflict = String(req.query.onConflict || 'error').toLowerCase(); // error|ignore|replace
+  const items = addressesCreate.parse(req.body);
+
+  const { status, payload } = await AM.createMany(customerId, items, onConflict);
+  if (status >= 400) console.error('[addresses.createMany][FAIL]', { status, payload });
+  return res.status(status).json(payload);
+});
+
+/* ===== Contactos ===== */
+
+// GET /customers/:id/contacts
+export const listContacts = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  res.json(await OM.listContacts(id));
+});
+
+// PUT /customers/:id/contacts  (upsert uno)
+export const upsertContactCtl = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  const body = contactUpsert.parse(req.body);
+  const code = await OM.upsertContact(id, body);
+  res.status(200).json({ ok: true, contactCode: code });
+});
+
+// POST /customers/:id/contacts?onConflict=error|ignore|replace  (bulk)
+export const postContacts = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  const onConflict = String(req.query.onConflict || 'error').toLowerCase();
+  const items = contactsCreate.parse(req.body);
+  const { status, payload } = await OM.createMany(id, items, onConflict);
+  res.status(status).json(payload);
+});
+
+// DELETE /customers/:id/contacts/:contactCode
+export const deleteContact = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  const code = z.string().min(1).max(50).parse(req.params.contactCode); // ← string (no Number)
+  const ok = await OM.removeContact(id, code);
+  if (!ok) return res.status(404).json({ error: 'CONTACT_NOT_FOUND' });
+  res.status(204).end();
+});
+
+// GET /customers/:id/contacts/:contactCode
+export const getContactByCode = asyncHandler(async (req, res) => {
+  const id = idRutType.parse(req.params.id);
+  const contactCode = z.string().min(1).max(50).parse(req.params.contactCode);
+  const contact = await OM.getContactByCode(id, contactCode);
+  if (!contact) return res.status(404).json({ error: 'CONTACT_NOT_FOUND' });
+  res.json(contact);
+});

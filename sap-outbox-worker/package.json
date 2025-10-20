@@ -1,0 +1,13 @@
+{
+  "name": "sap-outbox-worker",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": { "start": "node src/index.js" },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "kafkajs": "^2.2.4",
+    "mssql": "^10.0.2",
+    "pino": "^9.0.0"
+  }
+}
