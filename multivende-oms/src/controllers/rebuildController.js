@@ -1,7 +1,8 @@
 // src/controllers/rebuildController.js
 import { getCheckout } from '../services/multivendeApi.js';
-import { toOmsFormat } from '../services/transform.js';
+import { toOmsFormat, toFinanceFormat } from '../services/transform.js';
 import { postToOms } from '../services/oms.js';
+import { postFinancePayment } from '../services/finance.js';
 import {
   findById,
   findByURef1,

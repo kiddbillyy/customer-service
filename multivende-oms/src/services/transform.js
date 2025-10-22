@@ -20,13 +20,14 @@ export function toOmsFormat(mvOrder) {
   const baseItems = (mvOrder?.CheckoutItems || []).map((it, idx) => {
     const pv  = it?.ProductVersion || {};
     const prd = pv?.Product || {};
+    const quantity = it?.count || 1; // 👉 define primero
     return {
       itemIndex: idx,
       uniqueId: it?._id || '',
       itemcode: pv?.code || prd?.code || '',
       dscription: prd?.name || '',
-      quantity: it?.count || 1,
-      priceAfterVAT: it?.gross ?? it?.total ?? 0,
+      quantity: quantity,
+      priceAfterVAT: (it?.totalWithDiscount || 0) / quantity,
       codebars: prd?.code || '',
       imageUrl: '',
       whscode: "03",
@@ -68,7 +69,7 @@ export function toOmsFormat(mvOrder) {
     salesChannelReferenceId:canalVenta,
     u_ref1: mvOrder?.CheckoutLinks?.[0]?.externalOrderNumber || mvOrder?.code,
     orderStatusCode: 'Pedido Nuevo',
-    doctotalsy: mvOrder?.CheckoutLinks?.externalContent?.total_amount_with_shipping || 0,
+    doctotalsy: mvOrder?.CheckoutLinks?.externalContent?.total_amount_with_shipping || mvOrder?.totalPayment,
     valuesInCents: false,
     deliveryDate:
       mvOrder?.DeliveryOrderInCheckouts?.[0]?.DeliveryOrder?.promisedDeliveryDate ||
@@ -84,7 +85,7 @@ export function toOmsFormat(mvOrder) {
     fulfillment: {
       firstName: client?.name || addr?.name || '',
       lastName: client?.lastName || '',
-      email: client?.email || '',
+      email: client?.email || 'noreply@noreply.cl',
       phone: client?.phoneNumber || '',
       isCorporate,
       currencyCode: mvOrder?.Currency?.PlatformCurrency?.code || 'CLP',
@@ -109,13 +110,11 @@ export function toOmsFormat(mvOrder) {
 }
 
 export function toFinanceFormat(mvOrder, { u_ref1 }) {
-  const pay = mvOrder?.CheckoutPayments?.[0];
-  const authCode = pay?.authorizationCode || pay?.code || '';
+  const pay =mvOrder?.CheckoutLinks?.externalContent?.total_amount_with_shipping || mvOrder?.totalPayment;
+  const authCode = '1111';
   const installments = Number(pay?.installments || 0);
-  const paymentSystem = (pay?.PaymentMethod?.codeTranslated || '')
-    .toUpperCase()
-    .replace(/\s+/g, '_') || 'UNKNOWN';
-  const last4 = pay?.cardNumber || pay?.last4 || '';
+  const paymentSystem =  mvOrder?.CheckoutPayments[0]?.PaymentMethod?.codeTranslated || 'Other';
+  const last4 = '1111';
 
   return {
     orderId: u_ref1 || mvOrder?.code || mvOrder?.CheckoutLinks?.[0]?.externalOrderNumber,
@@ -124,11 +123,11 @@ export function toFinanceFormat(mvOrder, { u_ref1 }) {
       acquirer: 'Transbank',
       message: pay?.paymentStatus === 'completed' ? 'Aprobado' : (pay?.paymentStatus || 'Desconocido'),
       installments,
-      tid: authCode ? `TBK-${authCode}` : '',
+      tid: '1111',
       last4: String(last4),
-      valueCents: Math.round(Number(mvOrder?.gross ?? mvOrder?.total ?? 0)) * 1,
+      valueCents: Math.round(pay) * 1,
       paymentSystem,
-      paymentSystemName: pay?.PaymentMethod?.codeTranslated || 'N/A',
+      paymentSystemName: mvOrder?.CheckoutPayments[0]?.PaymentMethod?.codeTranslated  || 'OTHER'
     }
   };
 }

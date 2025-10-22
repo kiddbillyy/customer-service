@@ -59,8 +59,9 @@ export function toFinancePayload(mvOrder, { orderIdForFinance }) {
       tid:'1111',
       last4:'1111',
       valueCents:pay,
-      paymentSystem:     pay.paymentSystem     || pay.method || 'OTHER',
-      paymentSystemName: pay.paymentSystemName || pay.methodName || pay.method || 'Other'
+      paymentSystem:     mvOrder?.CheckoutPayments[0]?.PaymentMethod?.codeTranslated  || 'OTHER',
+      paymentSystemName: mvOrder?.CheckoutPayments[0]?.PaymentMethod?.codeTranslated  || 'OTHER'
     }
   };
 }
+

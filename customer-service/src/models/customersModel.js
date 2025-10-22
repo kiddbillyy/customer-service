@@ -13,6 +13,40 @@ function add(req, name, type, value) {
   if (value !== undefined) req.input(name, type, value);
 }
 
+async function getCustomerByRut(rut) {
+  if (!rut) return null;
+  const pool = await getPool();
+  const { recordset } = await pool.request()
+    .input('rut', sql.VarChar(20), rut)
+    .query(`${BASE_SELECT} AND c.RUT = @rut;`);
+  return recordset[0] || null;
+}
+
+function applyRequestInputsFromPayload(req, payload) {
+  // Reutiliza exactamente los mismos tipos/nombres que ya usas en INSERT
+  return req
+    .input('PartnerType',         sql.Char(1),        payload.partnerType)
+    .input('RUT',                 sql.VarChar(20),    payload.rut)
+    .input('FirstName',           sql.NVarChar(100),  payload.firstName)
+    .input('LastName',            sql.NVarChar(100),  payload.lastName)
+    .input('Email',               sql.NVarChar(255),  payload.email)
+    .input('Notes',               sql.NVarChar(254),  payload.notes ?? null)
+    .input('Phone',               sql.NVarChar(40),   payload.phone ?? null)
+    .input('Address',             sql.NVarChar(255),  payload.address ?? null)
+    .input('City',                sql.NVarChar(100),  payload.city ?? null)
+    .input('Region',              sql.NVarChar(100),  payload.region ?? null)
+    .input('Country',             sql.NVarChar(100),  payload.country ?? 'CL')
+    .input('GroupCode',           sql.Int,            payload.groupCode ?? null)
+    .input('GroupNum',            sql.Int,            payload.groupNum ?? null)
+    .input('ListNum',             sql.Int,            payload.listNum ?? null)
+    .input('Currency',            sql.NVarChar(3),    payload.currency ?? 'CLP')
+    .input('CreditLimit',         sql.Decimal(18,2),  payload.creditLimit ?? null)
+    .input('DiscountPercent',     sql.Decimal(9,2),   payload.discountPercent ?? null)
+    .input('DefaultBillToCode',   sql.NVarChar(50),   payload.defaultBillToCode ?? null)
+    .input('DefaultShipToCode',   sql.NVarChar(50),   payload.defaultShipToCode ?? null)
+    .input('DefaultContactCode',  sql.Int,            payload.defaultContactCode ?? null);
+}
+
 /** Caller del SP: dbo.UpsertCustomerAndEnqueueCredit */
 export async function upsertCustomerAndEnqueueCredit_SP({
   customerId = null,           // opcional, tu SP lo ignora para la PK
@@ -89,31 +123,17 @@ export async function getCustomer(id) {
 export async function createCustomer(payload) {
   const pool = await getPool();
   const now = new Date();
-  await pool.request()
-    .input('Id', sql.VarChar(64), payload.id)
-    .input('PartnerType', sql.Char(1), payload.partnerType)
-    .input('RUT', sql.VarChar(20), payload.rut)
-    .input('FirstName', sql.NVarChar(100), payload.firstName)
-    .input('LastName', sql.NVarChar(100), payload.lastName)
-    .input('Email', sql.NVarChar(255), payload.email)
-    .input('Notes', sql.NVarChar(254), payload.notes ?? null)
-    .input('Phone', sql.NVarChar(40), payload.phone ?? null)
-    .input('Address', sql.NVarChar(255), payload.address ?? null)
-    .input('City', sql.NVarChar(100), payload.city ?? null)
-    .input('Region', sql.NVarChar(100), payload.region ?? null)
-    .input('Country', sql.NVarChar(100), payload.country ?? 'CL')
-    .input('GroupCode', sql.Int, payload.groupCode ?? null)
-    .input('GroupNum', sql.Int, payload.groupNum ?? null)
-    .input('ListNum', sql.Int, payload.listNum ?? null)
-    .input('Currency', sql.NVarChar(3), payload.currency ?? 'CLP')
-    .input('CreditLimit', sql.Decimal(18,2), payload.creditLimit ?? null)
-    .input('DiscountPercent', sql.Decimal(9,2), payload.discountPercent ?? null)
-    .input('DefaultBillToCode', sql.NVarChar(50), payload.defaultBillToCode ?? null)
-    .input('DefaultShipToCode', sql.NVarChar(50), payload.defaultShipToCode ?? null)
-    .input('DefaultContactCode', sql.Int, payload.defaultContactCode ?? null)
-    .input('CreatedAt', sql.DateTime2(3), now)
-    .input('UpdatedAt', sql.DateTime2(3), now)
-    .query(`
+
+  try {
+    // 1) INSERT normal
+    const reqIns = pool.request()
+      .input('Id', sql.VarChar(64), payload.id)
+      .input('CreatedAt', sql.DateTime2(3), now)
+      .input('UpdatedAt', sql.DateTime2(3), now);
+
+    applyRequestInputsFromPayload(reqIns, payload);
+
+    await reqIns.query(`
       INSERT INTO dbo.Customers
       (Id, PartnerType, RUT, FirstName, LastName, Email, Notes, Phone, Address, City, Region, Country,
        GroupCode, GroupNum, ListNum, Currency, CreditLimit, DiscountPercent,
@@ -124,7 +144,94 @@ export async function createCustomer(payload) {
        @DefaultBillToCode,@DefaultShipToCode,@DefaultContactCode,@CreatedAt,@UpdatedAt, 1);
     `);
 
-  return await getCustomer(payload.id);
+    return await getCustomer(payload.id);
+
+  } catch (e) {
+    const number = e?.number || e?.originalError?.info?.number;
+    const isDup = number === 2627 || number === 2601;
+    if (!isDup) throw e;
+
+    // 2) Duplicado → resolver idempotente
+    const existingById = await getCustomer(payload.id);
+    if (existingById) {
+      const r = pool.request()
+        .input('Id', sql.VarChar(64), payload.id)
+        .input('UpdatedAt', sql.DateTime2(3), new Date());
+      applyRequestInputsFromPayload(r, payload);
+
+      await r.query(`
+        UPDATE dbo.Customers
+        SET
+          PartnerType       = COALESCE(@PartnerType, PartnerType),
+          RUT               = COALESCE(@RUT, RUT),
+          FirstName         = COALESCE(@FirstName, FirstName),
+          LastName          = COALESCE(@LastName, LastName),
+          Email             = COALESCE(@Email, Email),
+          Notes             = COALESCE(@Notes, Notes),
+          Phone             = COALESCE(@Phone, Phone),
+          Address           = COALESCE(@Address, Address),
+          City              = COALESCE(@City, City),
+          Region            = COALESCE(@Region, Region),
+          Country           = COALESCE(@Country, Country),
+          GroupCode         = COALESCE(@GroupCode, GroupCode),
+          GroupNum          = COALESCE(@GroupNum, GroupNum),
+          ListNum           = COALESCE(@ListNum, ListNum),
+          Currency          = COALESCE(@Currency, Currency),
+          CreditLimit       = COALESCE(@CreditLimit, CreditLimit),
+          DiscountPercent   = COALESCE(@DiscountPercent, DiscountPercent),
+          DefaultBillToCode = COALESCE(@DefaultBillToCode, DefaultBillToCode),
+          DefaultShipToCode = COALESCE(@DefaultShipToCode, DefaultShipToCode),
+          DefaultContactCode= COALESCE(@DefaultContactCode, DefaultContactCode),
+          IsActive          = 1,
+          UpdatedAt         = @UpdatedAt
+        WHERE Id=@Id AND DeletedAt IS NULL;
+      `);
+
+      return await getCustomer(payload.id);
+    }
+
+    // Duplicado por RUT
+    const existingByRut = await getCustomerByRut(payload.rut);
+    if (existingByRut) {
+      const r = pool.request()
+        .input('Id', sql.VarChar(64), existingByRut.Id)
+        .input('UpdatedAt', sql.DateTime2(3), new Date());
+      applyRequestInputsFromPayload(r, payload);
+
+      await r.query(`
+        UPDATE dbo.Customers
+        SET
+          PartnerType       = COALESCE(@PartnerType, PartnerType),
+          RUT               = COALESCE(@RUT, RUT),
+          FirstName         = COALESCE(@FirstName, FirstName),
+          LastName          = COALESCE(@LastName, LastName),
+          Email             = COALESCE(@Email, Email),
+          Notes             = COALESCE(@Notes, Notes),
+          Phone             = COALESCE(@Phone, Phone),
+          Address           = COALESCE(@Address, Address),
+          City              = COALESCE(@City, City),
+          Region            = COALESCE(@Region, Region),
+          Country           = COALESCE(@Country, Country),
+          GroupCode         = COALESCE(@GroupCode, GroupCode),
+          GroupNum          = COALESCE(@GroupNum, GroupNum),
+          ListNum           = COALESCE(@ListNum, ListNum),
+          Currency          = COALESCE(@Currency, Currency),
+          CreditLimit       = COALESCE(@CreditLimit, CreditLimit),
+          DiscountPercent   = COALESCE(@DiscountPercent, DiscountPercent),
+          DefaultBillToCode = COALESCE(@DefaultBillToCode, DefaultBillToCode),
+          DefaultShipToCode = COALESCE(@DefaultShipToCode, DefaultShipToCode),
+          DefaultContactCode= COALESCE(@DefaultContactCode, DefaultContactCode),
+          IsActive          = 1,
+          UpdatedAt         = @UpdatedAt
+        WHERE Id=@Id AND DeletedAt IS NULL;
+      `);
+
+      return await getCustomer(existingByRut.Id);
+    }
+
+    // No pudimos resolver el duplicado
+    throw e;
+  }
 }
 
 /** UPDATE parcial:
