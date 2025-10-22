@@ -16,7 +16,9 @@ import { toOmsFormat } from '../services/transform.js';
 import { postToOms } from '../services/oms.js';
 import { getCheckout } from '../services/multivendeApi.js';
 
-import { postPayment, toFinancePayload } from '../services/finance.js';
+//import { postPayment, toFinancePayload } from '../services/finance.js';
+import { postFinancePayment } from '../services/finance.js';
+
 
 import { toFinanceFormat } from '../services/transform.js';
 import { setPaymentSent, setPaymentError } from '../models/repository.js';
@@ -128,10 +130,10 @@ async function webhookHandler(req, res) {
 
         try {
           const finOrderId = uRef1 || CheckoutId || String(omsId);
-          const finPayload = toFinancePayload(mvOrder, { orderIdForFinance: finOrderId });
+         const finPayload = toFinanceFormat(mvOrder, { orderIdForFinance: payload.u_ref1 });
 
           console.log('[OMS → FINANCE] Payload:', JSON.stringify(finPayload, null, 2));
-          const finResp = await postPayment(finPayload);
+          const finResp = await postFinancePayment(finPayload);
 
           console.log('[OK] Pago registrado en Finance:', finResp);
           await setPaymentSent(orderId); // ✅ marca como enviado

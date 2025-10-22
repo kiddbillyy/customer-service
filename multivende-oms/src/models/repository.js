@@ -288,3 +288,16 @@ export async function setPaymentError(orderId, msg) {
        WHERE id = @orderId;
     `);
 }
+
+export async function saveFinancePayload(orderId, payload) {
+  const pool = await getPool();
+  await pool.request()
+    .input('orderId', sql.UniqueIdentifier, orderId)
+    .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))
+    .query(`
+      UPDATE dbo.Orders
+         SET financePayload = @payload,
+             modifiedAt = SYSDATETIME()
+       WHERE id = @orderId;
+    `);
+}

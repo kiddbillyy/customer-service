@@ -10,7 +10,7 @@ export function toOmsFormat(mvOrder) {
   const canalVenta = vendedor === 'mercadolibre' ? 'MER-002' : vendedor === 'fcom' ? 'FAL-001' : null;
   // 🚚 Total de envíos desde externalContent.shipmentPayments (si existe)
   const shipmentPayments =
-    mvOrder?.CheckoutLinks?.[0]?.externalContent?.shipmentPayments;
+    mvOrder?.CheckoutLinks[0]?.externalContent?.shipmentPayments;
 
   const shippingAmount = Array.isArray(shipmentPayments)
     ? shipmentPayments.reduce((acc, sp) => acc + Number(sp?.amount || 0), 0)
@@ -46,7 +46,7 @@ export function toOmsFormat(mvOrder) {
   if (shippingAmount > 0) {
     baseItems.push({
       itemIndex: baseItems.length,
-      uniqueId: `SHIP-${mvOrder?.code || mvOrder?._id || Date.now()}`,
+      uniqueId: `SHIP-${mvOrder?.CheckoutLinks[0]?.externalOrderNumber ||  Date.now()}`,
       itemcode: "701001008",
       dscription: "Flete",
       quantity: 1,
@@ -67,7 +67,7 @@ export function toOmsFormat(mvOrder) {
 
   return {
     salesChannelReferenceId:canalVenta,
-    u_ref1: mvOrder?.CheckoutLinks?.[0]?.externalOrderNumber || mvOrder?.code,
+    u_ref1: mvOrder?.CheckoutLinks[0]?.externalOrderNumber || mvOrder?.CheckoutLinks[0]?.externalId,
     orderStatusCode: 'Pedido Nuevo',
     doctotalsy: mvOrder?.CheckoutLinks?.externalContent?.total_amount_with_shipping || mvOrder?.totalPayment,
     valuesInCents: false,
@@ -110,15 +110,15 @@ export function toOmsFormat(mvOrder) {
 }
 
 export function toFinanceFormat(mvOrder, { u_ref1 }) {
-  const pay =mvOrder?.CheckoutLinks?.externalContent?.total_amount_with_shipping || mvOrder?.totalPayment;
+  const pay =mvOrder?.CheckoutLinks[0]?.externalContent?.total_amount_with_shipping || mvOrder?.totalPayment;
   const authCode = '1111';
   const installments = Number(pay?.installments || 0);
   const paymentSystem =  mvOrder?.CheckoutPayments[0]?.PaymentMethod?.codeTranslated || 'Other';
   const last4 = '1111';
 
   return {
-    orderId: u_ref1 || mvOrder?.code || mvOrder?.CheckoutLinks?.[0]?.externalOrderNumber,
-    idempotencyKey: `pay-${u_ref1 || mvOrder?.code}-01`,
+    orderId: mvOrder?.CheckoutLinks[0]?.externalOrderNumber,
+    idempotencyKey: `pay-${mvOrder?.CheckoutLinks[0]?.externalOrderNumber}-01`,
     payments: {
       acquirer: 'Transbank',
       message: pay?.paymentStatus === 'completed' ? 'Aprobado' : (pay?.paymentStatus || 'Desconocido'),

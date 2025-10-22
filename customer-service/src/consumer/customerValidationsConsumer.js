@@ -49,7 +49,7 @@ export async function startCustomerValidationsConsumer() {
 
         // 1) Normaliza/valida y deriva id
         const payload = customerCreateLoose.parse({
-          partnerType: f.IsCorporate ? 'P' : 'C',
+          partnerType: 'C',
           rut: String(f.Document || ''),
           firstName: f.FirstName || '',
           lastName : f.LastName  || '',
