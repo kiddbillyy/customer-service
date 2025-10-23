@@ -53,7 +53,7 @@ const customerBase = z.object({
   partnerType,                // 'C' | 'P' (normalizado)
   rut: rutWithDV,             // ej: 33333333-3  ← se guarda ASÍ
   firstName: z.string().min(1).max(100),
-  lastName: z.string().min(1).max(100),
+  lastName: z.string().max(100).optional().nullable(),
   email: z.string().email().max(255),
   phone: z.string().max(40).optional().nullable(),
   address: z.string().max(255).optional().nullable(),

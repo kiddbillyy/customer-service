@@ -102,7 +102,11 @@ export function toOmsFormat(mvOrder) {
       country: addr?.country || 'CL',
       postalCode: addr?.zipCode || '',
       referenceAddress: addr?.description || '',
-      notes: mvOrder?.comment || ''
+      notes: mvOrder?.comment || '' ,
+      giro:mvOrder?.CheckoutLinks[0]?.externalContent?.remote_order_billing_information?.buyer?.billing_info?.taxes?.economic_activity || 'PARTICULAR',
+      cardname:client?.fullName 
+      //falta giro
+
     },
 
     items: baseItems,
