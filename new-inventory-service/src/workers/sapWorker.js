@@ -156,8 +156,9 @@ function buildOPDN(header, lines) { // EP → PurchaseDeliveryNotes (GRPO)
   const docDate = (meta.DocDate || header.postingDate)
     ? new Date(meta.DocDate || header.postingDate).toISOString().slice(0,10)
     : new Date().toISOString().slice(0,10);
-
+  console.log(meta)
   return clean({
+    
     DocDate: docDate,
     DocDueDate: meta.DocDueDate || docDate,
     Comments: header.reference || null,

@@ -7,35 +7,40 @@ const BATCH = Number(process.env.SAP_MOV_POLL_BATCH || 500);
 
 // --- mapeo de tipos desde SAP ---
 function mapSapMovimientoToType(m) {
-  const v = String(m || '').trim().toLowerCase();
+  const v = String(m || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (v === 'tt') return 'TT';                               // 👈 detectar TT “puro”
+  if (v.includes('tt') && v.includes('salida'))  return 'SM'; // legacy
+  if (v.includes('tt') && v.includes('entrada')) return 'EM'; // legacy
+
   if (v.startsWith('entrad') || v === 'em' || v === 'ingreso') return 'EM';
   if (v.startsWith('salid')  || v === 'sm' || v === 'egreso')  return 'SM';
-  if (v.includes('transfer')) return 'TT';
+  if (v.includes('transfer')) return 'TT'; // por si llega “Transferencia”
   if (v.startsWith('reser'))  return 'FR';
   if (v === 'noventa' || v.includes('liber')) return 'NV';
   if (v === 'ep') return 'EP';
   if (v === 'poadd') return 'POADD';
   if (v === 'porem') return 'POREM';
-  return null; // no soportado
+  return null;
 }
 
 function buildSpArgsFromRow(row) {
   const type = mapSapMovimientoToType(row.Movimiento);
   if (!type) return null;
 
+  // Alias seguros (por si en la tabla es FromWhsCod)
+  const fromWhRaw = row.FromWhsCode ?? row.FromWhsCod ?? row.WhsCodeFrom ?? null;
+  const toWhRaw   = row.WhsCode ?? row.WhsCodeTo ?? row.WhsTo ?? null;
+
   let fromWh = null, toWh = null;
   switch (type) {
-    case 'SM': fromWh = row.WhsCode; break;
-    case 'EM': toWh   = row.WhsCode; break;
-    case 'TT':
-      fromWh = row.FromWhsCode || row.WhsCodeFrom || row.WhsCode;
-      toWh   = row.ToWhsCode   || row.WhsCodeTo;
-      break;
-    case 'FR': fromWh = row.WhsCode; break;
-    case 'NV': fromWh = row.WhsCode; break;
-    case 'EP': toWh   = row.WhsCode; break;
-    case 'POADD': toWh = row.WhsCode; break;
-    case 'POREM': toWh = row.WhsCode; break;
+    case 'SM': fromWh = toWhRaw; break;                  // SM usa from = WhsCode
+    case 'EM': toWh   = toWhRaw; break;                  // EM usa to = WhsCode
+    case 'TT': fromWh = fromWhRaw; toWh = toWhRaw; break; // 👈 TT: origen+destino en una sola fila
+    case 'FR': fromWh = toWhRaw; break;
+    case 'NV': fromWh = toWhRaw; break;
+    case 'EP': toWh   = toWhRaw; break;
+    case 'POADD': toWh = toWhRaw; break;
+    case 'POREM': toWh = toWhRaw; break;
   }
 
   const reference = `SAP:${row.ObjectType || ''}/${row.DocEntry || ''}#${row.ID}`;
@@ -62,6 +67,19 @@ function buildSpArgsFromRow(row) {
 }
 
 async function applyMovementViaSP(localPool, args) {
+
+  // 🔍 Log especial para TT (te ayuda a ver si viene bien from/to)
+  if (args.type === 'TT') {
+    console.log('[TT] Ejecutando apply_movement', {
+      itemSku: args.itemSku,
+      fromWhCode: args.fromWhCode,
+      toWhCode: args.toWhCode,
+      quantity: args.quantity,
+      reference: args.reference
+    });
+  }
+
+  // 🚀 Ejecutar SP
   const r = await localPool.request()
     .input('type',       sql.NVarChar(20),  args.type)
     .input('itemSku',    sql.NVarChar(100), args.itemSku)
@@ -71,8 +89,17 @@ async function applyMovementViaSP(localPool, args) {
     .input('reference',  sql.NVarChar(200), args.reference)
     .input('metaJson',   sql.NVarChar(sql.MAX), args.metaJson)
     .execute('dbo.apply_movement'); // SP devuelve movementId, type
-  return r.recordset?.[0];
+
+  const result = r.recordset?.[0];
+
+  // ✅ Log de éxito TT para ver qué guardó el SP
+  if (args.type === 'TT') {
+    console.log('[TT] Resultado apply_movement', result);
+  }
+
+  return result;
 }
+
 
 async function ensureCursorRow(localPool) {
   const sourceDb = process.env.SAP_COMPANY_DB || 'COMERCIAL_CIERRE_TEST';
