@@ -235,3 +235,7 @@ export async function stopCustomerValidationsConsumer() {
   _consumerConnected = false;
   _running = false;
 }
+
+
+
+
