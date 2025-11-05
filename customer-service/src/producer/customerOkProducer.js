@@ -61,3 +61,4 @@ export async function stopCustomerOkProducer() {
   try { await producer.disconnect(); } catch {}
   _connected = false;
 }
+
