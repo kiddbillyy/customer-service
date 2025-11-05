@@ -3,8 +3,9 @@ import { getPool, sql } from '../config/db.js';
 import { upsertBusinessPartner } from '../integrations/sapB1.js'; // 🔄 sync SAP tras PATCH
 
 const BASE_SELECT = `
-SELECT c.*
+SELECT c.*,g.groupname
 FROM dbo.Customers c WITH (NOLOCK)
+left join CustomerGroups g on c.groupcode=g.groupcode
 WHERE c.DeletedAt IS NULL
 `;
 
